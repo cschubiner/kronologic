@@ -301,6 +301,7 @@ export function buildCNF(config){
       }
     }
     
+    // Lovers never meet
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
         for (let c1=0; c1<C.length; c1++){
@@ -311,6 +312,29 @@ export function buildCNF(config){
         }
       }
     }
+    
+    // Non-lovers must share a room with someone at least once
+    for (let ci=0; ci<C.length; ci++){
+      const atLeastOnceWithOthers = [];
+      for (let t=0; t<T; t++){
+        for (let ri=0; ri<R.length; ri++){
+          for (let cj=0; cj<C.length; cj++){
+            if (ci===cj) continue;
+            // Create variable: both ci and cj in room ri at time t
+            const withOther = vp.get(`loverNonAlone_${ci}_${t}_${ri}_${cj}`);
+            // withOther ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
+            clauses.push([-withOther, X(ci,t,ri)]);
+            clauses.push([-withOther, X(cj,t,ri)]);
+            clauses.push([-X(ci,t,ri), -X(cj,t,ri), withOther]);
+            atLeastOnceWithOthers.push(withOther);
+          }
+        }
+      }
+      // If NOT a lover, must have at least one "with others" moment
+      // (L1[ci] ∨ L2[ci]) ∨ (at least one withOther is true)
+      clauses.push([L1[ci], L2[ci], ...atLeastOnceWithOthers]);
+    }
+    
     privKeys.L1 = L1;
     privKeys.L2 = L2;
   }
@@ -438,6 +462,7 @@ export function buildCNF(config){
     clauses.push(...exactlyOne(A2));
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
 
+    // Bombers are the ONLY pair ever alone together
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
         for (let ci=0; ci<C.length; ci++){
@@ -475,6 +500,29 @@ export function buildCNF(config){
         }
       }
     }
+    
+    // Non-bombers must share a room with someone at least once
+    for (let ci=0; ci<C.length; ci++){
+      const atLeastOnceWithOthers = [];
+      for (let t=0; t<T; t++){
+        for (let ri=0; ri<R.length; ri++){
+          for (let cj=0; cj<C.length; cj++){
+            if (ci===cj) continue;
+            // Create variable: both ci and cj in room ri at time t
+            const withOther = vp.get(`bomberNonAlone_${ci}_${t}_${ri}_${cj}`);
+            // withOther ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
+            clauses.push([-withOther, X(ci,t,ri)]);
+            clauses.push([-withOther, X(cj,t,ri)]);
+            clauses.push([-X(ci,t,ri), -X(cj,t,ri), withOther]);
+            atLeastOnceWithOthers.push(withOther);
+          }
+        }
+      }
+      // If NOT a bomber, must have at least one "with others" moment
+      // (A1[ci] ∨ A2[ci]) ∨ (at least one withOther is true)
+      clauses.push([A1[ci], A2[ci], ...atLeastOnceWithOthers]);
+    }
+    
     privKeys.A1 = A1;
     privKeys.A2 = A2;
   }
