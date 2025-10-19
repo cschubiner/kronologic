@@ -21,7 +21,8 @@
   .pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #253244; color:#d8e6f6; background:#0e141b; }
   button.primary { background:var(--accent); color:#001122; border:none; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
   button.ghost { background:#0e141b; color:var(--fg); border:1px solid #253244; padding:8px 10px; border-radius:10px; cursor:pointer; }
-  table { width:100%; border-collapse:collapse; }
+  table { width:100%; border-collapse:collapse; white-space:nowrap; }
+  .table-scroll { overflow-x:auto; max-width:100%; }
   th, td { border-bottom:1px solid #223146; padding:6px 8px; text-align:left; }
   th { color:#cfe6ff; font-weight:600; font-size:12px; }
   .muted { color:var(--muted); }
@@ -605,7 +606,7 @@ function solveAndDecode(cfg){
 function qs(id){ return document.getElementById(id); }
 function renderTable(container, obj, headerLeft){
   const el = typeof container==="string"? qs(container) : container;
-  let html = "<table><thead><tr>";
+  let html = "<div class='table-scroll'><table><thead><tr>";
   if (headerLeft) html += `<th>${headerLeft}</th>`;
   const keys = Object.keys(obj);
   const isArrayRows = Array.isArray(obj[keys[0]]);
@@ -628,7 +629,7 @@ function renderTable(container, obj, headerLeft){
       html += `</tr>`;
     }
   }
-  html += "</tbody></table>";
+  html += "</tbody></table></div>";
   el.innerHTML = html;
 }
 
