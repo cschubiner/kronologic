@@ -138,7 +138,10 @@
   </section>
 
   <section class="card">
-    <h2>Results</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h2 style="margin:0;">Results</h2>
+      <button class="ghost" id="toggleResultsBtn" style="display:none;">▼ Collapse</button>
+    </div>
     <div id="resultsHint" class="hint tiny">No results yet.</div>
     <div id="results" style="display:none">
       <div class="grid">
@@ -1148,6 +1151,7 @@ qs("genBtn").addEventListener("click", async ()=>{
     // Display selected solution
     qs("resultsHint").style.display = "none";
     qs("results").style.display = "block";
+    qs("toggleResultsBtn").style.display = "inline-block";
     renderTable("schedule", res.schedule, "Character");
     renderTable("byTime", res.byTime, "Time");
     renderTable("visits", res.visits, "Character");
@@ -1310,6 +1314,19 @@ function setupQuestionInterface(res, cfg){
   // Default to Location + Time
   qs("askLocTimeBtn").click();
 }
+
+// Toggle results collapse/expand
+qs("toggleResultsBtn").addEventListener("click", ()=>{
+  const resultsDiv = qs("results");
+  const btn = qs("toggleResultsBtn");
+  if (resultsDiv.style.display === "none") {
+    resultsDiv.style.display = "block";
+    btn.textContent = "▼ Collapse";
+  } else {
+    resultsDiv.style.display = "none";
+    btn.textContent = "▶ Expand";
+  }
+});
 </script>
 </body>
 </html>
