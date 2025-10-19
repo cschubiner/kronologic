@@ -80,7 +80,6 @@ Players must deduce the secret scenario by combining:
 - Two characters are the bombers
 - **Critical**: The bombers are the ONLY pair who are ever alone together (exactly 2 people in a room) at ANY time
 - Other characters can be in groups of 1, 3, 4, 5, 6... but never exactly 2 (except the bombers)
-- **All non-bombers must share a room with at least one other person at some point** (they cannot be completely isolated)
 
 **Goal**: Identify the two bombers.
 

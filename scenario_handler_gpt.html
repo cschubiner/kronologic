@@ -114,7 +114,7 @@
       <label><input type="checkbox" id="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>; non-bombers must have company at least once)</label>
+      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
     </div>
     <div class="row">
       <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; non-lovers must have company at least once; if S2 enabled, phantom must NOT be a lover)</label>
@@ -235,7 +235,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom), S4 (Bomb Duo + non-isolation), S5 (Lovers + non-isolation), S2+S5 (phantom NOT a lover).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S4 (Bomb Duo), S5 (Lovers + non-isolation), S2+S5 (phantom NOT a lover).</div>
 
 <script>
 /* ===========================
@@ -793,28 +793,6 @@ function buildCNF(config){
           }
         }
       }
-    }
-    
-    // Non-bombers must share a room with someone at least once
-    for (let ci=0; ci<C.length; ci++){
-      const atLeastOnceWithOthers = [];
-      for (let t=0; t<T; t++){
-        for (let ri=0; ri<R.length; ri++){
-          for (let cj=0; cj<C.length; cj++){
-            if (ci===cj) continue;
-            // Create variable: both ci and cj in room ri at time t
-            const withOther = vp.get(`bomberNonAlone_${ci}_${t}_${ri}_${cj}`);
-            // withOther ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
-            clauses.push([-withOther, X(ci,t,ri)]);
-            clauses.push([-withOther, X(cj,t,ri)]);
-            clauses.push([-X(ci,t,ri), -X(cj,t,ri), withOther]);
-            atLeastOnceWithOthers.push(withOther);
-          }
-        }
-      }
-      // If NOT a bomber, must have at least one "with others" moment
-      // (A1[ci] ∨ A2[ci]) ∨ (at least one withOther is true)
-      clauses.push([A1[ci], A2[ci], ...atLeastOnceWithOthers]);
     }
   }
 

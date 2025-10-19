@@ -209,42 +209,6 @@ describe('S2: Phantom Scenario', () => {
 })
 
 describe('S4: Bomb Duo Scenario', () => {
-  it('should have non-bombers share rooms with others', () => {
-    const cfg = {
-      rooms: ['A', 'B', 'C', 'D'],
-      edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
-      chars: ['W', 'X', 'Y', 'Z'],
-      T: 6,
-      mustMove: false,
-      allowStay: true,
-      scenarios: { s4: true },
-      seed: 400
-    }
-
-    const res = solveAndDecode(cfg)
-    expect(res).not.toBeNull()
-
-    const [bomber1, bomber2] = res.priv.bomb_duo
-
-    // Every non-bomber must share a room with someone at least once
-    for (const char of cfg.chars) {
-      if (char === bomber1 || char === bomber2) continue
-
-      let hasCompany = false
-      for (let t = 0; t < cfg.T; t++) {
-        const room = res.schedule[char][t]
-        const others = cfg.chars.filter(c =>
-          c !== char && res.schedule[c][t] === room
-        )
-        if (others.length > 0) {
-          hasCompany = true
-          break
-        }
-      }
-      expect(hasCompany).toBe(true)
-    }
-  })
-
   it('should have bombers as ONLY pair ever alone together', () => {
     const cfg = {
       rooms: ['A', 'B', 'C', 'D'],
