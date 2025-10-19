@@ -113,13 +113,12 @@
       <label><input type="checkbox" id="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits <i>alone together</i> at plant time &amp; room)</label>
+      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits <i>alone together</i> at final time, only pair ever alone)</label>
     </div>
     <div class="row tiny">
       <label>Plant room (optional exact):</label>
       <input id="s4_room" class="pill" placeholder="e.g., Lobby" />
-      <label>Plant time (1..T):</label>
-      <input id="s4_time" class="pill" placeholder="e.g., 4" />
+      <span class="muted tiny">(Bomb always explodes at final timestep)</span>
     </div>
     <div class="row">
       <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet / same room same time)</label>
@@ -554,45 +553,103 @@ function buildCNF(config){
   }
 
   // S4: Bomb duo — two culprits A1/A2 alone together at plant time & room
-  let A1=null, A2=null, KT=null, KR=null;
+  // Bomb explodes at final timestep, and they are the ONLY pair ever alone together
+  let A1=null, A2=null, KR=null;
   if (config.scenarios.s4){
     A1 = C.map((_,ci)=> vp.get(`A1_${C[ci]}`));
     A2 = C.map((_,ci)=> vp.get(`A2_${C[ci]}`));
-    KT = Array.from({length:T}, (_,t)=> vp.get(`KT_${t}`));
     KR = R.map((_,ri)=> vp.get(`KR_${R[ri]}`));
     clauses.push(...exactlyOne(A1));
     clauses.push(...exactlyOne(A2));
     // distinct
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
-    clauses.push(...exactlyOne(KT));
     clauses.push(...exactlyOne(KR));
-    // Optional pins
+    
+    // Bomb always explodes at final timestep (T-1 in 0-indexed)
+    const plantTime = T - 1;
+    
+    // Optional pin for room only (time is fixed to final)
     if (config.scenarios.s4_room){
       const ri = Ridx.get(config.scenarios.s4_room);
       if (ri!=null) clauses.push([ KR[ri] ]);
     }
-    if (config.scenarios.s4_time){
-      const t = Number(config.scenarios.s4_time)-1;
-      if (!Number.isNaN(t) && t>=0 && t<T) clauses.push([ KT[t] ]);
+    
+    // Enforce A1 and A2 are in the plant room at final time, and nobody else
+    for (let ri=0; ri<R.length; ri++){
+      for (let ci=0; ci<C.length; ci++){
+        // A1(ci) & KR(ri) => X(ci, plantTime, ri)
+        clauses.push([ -A1[ci], -KR[ri], X(ci, plantTime, ri) ]);
+        // A2(ci) & KR(ri) => X(ci, plantTime, ri)
+        clauses.push([ -A2[ci], -KR[ri], X(ci, plantTime, ri) ]);
+        // Any character at (plantTime, ri) must be A1 or A2
+        // (KR(ri) & X(ci, plantTime, ri)) => (A1(ci) ∨ A2(ci))
+        clauses.push([ -KR[ri], -X(ci, plantTime, ri), A1[ci], A2[ci] ]);
+      }
     }
-    // Enforce A1 in place, A2 in place, and nobody else there
+    
+    // Enforce: No other time/room can have exactly 2 people
+    // For every (t, room) except the plant moment, ensure it's not exactly 2 people
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
+        // Skip the plant time/room combination
+        const isPlantMoment = vp.get(`isPlant_${t}_${ri}`);
+        // isPlantMoment <=> (t == plantTime && KR[ri])
+        if (t === plantTime) {
+          clauses.push(...impl(KR[ri], isPlantMoment));
+          clauses.push(...impl(isPlantMoment, KR[ri]));
+        } else {
+          // Not plant time, so isPlantMoment must be false
+          clauses.push([-isPlantMoment]);
+        }
+        
+        // Count how many characters are in room ri at time t
+        // We need to forbid exactly 2 unless it's the plant moment
+        // Create variables for each possible pair being the only two present
         for (let ci=0; ci<C.length; ci++){
-          // A1(ci) & KT & KR => X(ci,t,ri)
-          clauses.push([ -A1[ci], -KT[t], -KR[ri], X(ci,t,ri) ]);
-          // A2(ci) & KT & KR => X(ci,t,ri)
-          clauses.push([ -A2[ci], -KT[t], -KR[ri], X(ci,t,ri) ]);
-          // Any character d present at (t,ri) must be either A1 or A2
-          // (KT & KR & X(d,t,ri)) ⇒ (A1(d) ∨ A2(d))
-          // CNF: ¬KT ∨ ¬KR ∨ ¬X(d,t,ri) ∨ A1(d) ∨ A2(d)
-          clauses.push([ -KT[t], -KR[ri], -X(ci,t,ri), A1[ci], A2[ci] ]);
+          for (let cj=ci+1; cj<C.length; cj++){
+            // Variable: ci and cj are the ONLY two in room ri at time t
+            const onlyTwo = vp.get(`onlyTwo_${t}_${ri}_${ci}_${cj}`);
+            
+            // onlyTwo => X(ci,t,ri) and X(cj,t,ri)
+            clauses.push([-onlyTwo, X(ci,t,ri)]);
+            clauses.push([-onlyTwo, X(cj,t,ri)]);
+            
+            // onlyTwo => no other character in room ri at time t
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-onlyTwo, -X(ck,t,ri)]);
+            }
+            
+            // If X(ci,t,ri) and X(cj,t,ri) and no others, then onlyTwo
+            // This is complex, so we'll just forbid onlyTwo unless it's the plant moment with A1/A2
+            // onlyTwo => isPlantMoment
+            clauses.push([-onlyTwo, isPlantMoment]);
+            
+            // If isPlantMoment, then the only valid onlyTwo is A1 and A2
+            // isPlantMoment & onlyTwo => (A1[ci] & A2[cj]) or (A1[cj] & A2[ci])
+            const validPair = vp.get(`validPair_${ci}_${cj}`);
+            // validPair <=> (A1[ci] & A2[cj]) or (A1[cj] & A2[ci])
+            const pair1 = vp.get(`pair1_${ci}_${cj}`);
+            const pair2 = vp.get(`pair2_${ci}_${cj}`);
+            clauses.push(...impl(pair1, A1[ci]));
+            clauses.push(...impl(pair1, A2[cj]));
+            clauses.push([-A1[ci], -A2[cj], pair1]);
+            clauses.push(...impl(pair2, A1[cj]));
+            clauses.push(...impl(pair2, A2[ci]));
+            clauses.push([-A1[cj], -A2[ci], pair2]);
+            clauses.push([-validPair, pair1, pair2]);
+            clauses.push([-pair1, validPair]);
+            clauses.push([-pair2, validPair]);
+            
+            // onlyTwo & isPlantMoment => validPair
+            clauses.push([-onlyTwo, -isPlantMoment, validPair]);
+          }
         }
       }
     }
   }
 
-  return { vp, clauses, privKeys: {PH, L1, L2, A, PT, PR, A1, A2, KT, KR} };
+  return { vp, clauses, privKeys: {PH, L1, L2, A, PT, PR, A1, A2, KR} };
 }
 
 /* ===========================
@@ -833,12 +890,11 @@ function solveAndDecode(cfg){
     for (let ri=0; ri<R.length; ri++) if (val(`PR_${R[ri]}`)) pRoom = R[ri];
     priv.assassin = assassin; priv.poison_time = pTime; priv.poison_room = pRoom;
   }
-  if (privKeys.A1 && privKeys.A2 && privKeys.KT && privKeys.KR){
-    let a1=null, a2=null, kTime=null, kRoom=null;
+  if (privKeys.A1 && privKeys.A2 && privKeys.KR){
+    let a1=null, a2=null, kRoom=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
-    for (let t=0; t<T; t++) if (val(`KT_${t}`)) kTime = t+1;
     for (let ri=0; ri<R.length; ri++) if (val(`KR_${R[ri]}`)) kRoom = R[ri];
-    priv.bomb_duo = [a1,a2]; priv.plant_time = kTime; priv.plant_room = kRoom;
+    priv.bomb_duo = [a1,a2]; priv.plant_time = T; priv.plant_room = kRoom;
   }
 
   return { schedule, byTime, visits, priv, meta: { vars:numVars } };
@@ -910,8 +966,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s5: qs("s5").checked,
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null,
-      s4_room: qs("s4_room").value.trim() || null,
-      s4_time: qs("s4_time").value.trim() || null
+      s4_room: qs("s4_room").value.trim() || null
     }
   };
 
