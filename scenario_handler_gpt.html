@@ -157,6 +157,15 @@
           <div id="privateFacts"></div>
         </div>
         <div class="card">
+          <h2>Scenario String</h2>
+          <div class="hint tiny">This string encodes the entire scenario. Share it or bookmark the URL to recreate this exact scenario.</div>
+          <textarea id="scenarioString" class="mono tiny" readonly style="height:80px; font-size:11px; resize:vertical;"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button class="ghost" id="copyScenarioBtn">📋 Copy String</button>
+            <button class="ghost" id="copyURLBtn">🔗 Copy URL</button>
+          </div>
+        </div>
+        <div class="card">
           <h2>Raw JSON</h2>
           <pre class="mono tiny" id="rawJson"></pre>
           <button class="ghost" id="downloadBtn">Download JSON</button>
@@ -995,6 +1004,96 @@ function scoreBomb(res, cfg) {
 }
 
 /* ===========================
+   URL State Management
+   =========================== */
+function encodeScenarioToURL(res, cfg) {
+  // Create a compact representation of the scenario
+  const state = {
+    v: 1, // version
+    r: cfg.rooms,
+    c: cfg.chars,
+    t: cfg.T,
+    e: cfg.edges,
+    s: cfg.seed,
+    // Encode schedule as compact string: char_index,room_index for each timestep
+    // Format: "0,1,2,0,1,2|1,2,0,1,2,0|..." (pipe separates characters)
+    sch: cfg.chars.map(char => {
+      return res.schedule[char].map(room => cfg.rooms.indexOf(room)).join(',');
+    }).join('|')
+  };
+  
+  // Convert to base64 JSON
+  const json = JSON.stringify(state);
+  const encoded = btoa(encodeURIComponent(json));
+  return encoded;
+}
+
+function decodeScenarioFromURL(encoded) {
+  try {
+    const json = decodeURIComponent(atob(encoded));
+    const state = JSON.parse(json);
+    
+    if (state.v !== 1) return null; // Version mismatch
+    
+    // Reconstruct schedule
+    const schedule = {};
+    const schedParts = state.sch.split('|');
+    state.c.forEach((char, ci) => {
+      const roomIndices = schedParts[ci].split(',').map(Number);
+      schedule[char] = roomIndices.map(ri => state.r[ri]);
+    });
+    
+    // Reconstruct byTime
+    const byTime = {};
+    for (let t = 0; t < state.t; t++) {
+      const counts = {};
+      state.r.forEach(r => counts[r] = 0);
+      state.c.forEach(char => {
+        const room = schedule[char][t];
+        if (counts[room] != null) counts[room]++;
+      });
+      byTime[t + 1] = counts;
+    }
+    
+    // Reconstruct visits
+    const visits = {};
+    state.c.forEach(char => {
+      const v = {};
+      state.r.forEach(r => v[r] = 0);
+      for (let t = 0; t < state.t; t++) {
+        v[schedule[char][t]]++;
+      }
+      visits[char] = v;
+    });
+    
+    return {
+      schedule,
+      byTime,
+      visits,
+      rooms: state.r,
+      chars: state.c,
+      T: state.t,
+      edges: state.e,
+      seed: state.s
+    };
+  } catch (e) {
+    console.error('Failed to decode scenario from URL:', e);
+    return null;
+  }
+}
+
+function updateURL(encoded) {
+  const url = new URL(window.location);
+  url.searchParams.set('scenario', encoded);
+  window.history.pushState({}, '', url);
+}
+
+function getScenarioFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('scenario');
+}
+
+/* ===========================
    Decode & Clues
    =========================== */
 function solveAndDecode(cfg){
@@ -1181,6 +1280,10 @@ qs("genBtn").addEventListener("click", async ()=>{
     const targetIdx = Math.floor((percentile / 100) * (solutions.length - 1));
     const res = solutions[targetIdx];
     
+    // Encode scenario to URL
+    const encoded = encodeScenarioToURL(res, cfg);
+    updateURL(encoded);
+    
     qs("status").innerHTML = `<span class="ok">Selected ${percentile}th percentile scenario</span> (score: ${res.score.total.toFixed(1)}, rank ${targetIdx+1}/${solutions.length}, ${skipped} skipped)`;
     // Display selected solution
     qs("resultsHint").style.display = "none";
@@ -1198,6 +1301,28 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
+
+    // Display scenario string
+    qs("scenarioString").value = encoded;
+    
+    // Copy buttons
+    qs("copyScenarioBtn").onclick = ()=>{
+      navigator.clipboard.writeText(encoded).then(()=>{
+        const btn = qs("copyScenarioBtn");
+        const orig = btn.textContent;
+        btn.textContent = "✓ Copied!";
+        setTimeout(()=> btn.textContent = orig, 2000);
+      });
+    };
+    
+    qs("copyURLBtn").onclick = ()=>{
+      navigator.clipboard.writeText(window.location.href).then(()=>{
+        const btn = qs("copyURLBtn");
+        const orig = btn.textContent;
+        btn.textContent = "✓ Copied!";
+        setTimeout(()=> btn.textContent = orig, 2000);
+      });
+    };
 
     const raw = { schedule: res.schedule, by_time: res.byTime, visits: res.visits, private: res.priv, meta: res.meta };
     qs("rawJson").textContent = JSON.stringify(raw, null, 2);
@@ -1389,6 +1514,85 @@ qs("toggleResultsBtn").addEventListener("click", ()=>{
   } else {
     resultsDiv.style.display = "none";
     btn.textContent = "▶ Expand";
+  }
+});
+
+// Load scenario from URL on page load
+window.addEventListener('DOMContentLoaded', ()=>{
+  const encoded = getScenarioFromURL();
+  if (encoded) {
+    const decoded = decodeScenarioFromURL(encoded);
+    if (decoded) {
+      // Populate form fields
+      const mermaidLines = ['graph TD'];
+      decoded.edges.forEach(([a, b]) => {
+        const aQuoted = a.includes(' ') ? `"${a}"` : a;
+        const bQuoted = b.includes(' ') ? `"${b}"` : b;
+        mermaidLines.push(`  ${aQuoted} --- ${bQuoted}`);
+      });
+      qs("mermaidInput").value = mermaidLines.join('\n');
+      qs("chars").value = decoded.chars.join(', ');
+      qs("steps").value = decoded.T;
+      qs("seed").value = decoded.seed;
+      
+      // Display the scenario
+      qs("status").innerHTML = `<span class="ok">Loaded scenario from URL</span>`;
+      qs("resultsHint").style.display = "none";
+      qs("results").style.display = "block";
+      qs("toggleResultsBtn").style.display = "inline-block";
+      
+      renderTable("schedule", decoded.schedule, "Character");
+      renderTable("byTime", decoded.byTime, "Time");
+      renderTable("visits", decoded.visits, "Character");
+      
+      // Note: We don't have private facts in the URL encoding (by design - they're secret!)
+      qs("privateFacts").innerHTML = `<div class="muted">Private facts not included in URL (generate to see them)</div>`;
+      
+      // Display scenario string
+      qs("scenarioString").value = encoded;
+      
+      // Copy buttons
+      qs("copyScenarioBtn").onclick = ()=>{
+        navigator.clipboard.writeText(encoded).then(()=>{
+          const btn = qs("copyScenarioBtn");
+          const orig = btn.textContent;
+          btn.textContent = "✓ Copied!";
+          setTimeout(()=> btn.textContent = orig, 2000);
+        });
+      };
+      
+      qs("copyURLBtn").onclick = ()=>{
+        navigator.clipboard.writeText(window.location.href).then(()=>{
+          const btn = qs("copyURLBtn");
+          const orig = btn.textContent;
+          btn.textContent = "✓ Copied!";
+          setTimeout(()=> btn.textContent = orig, 2000);
+        });
+      };
+      
+      const raw = { schedule: decoded.schedule, by_time: decoded.byTime, visits: decoded.visits, meta: { source: 'url' } };
+      qs("rawJson").textContent = JSON.stringify(raw, null, 2);
+      
+      qs("downloadBtn").onclick = ()=>{
+        const blob = new Blob([JSON.stringify(raw,null,2)], {type:"application/json"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "scenario_solution.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
+      
+      // Setup question interface with the decoded scenario
+      const cfg = {
+        rooms: decoded.rooms,
+        chars: decoded.chars,
+        T: decoded.T,
+        edges: decoded.edges
+      };
+      setupQuestionInterface(decoded, cfg);
+    } else {
+      qs("status").innerHTML = `<span class="warn">Failed to load scenario from URL</span>`;
+    }
   }
 });
 </script>
