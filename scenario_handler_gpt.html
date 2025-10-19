@@ -166,48 +166,49 @@
           <pre class="mono tiny" id="rawJson"></pre>
           <button class="ghost" id="downloadBtn">Download JSON</button>
         </div>
-        <div class="card">
-          <h2>Question Interface</h2>
-          <div class="question-interface">
-            <div class="question-type">
-              <button class="ghost" id="askLocTimeBtn">Location + Time</button>
-              <button class="ghost" id="askLocCharBtn">Location + Character</button>
-            </div>
-            
-            <div id="locTimeForm" class="question-form">
-              <div class="row">
-                <label>Location:</label>
-                <select id="locTimeLocation" class="pill"></select>
-                <label>Time:</label>
-                <select id="locTimeTime" class="pill"></select>
-                <button class="primary" id="askLocTimeSubmit">Ask</button>
-              </div>
-              <div id="locTimeAnswer" class="answer-box" style="display:none;">
-                <div class="answer-shared" id="locTimeShared"></div>
-                <div>
-                  <button class="ghost private-toggle" id="locTimeToggle">👁️ Show</button>
-                </div>
-                <div class="answer-private hidden" id="locTimePrivate"></div>
-              </div>
-            </div>
-            
-            <div id="locCharForm" class="question-form">
-              <div class="row">
-                <label>Location:</label>
-                <select id="locCharLocation" class="pill"></select>
-                <label>Character:</label>
-                <select id="locCharChar" class="pill"></select>
-                <button class="primary" id="askLocCharSubmit">Ask</button>
-              </div>
-              <div id="locCharAnswer" class="answer-box" style="display:none;">
-                <div class="answer-shared" id="locCharShared"></div>
-                <div>
-                  <button class="ghost private-toggle" id="locCharToggle">👁️ Show</button>
-                </div>
-                <div class="answer-private hidden" id="locCharPrivate"></div>
-              </div>
-            </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Question Interface</h2>
+    <div class="question-interface">
+      <div class="question-type">
+        <button class="ghost" id="askLocTimeBtn">Location + Time</button>
+        <button class="ghost" id="askLocCharBtn">Location + Character</button>
+      </div>
+      
+      <div id="locTimeForm" class="question-form">
+        <div class="row">
+          <label>Location:</label>
+          <select id="locTimeLocation" class="pill"></select>
+          <label>Time:</label>
+          <select id="locTimeTime" class="pill"></select>
+          <button class="primary" id="askLocTimeSubmit">Ask</button>
+        </div>
+        <div id="locTimeAnswer" class="answer-box" style="display:none;">
+          <div class="answer-shared" id="locTimeShared"></div>
+          <div>
+            <button class="ghost private-toggle" id="locTimeToggle">👁️ Show</button>
           </div>
+          <div class="answer-private hidden" id="locTimePrivate"></div>
+        </div>
+      </div>
+      
+      <div id="locCharForm" class="question-form">
+        <div class="row">
+          <label>Location:</label>
+          <select id="locCharLocation" class="pill"></select>
+          <label>Character:</label>
+          <select id="locCharChar" class="pill"></select>
+          <button class="primary" id="askLocCharSubmit">Ask</button>
+        </div>
+        <div id="locCharAnswer" class="answer-box" style="display:none;">
+          <div class="answer-shared" id="locCharShared"></div>
+          <div>
+            <button class="ghost private-toggle" id="locCharToggle">👁️ Show</button>
+          </div>
+          <div class="answer-private hidden" id="locCharPrivate"></div>
         </div>
       </div>
     </div>
