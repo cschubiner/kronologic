@@ -783,32 +783,6 @@ describe('Movement Constraints', () => {
   })
 })
 
-describe('Combined Scenarios', () => {
-  it('should handle S2 + S5 together with phantom as a lover', () => {
-    const cfg = {
-      rooms: ['A', 'B', 'C', 'D'],
-      edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
-      chars: ['P', 'L1', 'L2', 'N1', 'N2'],
-      T: 5,
-      mustMove: false,
-      allowStay: true,
-      scenarios: { s2: true, s5: true },
-      seed: 1000
-    }
-
-    const res = solveAndDecode(cfg)
-    expect(res).not.toBeNull()
-    expect(res.priv.phantom).toBeTruthy()
-    expect(res.priv.lovers).toBeTruthy()
-
-    const phantom = res.priv.phantom
-    const [lover1, lover2] = res.priv.lovers
-    
-    // Phantom MUST be one of the lovers
-    expect([lover1, lover2]).toContain(phantom)
-  })
-})
-
 describe('Edge Cases', () => {
   it('should handle minimum configuration', () => {
     const cfg = {

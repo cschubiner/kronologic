@@ -583,9 +583,13 @@ function buildCNF(config){
           }
         }
       }
-      // If NOT a lover, must have at least one "with others" moment
-      // (L1[ci] ∨ L2[ci]) ∨ (at least one withOther is true)
-      clauses.push([L1[ci], L2[ci], ...atLeastOnceWithOthers]);
+      // If NOT a lover (and NOT phantom if S2 enabled), must have at least one "with others" moment
+      // (L1[ci] ∨ L2[ci] ∨ PH[ci]) ∨ (at least one withOther is true)
+      if (PH) {
+        clauses.push([L1[ci], L2[ci], PH[ci], ...atLeastOnceWithOthers]);
+      } else {
+        clauses.push([L1[ci], L2[ci], ...atLeastOnceWithOthers]);
+      }
     }
   }
 
