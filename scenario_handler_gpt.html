@@ -1195,9 +1195,9 @@ function scoreAggrosassin(res, cfg) {
   
   let score = 0;
   
-  // +3 points per victim
+  // +10 points per victim (increased from 3 to weight kills more)
   const victimCount = res.priv.victims ? res.priv.victims.length : 0;
-  score += victimCount * 3;
+  score += victimCount * 10;
   
   // +1 point per instance of exactly 2 people in a room
   for (let t = 0; t < T; t++) {

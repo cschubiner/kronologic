@@ -191,8 +191,8 @@ Players must deduce the secret scenario by combining:
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
 - The "half of timesteps" constraint ensures consistent killing behavior, making the pattern more detectable
 
-**Scoring**: Difficulty = (number of victims × 3) + (total 2-person meetings in entire scenario)
-- More victims increases difficulty significantly
+**Scoring**: Difficulty = (number of victims × 10) + (total 2-person meetings in entire scenario)
+- More victims increases difficulty significantly (heavily weighted)
 - More "pair meetings" in general creates more noise in the data
 
 ---
@@ -284,13 +284,14 @@ The generator creates many valid scenarios and scores them based on "red herring
 #### S7: Aggrosassin Scoring
 **What makes it harder**: More victims and more pair meetings in general
 
-- **+3 points per victim** (character who was alone with aggrosassin)
+- **+10 points per victim** (character who was alone with aggrosassin)
   - More victims = more characters to track and more complex patterns
+  - Heavily weighted to emphasize kill count as primary difficulty factor
 - **+1 point per instance** of exactly 2 people in a room (any pair, including aggrosassin)
   - Creates noise in the data - harder to identify which pairs are significant
   - Every "alone together" moment adds to the confusion
 
-**Example**: If the aggrosassin kills 3 victims (9 points) and there are 12 total instances of pairs being alone throughout the timeline (12 points), that's 21 difficulty total.
+**Example**: If the aggrosassin kills 3 victims (30 points) and there are 12 total instances of pairs being alone throughout the timeline (12 points), that's 42 difficulty total.
 
 #### Combined Scoring
 When multiple scenarios are enabled, scores are added together. The percentile selection then picks from the sorted list:
