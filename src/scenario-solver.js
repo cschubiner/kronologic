@@ -405,7 +405,6 @@ export function buildCNF(config){
 
           const others = [];
           for (let ck=0; ck<C.length; ck++){
-          for (let ck=0; ck<C.length; ck++){
             if (ck === assassinIdx || ck === ci) continue;
             others.push(X(ck, t, ri));
           }
