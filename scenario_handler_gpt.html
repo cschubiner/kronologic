@@ -126,6 +126,12 @@
     </div>
 
     <div class="row">
+      <label>Difficulty percentile (0-100):</label>
+      <input id="percentile" type="number" min="0" max="100" step="0.1" class="pill" value="50" />
+      <label>Samples:</label>
+      <input id="samples" type="number" min="10" max="5000" class="pill" value="100" />
+    </div>
+    <div class="row">
       <button class="primary" id="genBtn">Generate</button>
       <span id="status" class="hint"></span>
     </div>
@@ -590,6 +596,175 @@ function buildCNF(config){
 }
 
 /* ===========================
+   Scoring Functions
+   =========================== */
+function scoreScenario(res, cfg) {
+  let score = 0;
+  const scores = {};
+  
+  // S2: Phantom scoring
+  if (cfg.scenarios.s2 && res.priv.phantom) {
+    scores.phantom = scorePhantom(res, cfg);
+    score += scores.phantom;
+  }
+  
+  // S5: Lovers scoring
+  if (cfg.scenarios.s5 && res.priv.lovers) {
+    scores.lovers = scoreLovers(res, cfg);
+    score += scores.lovers;
+  }
+  
+  // S1: Poison scoring
+  if (cfg.scenarios.s1 && res.priv.assassin) {
+    scores.poison = scorePoison(res, cfg);
+    score += scores.poison;
+  }
+  
+  // S4: Bomb duo scoring
+  if (cfg.scenarios.s4 && res.priv.bomb_duo) {
+    scores.bomb = scoreBomb(res, cfg);
+    score += scores.bomb;
+  }
+  
+  return { total: score, breakdown: scores };
+}
+
+function scorePhantom(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: How many other characters are "almost phantom" (alone many times but not all)
+  const phantom = res.priv.phantom;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  
+  let score = 0;
+  
+  for (const char of chars) {
+    if (char === phantom) continue;
+    
+    // Count how many times this character is alone
+    let aloneCount = 0;
+    for (let t = 0; t < T; t++) {
+      const room = res.schedule[char][t];
+      const othersInRoom = chars.filter(c => 
+        c !== char && res.schedule[c][t] === room
+      ).length;
+      if (othersInRoom === 0) aloneCount++;
+    }
+    
+    // Characters alone T-1 or T-2 times are "red herrings" - increase difficulty
+    if (aloneCount >= T - 2) {
+      score += 100 * (aloneCount / T); // Weight by proportion
+    } else if (aloneCount >= T / 2) {
+      score += 50 * (aloneCount / T); // Moderate red herrings
+    }
+  }
+  
+  return score;
+}
+
+function scoreLovers(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: How many other character pairs are "almost lovers" (rarely meet)
+  const [lover1, lover2] = res.priv.lovers;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  
+  let score = 0;
+  
+  // Check all other pairs
+  for (let i = 0; i < chars.length; i++) {
+    for (let j = i + 1; j < chars.length; j++) {
+      const c1 = chars[i], c2 = chars[j];
+      if ((c1 === lover1 && c2 === lover2) || (c1 === lover2 && c2 === lover1)) continue;
+      
+      // Count meetings
+      let meetings = 0;
+      for (let t = 0; t < T; t++) {
+        if (res.schedule[c1][t] === res.schedule[c2][t]) meetings++;
+      }
+      
+      // Pairs that meet 0-1 times are red herrings
+      if (meetings === 0) score += 100;
+      else if (meetings === 1) score += 80;
+      else if (meetings <= 2) score += 40;
+    }
+  }
+  
+  return score;
+}
+
+function scorePoison(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: How many other characters are alone at various times
+  const assassin = res.priv.assassin;
+  const poisonTime = res.priv.poison_time - 1; // 0-indexed
+  const poisonRoom = res.priv.poison_room;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  
+  let score = 0;
+  
+  // Count characters alone at other times/rooms
+  for (const char of chars) {
+    if (char === assassin) continue;
+    
+    for (let t = 0; t < T; t++) {
+      const room = res.schedule[char][t];
+      const othersInRoom = chars.filter(c => 
+        c !== char && res.schedule[c][t] === room
+      ).length;
+      
+      if (othersInRoom === 0) {
+        // Alone at different time or room = red herring
+        if (t !== poisonTime || room !== poisonRoom) {
+          score += 50;
+        }
+      }
+    }
+  }
+  
+  return score;
+}
+
+function scoreBomb(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: How many other pairs are alone together at various times
+  const [bomber1, bomber2] = res.priv.bomb_duo;
+  const plantTime = res.priv.plant_time - 1;
+  const plantRoom = res.priv.plant_room;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  
+  let score = 0;
+  
+  // Check all other pairs
+  for (let i = 0; i < chars.length; i++) {
+    for (let j = i + 1; j < chars.length; j++) {
+      const c1 = chars[i], c2 = chars[j];
+      if ((c1 === bomber1 && c2 === bomber2) || (c1 === bomber2 && c2 === bomber1)) continue;
+      
+      // Check if they're alone together at any time
+      for (let t = 0; t < T; t++) {
+        const room1 = res.schedule[c1][t];
+        const room2 = res.schedule[c2][t];
+        
+        if (room1 === room2) {
+          const othersInRoom = chars.filter(c => 
+            c !== c1 && c !== c2 && res.schedule[c][t] === room1
+          ).length;
+          
+          if (othersInRoom === 0 && (t !== plantTime || room1 !== plantRoom)) {
+            score += 60; // Red herring pair
+          }
+        }
+      }
+    }
+  }
+  
+  return score;
+}
+
+/* ===========================
    Decode & Clues
    =========================== */
 function solveAndDecode(cfg){
@@ -710,20 +885,23 @@ qs("validateBtn").addEventListener("click", ()=>{
   qs("status").innerHTML = msg;
 });
 
-qs("genBtn").addEventListener("click", ()=>{
-  qs("status").textContent = "Solving…";
+qs("genBtn").addEventListener("click", async ()=>{
+  const percentile = Number(qs("percentile").value);
+  const sampleCount = Number(qs("samples").value) || 100;
+  
+  qs("status").textContent = `Generating ${sampleCount} scenarios…`;
+  
   const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
   const chars = qs("chars").value.split(",").map(s=>s.trim()).filter(Boolean);
   const T = Math.max(2, Math.min(10, Number(qs("steps").value)||6));
   const mustMove = qs("mustMove").checked;
   const allowStay = qs("allowStay").checked;
-  const seed = Number(qs("seed").value)||0;
 
   if (rooms.length<2 || edges.length<1){ qs("status").innerHTML = `<span class="warn">Map too small.</span>`; return; }
   if (chars.length<2){ qs("status").innerHTML = `<span class="warn">Add at least 2 characters.</span>`; return; }
 
   const cfg = {
-    rooms, edges, chars, T, mustMove, allowStay, seed,
+    rooms, edges, chars, T, mustMove, allowStay,
     scenarios: {
       s1: qs("s1").checked,
       s2: qs("s2").checked,
@@ -738,9 +916,37 @@ qs("genBtn").addEventListener("click", ()=>{
   };
 
   try{
-    const res = solveAndDecode(cfg);
-    if (!res){ qs("status").innerHTML = `<span class="warn">No solution (UNSAT). Try relaxing constraints or changing T/characters.</span>`; return; }
-    qs("status").innerHTML = `<span class="ok">Solved.</span> Vars=${res.meta.vars}`;
+    // Multi-generation with scoring
+    const solutions = [];
+    
+    for (let i = 0; i < sampleCount; i++) {
+      cfg.seed = i;
+      const res = solveAndDecode(cfg);
+      if (res) {
+        const scored = { ...res, score: scoreScenario(res, cfg) };
+        solutions.push(scored);
+      }
+      
+      if (i % 10 === 0) {
+        qs("status").textContent = `Generated ${i}/${sampleCount}...`;
+        await new Promise(r => setTimeout(r, 0)); // Allow UI update
+      }
+    }
+    
+    if (solutions.length === 0) {
+      qs("status").innerHTML = `<span class="warn">No solutions found.</span>`;
+      return;
+    }
+    
+    // Sort by score (ascending - lower scores are easier)
+    solutions.sort((a, b) => a.score.total - b.score.total);
+    
+    // Select solution at the specified percentile
+    const targetIdx = Math.floor((percentile / 100) * (solutions.length - 1));
+    const res = solutions[targetIdx];
+    
+    qs("status").innerHTML = `<span class="ok">Selected ${percentile}th percentile scenario</span> (score: ${res.score.total.toFixed(1)}, rank ${targetIdx+1}/${solutions.length})`;
+    // Display selected solution
     qs("resultsHint").style.display = "none";
     qs("results").style.display = "block";
     renderTable("schedule", res.schedule, "Character");
