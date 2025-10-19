@@ -891,6 +891,109 @@ describe('S4: Bomb Duo Scenario', () => {
     }
   })
 
+  it('should always pick two defined bombers from the roster', () => {
+    for (let seed = 575; seed < 580; seed++) {
+      const cfg = {
+        rooms: ['Atrium', 'Gallery', 'Vault'],
+        edges: [['Atrium', 'Gallery'], ['Gallery', 'Vault']],
+        chars: ['Ada', 'Bea', 'Cal', 'Dex'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const duo = res.priv.bomb_duo
+      expect(duo).toHaveLength(2)
+
+      const [b1, b2] = duo
+      expect(b1).toBeTruthy()
+      expect(b2).toBeTruthy()
+      expect(b1).not.toBe(b2)
+      expect(cfg.chars).toContain(b1)
+      expect(cfg.chars).toContain(b2)
+    }
+  })
+
+  it('should respect graph adjacency when staying is allowed', () => {
+    for (let seed = 580; seed < 584; seed++) {
+      const cfg = {
+        rooms: ['North', 'East', 'South', 'West'],
+        edges: [
+          ['North', 'East'],
+          ['East', 'South'],
+          ['South', 'West'],
+          ['West', 'North']
+        ],
+        chars: ['Hunter', 'Iris', 'Jules', 'Kara'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, true)
+
+      for (const char of cfg.chars) {
+        const path = res.schedule[char]
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const current = path[t]
+          const next = path[t + 1]
+          const currentIdx = idx.get(current)
+          const nextIdx = idx.get(next)
+
+          expect(nextIdx).toBeDefined()
+          expect(currentIdx).toBeDefined()
+          expect(nbr[currentIdx]).toContain(nextIdx)
+        }
+      }
+    }
+  })
+
+  it('should keep byTime counts aligned with the schedule under S4', () => {
+    const cfg = {
+      rooms: ['Workshop'],
+      edges: [],
+      chars: ['X', 'Y'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s4: true },
+      seed: 42
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const bombers = res.priv.bomb_duo.slice().sort()
+    expect(bombers).toEqual(['X', 'Y'])
+
+    for (let t = 0; t < cfg.T; t++) {
+      const counts = { Workshop: 0 }
+      for (const char of cfg.chars) {
+        const room = res.schedule[char][t]
+        counts[room]++
+      }
+
+      expect(res.byTime[t + 1]).toEqual(counts)
+
+      for (const room of cfg.rooms) {
+        const occupants = cfg.chars.filter(c => res.schedule[c][t] === room)
+        if (occupants.length === 2) {
+          expect(occupants.sort()).toEqual(bombers)
+        }
+      }
+    }
+  })
+
 })
 
 describe('S5: Lovers Scenario', () => {
