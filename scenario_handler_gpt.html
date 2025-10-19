@@ -397,6 +397,48 @@ function atMostOne(vars){ // pairwise
 function exactlyOne(vars){
   return [...atLeastOne(vars), ...atMostOne(vars)];
 }
+
+function buildTotalizer(vars, vp, clauses, prefix){
+  let nodeCounter = 0;
+
+  function helper(list, tag){
+    if (!list.length) return [];
+    if (list.length === 1) return [list[0]];
+
+    const mid = Math.floor(list.length / 2);
+    const left = helper(list.slice(0, mid), `${tag}L`);
+    const right = helper(list.slice(mid), `${tag}R`);
+
+    const id = `${tag}_${nodeCounter++}`;
+    const outLen = left.length + right.length;
+    const out = new Array(outLen);
+
+    for (let i=0; i<outLen; i++){
+      out[i] = vp.get(`${prefix}_${id}_${i+1}`);
+    }
+
+    for (let i=1; i<out.length; i++){
+      clauses.push([-out[i], out[i-1]]);
+    }
+    for (let i=0; i<left.length; i++){
+      clauses.push([-left[i], out[i]]);
+    }
+    for (let j=0; j<right.length; j++){
+      clauses.push([-right[j], out[j]]);
+    }
+    for (let i=0; i<left.length; i++){
+      for (let j=0; j<right.length; j++){
+        const idx = i + j + 1;
+        if (idx < out.length){
+          clauses.push([-left[i], -right[j], out[idx]]);
+        }
+      }
+    }
+    return out;
+  }
+
+  return helper(vars, prefix);
+}
 function impl(aLit, bLit){ // a ⇒ b  ->  (-a ∨ b)
   return [[-aLit, bLit]];
 }
