@@ -282,20 +282,45 @@ function impl(aLit, bLit){ // a ⇒ b  ->  (-a ∨ b)
    Mermaid-ish Parser
    =========================== */
 function parseMermaid(txt){
-  // very forgiving: look for lines containing X --- Y
+  // Parse Mermaid-like graph: handle quoted and unquoted room names
   const rooms = new Set();
   const edges = [];
-  const re = /["]?([^"\-]+?)["]?\s*---\s*["]?([^"\-]+?)["]?/;
+  // Match: optional quote, capture content, optional quote, ---, repeat
+  const re = /"([^"]+)"|(\S+)/g;
   const lines = txt.split(/\r?\n/);
   for (let line of lines){
     line = line.trim();
     if (!line || line.startsWith("graph")) continue;
-    const m = line.match(re);
-    if (m){
-      const a = m[1].trim();
-      const b = m[2].trim();
-      rooms.add(a); rooms.add(b);
-      edges.push([a,b]);
+    if (!line.includes("---")) continue;
+    
+    // Extract all quoted or unquoted tokens
+    const tokens = [];
+    let match;
+    while ((match = re.exec(line)) !== null) {
+      tokens.push(match[1] || match[2]); // quoted or unquoted
+    }
+    
+    // Find --- separator position in original line
+    const parts = line.split("---");
+    if (parts.length === 2) {
+      // Re-parse each side
+      const leftTokens = [];
+      const rightTokens = [];
+      re.lastIndex = 0;
+      while ((match = re.exec(parts[0])) !== null) {
+        leftTokens.push(match[1] || match[2]);
+      }
+      re.lastIndex = 0;
+      while ((match = re.exec(parts[1])) !== null) {
+        rightTokens.push(match[1] || match[2]);
+      }
+      
+      if (leftTokens.length > 0 && rightTokens.length > 0) {
+        const a = leftTokens[leftTokens.length - 1]; // last token on left
+        const b = rightTokens[0]; // first token on right
+        rooms.add(a); rooms.add(b);
+        edges.push([a, b]);
+      }
     }
   }
   return { rooms: Array.from(rooms), edges };
