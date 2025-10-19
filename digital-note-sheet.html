@@ -1111,15 +1111,8 @@
             updateMiniMapVisuals(timestep);
             saveState();
 
-            // Refresh selector
-            if (state.currentSelector) {
-                const selector = document.getElementById('characterSelector');
-                const rect = selector.getBoundingClientRect();
-                showCharacterSelector(timestep, roomName, {
-                    pageX: rect.left + window.scrollX,
-                    pageY: rect.top + window.scrollY
-                });
-            }
+            // Refresh existing chips display without closing modal
+            refreshExistingChips(timestep, roomName);
         }
 
         function toggleStrikethrough(timestep, roomName, charName) {
@@ -1129,15 +1122,8 @@
                 updateMiniMapVisuals(timestep);
                 saveState();
 
-                // Refresh selector
-                if (state.currentSelector) {
-                    const selector = document.getElementById('characterSelector');
-                    const rect = selector.getBoundingClientRect();
-                    showCharacterSelector(timestep, roomName, {
-                        pageX: rect.left + window.scrollX,
-                        pageY: rect.top + window.scrollY
-                    });
-                }
+                // Refresh existing chips display without closing modal
+                refreshExistingChips(timestep, roomName);
             }
         }
 
@@ -1146,21 +1132,38 @@
             updateMiniMapVisuals(timestep);
             saveState();
 
-            // Refresh selector
-            if (state.currentSelector) {
-                const selector = document.getElementById('characterSelector');
-                const rect = selector.getBoundingClientRect();
-                showCharacterSelector(timestep, roomName, {
-                    pageX: rect.left + window.scrollX,
-                    pageY: rect.top + window.scrollY
-                });
-            }
+            // Refresh existing chips display without closing modal
+            refreshExistingChips(timestep, roomName);
         }
 
         function updateMiniMapVisuals(timestep) {
             const cyIndex = timestep - 1;
             if (state.cytoscapeInstances[cyIndex]) {
                 updateNodeColors(state.cytoscapeInstances[cyIndex], timestep);
+            }
+        }
+
+        function refreshExistingChips(timestep, roomName) {
+            const existingChips = document.getElementById('existingChips');
+            const placements = state.placements[timestep][roomName] || [];
+            
+            if (placements.length > 0) {
+                existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">Current:</div>';
+                placements.forEach(placement => {
+                    const chipItem = document.createElement('div');
+                    chipItem.className = 'chip-item';
+                    chipItem.innerHTML = `
+                        <span style="color: ${placement.color}; font-weight: 600;">${placement.initial}</span>
+                        <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through;' : ''}">${placement.char}</span>
+                        <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}')">
+                            ${placement.strikethrough ? 'Unstrike' : 'Strike'}
+                        </button>
+                        <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}')">Remove</button>
+                    `;
+                    existingChips.appendChild(chipItem);
+                });
+            } else {
+                existingChips.innerHTML = '';
             }
         }
 
