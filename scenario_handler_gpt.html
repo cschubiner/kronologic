@@ -396,6 +396,29 @@ function buildCNF(config){
         }
       }
     }
+    // Non-phantom characters must have at least one timestep where they're not alone
+    for (let ci=0; ci<C.length; ci++){
+      const atLeastOnceNotAlone = [];
+      for (let t=0; t<T; t++){
+        for (let ri=0; ri<R.length; ri++){
+          for (let cj=0; cj<C.length; cj++){
+            if (ci===cj) continue;
+            // Variable: both ci and cj are in room ri at time t
+            const bothThere = vp.get(`notAlone_${ci}_${t}_${ri}_${cj}`);
+            // bothThere ⇒ X(ci,t,ri) and bothThere ⇒ X(cj,t,ri)
+            clauses.push([-bothThere, X(ci,t,ri)]);
+            clauses.push([-bothThere, X(cj,t,ri)]);
+            // X(ci,t,ri) ∧ X(cj,t,ri) ⇒ bothThere
+            clauses.push([-X(ci,t,ri), -X(cj,t,ri), bothThere]);
+            atLeastOnceNotAlone.push(bothThere);
+          }
+        }
+      }
+      // If ci is NOT the phantom, then at least one "not alone" moment must be true
+      // ¬PH[ci] ⇒ (at least one bothThere is true)
+      // CNF: PH[ci] ∨ (OR of all bothThere vars)
+      clauses.push([PH[ci], ...atLeastOnceNotAlone]);
+    }
   }
 
   // S5: Lovers never meet (two distinct characters never share a room/time)
