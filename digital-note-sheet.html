@@ -1497,10 +1497,23 @@
 
         function strikeAllChips(timestep, roomName, event) {
             if (event) event.stopPropagation();
-            const placements = state.placements[timestep][roomName] || [];
-            placements.forEach(placement => {
-                placement.strikethrough = true;
+            
+            // Add all characters to this room if not already present, then strike them all
+            state.characters.forEach(char => {
+                const existing = state.placements[timestep][roomName].find(p => p.char === char.name);
+                if (existing) {
+                    existing.strikethrough = true;
+                } else {
+                    // Add the character with strikethrough
+                    state.placements[timestep][roomName].push({
+                        char: char.name,
+                        initial: char.initial,
+                        color: char.color,
+                        strikethrough: true
+                    });
+                }
             });
+            
             updateMiniMapVisuals(timestep);
             saveState();
             refreshExistingChips(timestep, roomName);
@@ -1508,10 +1521,23 @@
 
         function unstrikeAllChips(timestep, roomName, event) {
             if (event) event.stopPropagation();
-            const placements = state.placements[timestep][roomName] || [];
-            placements.forEach(placement => {
-                placement.strikethrough = false;
+            
+            // Add all characters to this room if not already present, then unstrike them all
+            state.characters.forEach(char => {
+                const existing = state.placements[timestep][roomName].find(p => p.char === char.name);
+                if (existing) {
+                    existing.strikethrough = false;
+                } else {
+                    // Add the character without strikethrough
+                    state.placements[timestep][roomName].push({
+                        char: char.name,
+                        initial: char.initial,
+                        color: char.color,
+                        strikethrough: false
+                    });
+                }
             });
+            
             updateMiniMapVisuals(timestep);
             saveState();
             refreshExistingChips(timestep, roomName);
