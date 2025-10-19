@@ -798,30 +798,6 @@ function setupQuestionInterface(res, cfg){
     qs("locCharAnswer").style.display = "none";
   };
 
-  // Toggle private info visibility
-  qs("locTimeToggle").onclick = ()=>{
-    const privateEl = qs("locTimePrivate");
-    const btn = qs("locTimeToggle");
-    if (privateEl.classList.contains("hidden")) {
-      privateEl.classList.remove("hidden");
-      btn.textContent = "👁️ Hide";
-    } else {
-      privateEl.classList.add("hidden");
-      btn.textContent = "👁️ Show";
-    }
-  };
-  qs("locCharToggle").onclick = ()=>{
-    const privateEl = qs("locCharPrivate");
-    const btn = qs("locCharToggle");
-    if (privateEl.classList.contains("hidden")) {
-      privateEl.classList.remove("hidden");
-      btn.textContent = "👁️ Hide";
-    } else {
-      privateEl.classList.add("hidden");
-      btn.textContent = "👁️ Show";
-    }
-  };
-
   // Location + Time question
   qs("askLocTimeSubmit").onclick = ()=>{
     const location = locTimeLocation.value;
@@ -854,6 +830,19 @@ function setupQuestionInterface(res, cfg){
     qs("locTimePrivate").classList.add("hidden");
     qs("locTimeToggle").textContent = "👁️ Show";
     qs("locTimeAnswer").style.display = "block";
+    
+    // Setup toggle handler
+    qs("locTimeToggle").onclick = ()=>{
+      const privateEl = qs("locTimePrivate");
+      const btn = qs("locTimeToggle");
+      if (privateEl.classList.contains("hidden")) {
+        privateEl.classList.remove("hidden");
+        btn.textContent = "👁️ Hide";
+      } else {
+        privateEl.classList.add("hidden");
+        btn.textContent = "👁️ Show";
+      }
+    };
   };
 
   // Location + Character question
@@ -892,6 +881,19 @@ function setupQuestionInterface(res, cfg){
     qs("locCharPrivate").classList.add("hidden");
     qs("locCharToggle").textContent = "👁️ Show";
     qs("locCharAnswer").style.display = "block";
+    
+    // Setup toggle handler
+    qs("locCharToggle").onclick = ()=>{
+      const privateEl = qs("locCharPrivate");
+      const btn = qs("locCharToggle");
+      if (privateEl.classList.contains("hidden")) {
+        privateEl.classList.remove("hidden");
+        btn.textContent = "👁️ Hide";
+      } else {
+        privateEl.classList.add("hidden");
+        btn.textContent = "👁️ Show";
+      }
+    };
   };
 
   // Default to Location + Time
