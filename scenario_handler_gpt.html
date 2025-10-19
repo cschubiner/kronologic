@@ -98,13 +98,14 @@
 
     <h2>Scenarios</h2>
     <div class="row">
-      <label><input type="checkbox" id="s1" /> S1: Poison (assassin alone at poison time &amp; room)</label>
+      <label><input type="checkbox" id="s1" /> S1: Poison (assassin alone with victim, first char is assassin)</label>
     </div>
     <div class="row tiny">
       <label>Poison room (optional exact):</label>
       <input id="s1_room" class="pill" placeholder="e.g., Office" />
       <label>Poison time (1..T):</label>
       <input id="s1_time" class="pill" placeholder="e.g., 3" />
+      <span class="muted tiny">(Assassin is always first character in list)</span>
     </div>
     <div class="row">
       <label><input type="checkbox" id="s2" /> S2: Phantom (one character is alone at every time)</label>
@@ -530,15 +531,24 @@ function buildCNF(config){
     }
   }
 
-  // S1: Poison — assassin alone at poison time & room
-  let A=null, PT=null, PR=null;
+  // S1: Poison — assassin (first character) alone with exactly one victim
+  let V=null, PT=null, PR=null;
   if (config.scenarios.s1){
-    A  = C.map((_,ci)=> vp.get(`A_${C[ci]}`));
+    // Assassin is always first character (index 0)
+    const assassinIdx = 0;
+    
+    // Variables for victim, poison time, and poison room
+    V  = C.map((_,ci)=> vp.get(`V_${C[ci]}`));
     PT = Array.from({length:T}, (_,t)=> vp.get(`PT_${t}`));
     PR = R.map((_,ri)=> vp.get(`PR_${R[ri]}`));
-    clauses.push(...exactlyOne(A));
+    
+    clauses.push(...exactlyOne(V));
     clauses.push(...exactlyOne(PT));
     clauses.push(...exactlyOne(PR));
+    
+    // Victim cannot be the assassin
+    clauses.push([ -V[assassinIdx] ]);
+    
     // Optional fixed room/time pins
     if (config.scenarios.s1_room){
       const ri = Ridx.get(config.scenarios.s1_room);
@@ -548,16 +558,114 @@ function buildCNF(config){
       const t = Number(config.scenarios.s1_time)-1;
       if (!Number.isNaN(t) && t>=0 && t<T) clauses.push([ PT[t] ]);
     }
+    
+    // At poison time/room: assassin and victim are there, no one else
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
-        for (let ci=0; ci<C.length; ci++){
-          // If A[ci] & PT[t] & PR[ri] then X(ci,t,ri)
-          clauses.push([ -A[ci], -PT[t], -PR[ri], X(ci,t,ri) ]);
-          // And everyone else not in (t,ri)
-          for (let cj=0; cj<C.length; cj++){
-            if (cj===ci) continue;
-            clauses.push([ -A[ci], -PT[t], -PR[ri], -X(cj,t,ri) ]);
+        for (let vi=0; vi<C.length; vi++){
+          if (vi === assassinIdx) continue;
+          
+          // If PT[t] & PR[ri] & V[vi], then:
+          // - Assassin is in room: X(assassin, t, ri)
+          clauses.push([ -PT[t], -PR[ri], -V[vi], X(assassinIdx, t, ri) ]);
+          // - Victim is in room: X(vi, t, ri)
+          clauses.push([ -PT[t], -PR[ri], -V[vi], X(vi, t, ri) ]);
+          
+          // - No one else is in room
+          for (let ci=0; ci<C.length; ci++){
+            if (ci === assassinIdx || ci === vi) continue;
+            clauses.push([ -PT[t], -PR[ri], -V[vi], -X(ci, t, ri) ]);
           }
+        }
+      }
+    }
+    
+    // Assassin is ONLY alone with one other person at the poison time/room
+    // For all other (t, ri) pairs, assassin must be either:
+    // - Completely alone (no one else in room), OR
+    // - With 2+ other people
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        // Create variable: this is the poison time/room
+        const isPoisonMoment = vp.get(`isPoisonMoment_${t}_${ri}`);
+        
+        // isPoisonMoment is true iff there exists a victim such that PT[t] & PR[ri] & V[victim]
+        const poisonClauses = [];
+        for (let vi=0; vi<C.length; vi++){
+          if (vi === assassinIdx) continue;
+          const thisPoison = vp.get(`thisPoison_${t}_${ri}_${vi}`);
+          // thisPoison <=> (PT[t] & PR[ri] & V[vi])
+          clauses.push([-thisPoison, PT[t]]);
+          clauses.push([-thisPoison, PR[ri]]);
+          clauses.push([-thisPoison, V[vi]]);
+          clauses.push([-PT[t], -PR[ri], -V[vi], thisPoison]);
+          poisonClauses.push(thisPoison);
+        }
+        // isPoisonMoment <=> (OR of all thisPoison vars)
+        clauses.push([-isPoisonMoment, ...poisonClauses]);
+        for (const tp of poisonClauses){
+          clauses.push([-tp, isPoisonMoment]);
+        }
+        
+        // If assassin is in this room at this time AND it's NOT the poison moment,
+        // then assassin must be either alone or with 2+ people (not exactly 1 other)
+        
+        // Count how many others are in room with assassin
+        for (let ci=0; ci<C.length; ci++){
+          if (ci === assassinIdx) continue;
+          for (let cj=ci+1; cj<C.length; cj++){
+            if (cj === assassinIdx) continue;
+            
+            // If assassin is here, NOT poison moment, and exactly ci and cj are the only others:
+            // This should be impossible
+            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
+            
+            // exactlyTwo => X(assassin), X(ci), X(cj), and no others
+            clauses.push([-exactlyTwo, X(assassinIdx, t, ri)]);
+            clauses.push([-exactlyTwo, X(ci, t, ri)]);
+            clauses.push([-exactlyTwo, X(cj, t, ri)]);
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === assassinIdx || ck === ci || ck === cj) continue;
+              clauses.push([-exactlyTwo, -X(ck, t, ri)]);
+            }
+            
+            // If all those conditions hold, then exactlyTwo
+            const others = [];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === assassinIdx || ck === ci || ck === cj) continue;
+              others.push(X(ck, t, ri));
+            }
+            clauses.push([exactlyTwo, -X(assassinIdx, t, ri), -X(ci, t, ri), -X(cj, t, ri), ...others]);
+            
+            // exactlyTwo AND NOT isPoisonMoment => FALSE (contradiction)
+            clauses.push([-exactlyTwo, isPoisonMoment]);
+          }
+        }
+        
+        // Also handle case where assassin is with exactly 1 other person (not a pair from above)
+        for (let ci=0; ci<C.length; ci++){
+          if (ci === assassinIdx) continue;
+          
+          const exactlyOne = vp.get(`exactlyOne_${t}_${ri}_${ci}`);
+          
+          // exactlyOne => X(assassin), X(ci), and no others
+          clauses.push([-exactlyOne, X(assassinIdx, t, ri)]);
+          clauses.push([-exactlyOne, X(ci, t, ri)]);
+          for (let ck=0; ck<C.length; ck++){
+            if (ck === assassinIdx || ck === ci) continue;
+            clauses.push([-exactlyOne, -X(ck, t, ri)]);
+          }
+          
+          // If those conditions hold, then exactlyOne
+          const others = [];
+          for (let ck=0; ck<C.length; ck++){
+            if (ck === assassinIdx || ck === ci) continue;
+            others.push(X(ck, t, ri));
+          }
+          clauses.push([exactlyOne, -X(assassinIdx, t, ri), -X(ci, t, ri), ...others]);
+          
+          // exactlyOne AND NOT isPoisonMoment => FALSE
+          clauses.push([-exactlyOne, isPoisonMoment]);
         }
       }
     }
@@ -655,7 +763,7 @@ function buildCNF(config){
     }
   }
 
-  return { vp, clauses, privKeys: {PH, L1, L2, A, PT, PR, A1, A2, KR} };
+  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2, KR} };
 }
 
 /* ===========================
@@ -758,8 +866,9 @@ function scoreLovers(res, cfg) {
 
 function scorePoison(res, cfg) {
   // Higher score = harder puzzle
-  // Measure: How many other characters are alone at various times
+  // Measure: How many other pairs of characters are alone together at various times
   const assassin = res.priv.assassin;
+  const victim = res.priv.victim;
   const poisonTime = res.priv.poison_time - 1; // 0-indexed
   const poisonRoom = res.priv.poison_room;
   const T = cfg.T;
@@ -767,20 +876,30 @@ function scorePoison(res, cfg) {
   
   let score = 0;
   
-  // Count characters alone at other times/rooms
-  for (const char of chars) {
-    if (char === assassin) continue;
-    
-    for (let t = 0; t < T; t++) {
-      const room = res.schedule[char][t];
-      const othersInRoom = chars.filter(c => 
-        c !== char && res.schedule[c][t] === room
-      ).length;
+  // Count other pairs who are alone together (red herrings)
+  for (let i = 0; i < chars.length; i++) {
+    for (let j = i + 1; j < chars.length; j++) {
+      const c1 = chars[i], c2 = chars[j];
       
-      if (othersInRoom === 0) {
-        // Alone at different time or room = red herring
-        if (t !== poisonTime || room !== poisonRoom) {
-          score += 50;
+      // Skip the actual assassin-victim pair at poison time
+      if ((c1 === assassin && c2 === victim) || (c1 === victim && c2 === assassin)) {
+        continue;
+      }
+      
+      // Check if they're alone together at any time
+      for (let t = 0; t < T; t++) {
+        const room1 = res.schedule[c1][t];
+        const room2 = res.schedule[c2][t];
+        
+        if (room1 === room2) {
+          const othersInRoom = chars.filter(c => 
+            c !== c1 && c !== c2 && res.schedule[c][t] === room1
+          ).length;
+          
+          if (othersInRoom === 0) {
+            // This pair is alone together - red herring
+            score += 60;
+          }
         }
       }
     }
@@ -889,12 +1008,13 @@ function solveAndDecode(cfg){
     }
     if (l1 && l2) priv.lovers = [l1,l2];
   }
-  if (privKeys.A && privKeys.PT && privKeys.PR){
-    let assassin=null, pTime=null, pRoom=null;
-    for (let ci=0; ci<C.length; ci++) if (val(`A_${C[ci]}`)) assassin = C[ci];
+  if (privKeys.V && privKeys.PT && privKeys.PR){
+    let victim=null, pTime=null, pRoom=null;
+    const assassin = C[0]; // First character is always assassin
+    for (let ci=0; ci<C.length; ci++) if (val(`V_${C[ci]}`)) victim = C[ci];
     for (let t=0; t<T; t++) if (val(`PT_${t}`)) pTime = t+1;
     for (let ri=0; ri<R.length; ri++) if (val(`PR_${R[ri]}`)) pRoom = R[ri];
-    priv.assassin = assassin; priv.poison_time = pTime; priv.poison_room = pRoom;
+    priv.assassin = assassin; priv.victim = victim; priv.poison_time = pTime; priv.poison_room = pRoom;
   }
   if (privKeys.A1 && privKeys.A2 && privKeys.KR){
     let a1=null, a2=null, kRoom=null;
@@ -1027,7 +1147,7 @@ qs("genBtn").addEventListener("click", async ()=>{
     const pf = [];
     if (res.priv.phantom) pf.push(`<div>Phantom: <b>${res.priv.phantom}</b></div>`);
     if (res.priv.lovers) pf.push(`<div>Lovers: <b>${res.priv.lovers[0]}</b> + <b>${res.priv.lovers[1]}</b></div>`);
-    if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
+    if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b> @ t=${res.priv.plant_time}, room=${res.priv.plant_room}</div>`);
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");

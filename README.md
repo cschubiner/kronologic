@@ -41,13 +41,14 @@ Players must deduce the secret scenario by combining:
 **Mystery**: One character poisoned someone at a specific time and location.
 
 **Rules**:
-- One character is the assassin
-- At the poison time/location, the assassin was **completely alone**
-- No other characters were in that room at that time
+- The assassin is always the **first character** in your character list (by default "A")
+- At the poison time/location, the assassin was **alone with exactly one other person** (the victim)
+- This is the **ONLY time** the assassin is ever alone with just one other person
+- At all other times, the assassin is either completely alone, or with 2+ people
 
-**Goal**: Identify who, when, and where the poisoning occurred.
+**Goal**: Identify when, where, and who was poisoned.
 
-**Difficulty Factors**: More characters being alone at other times creates red herrings.
+**Difficulty Factors**: Other characters being in pairs at various times creates red herrings.
 
 ---
 
