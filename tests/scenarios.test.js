@@ -464,9 +464,9 @@ describe('S2: Phantom Scenario', () => {
 
   it('should work with minimum configuration', () => {
     const cfg = {
-      rooms: ['A', 'B'],
-      edges: [['A', 'B']],
-      chars: ['Phantom', 'Other'],
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['Phantom', 'Other1', 'Other2'],
       T: 3,
       mustMove: false,
       allowStay: true,
