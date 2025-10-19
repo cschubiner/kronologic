@@ -917,27 +917,36 @@
                 <details style="margin-bottom: 12px;">
                     <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S7: Aggrosassin</summary>
                     <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One character is a serial poisoner who kills everyone they're alone with.</p>
+                        <p><strong>Mystery:</strong> One character is a serial poisoner who kills everyone they meet one-on-one.</p>
                         <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Exactly one character is the aggrosassin</li>
-                            <li>The aggrosassin is NOT guaranteed to be the first character (unlike S1 Poison)</li>
-                            <li>Any character who is alone in a room with the aggrosassin at any timestep becomes a victim</li>
-                            <li>The aggrosassin must <strong>kill (be alone with exactly one other person) in at least half of the total timesteps</strong>:
+                        <ol style="margin: 8px 0; padding-left: 20px;">
+                            <li><strong>Exactly one aggrosassin</strong> exists (can be any character, not necessarily the first)</li>
+                            <li><strong>Minimum kill frequency:</strong> The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least <strong>⌈T/2⌉ timesteps</strong>
                                 <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>For example, with T=6 timesteps, the aggrosassin must kill in at least 3 different timesteps</li>
+                                    <li>Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps</li>
                                     <li>This ensures the aggrosassin is actively hunting throughout the timeline</li>
                                 </ul>
                             </li>
-                            <li>The aggrosassin must be alone with people at least <strong>twice as often</strong> as any other character pair:
+                            <li><strong>Frequency dominance:</strong> If the aggrosassin has N total 1-on-1 meetings across all timesteps, then every other character has at most <strong>⌊N/2⌋</strong> 1-on-1 meetings
                                 <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>If the aggrosassin is alone with someone 4 times total, then no other pair can be alone together more than 2 times</li>
+                                    <li>Count per character: how many timesteps they're alone with exactly 1 other person</li>
+                                    <li>Example: If aggrosassin has 6 total 1-on-1 meetings, no other character can have more than 3</li>
                                     <li>This ensures the aggrosassin has a distinctly high "alone time" pattern</li>
                                 </ul>
                             </li>
-                            <li>Characters can be alone with the aggrosassin multiple times (each instance counts)</li>
-                            <li>The aggrosassin can be alone with different victims at different times</li>
-                        </ul>
+                            <li><strong>Victims:</strong> The aggrosassin kills everyone they meet 1-on-1 with
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>Victims = all characters who were alone with the aggrosassin at any timestep</li>
+                                    <li>A character can be alone with the aggrosassin multiple times (still counts as one victim)</li>
+                                </ul>
+                            </li>
+                            <li><strong>Other 1-on-1 meetings allowed:</strong> Non-aggrosassin characters CAN have 1-on-1 meetings with each other
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>But their counts are limited by constraint #3</li>
+                                    <li>This creates noise in the data</li>
+                                </ul>
+                            </li>
+                        </ol>
                         <p><strong>Goal:</strong> Identify the aggrosassin and determine how many victims they claimed.</p>
                     </div>
                 </details>

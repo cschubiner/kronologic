@@ -161,30 +161,37 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S7: Aggrosassin
-**Mystery**: One character is a serial poisoner who kills everyone they're alone with.
+**Mystery**: One character is a serial poisoner who kills everyone they meet one-on-one.
 
 **Rules**:
-- Exactly one character is the aggrosassin
-- The aggrosassin is NOT guaranteed to be the first character (unlike S1 Poison)
-- Any character who is alone in a room with the aggrosassin at any timestep becomes a victim
-- The aggrosassin must **kill (be alone with exactly one other person) in at least half of the total timesteps**
-  - For example, with T=6 timesteps, the aggrosassin must kill in at least 3 different timesteps
-  - This ensures the aggrosassin is actively hunting throughout the timeline
-- The aggrosassin must be alone with people at least **twice as often** as any other character pair
-  - If the aggrosassin is alone with someone 4 times total, then no other pair of characters can be alone together more than 2 times
-  - This ensures the aggrosassin has a distinctly high "alone time" pattern
-- Characters can be alone with the aggrosassin multiple times (each instance counts as a separate poisoning opportunity)
-- The aggrosassin can be alone with different victims at different times
+1. **Exactly one aggrosassin** exists (can be any character, not necessarily the first)
+
+2. **Minimum kill frequency**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **⌈T/2⌉ timesteps**
+   - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
+   - This ensures the aggrosassin is actively hunting throughout the timeline
+
+3. **Frequency dominance**: If the aggrosassin has N total 1-on-1 meetings across all timesteps, then every other character has at most **⌊N/2⌋** 1-on-1 meetings
+   - Count per character: how many timesteps they're alone with exactly 1 other person
+   - Example: If aggrosassin has 6 total 1-on-1 meetings, no other character can have more than 3
+   - This ensures the aggrosassin has a distinctly high "alone time" pattern
+
+4. **Victims**: The aggrosassin kills everyone they meet 1-on-1 with
+   - Victims = all characters who were alone with the aggrosassin at any timestep
+   - A character can be alone with the aggrosassin multiple times (still counts as one victim)
+
+5. **Other 1-on-1 meetings allowed**: Non-aggrosassin characters CAN have 1-on-1 meetings with each other
+   - But their counts are limited by constraint #3
+   - This creates noise in the data
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 
 **Difficulty Factors**: 
 - More victims = harder to identify the pattern (more characters to track)
-- Other character pairs being alone together creates confusion about who has the highest "alone count"
+- Other character pairs having 1-on-1 meetings creates confusion about who has the highest count
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
 - The "half of timesteps" constraint ensures consistent killing behavior, making the pattern more detectable
 
-**Scoring**: Difficulty = (number of victims × 3) + (total instances of exactly 2 people in any room)
+**Scoring**: Difficulty = (number of victims × 3) + (total 2-person meetings in entire scenario)
 - More victims increases difficulty significantly
 - More "pair meetings" in general creates more noise in the data
 
