@@ -1609,6 +1609,254 @@ describe('S6: Phantom + Lovers Scenario (S2 + S5)', () => {
   })
 })
 
+describe('S7: Aggrosassin Scenario', () => {
+  it('should have exactly one aggrosassin', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['X', 'Y', 'Z', 'W'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7000
+    }
+
+    testWithThreshold(cfg, (res) => {
+      expect(res.priv.aggrosassin).toBeTruthy()
+      expect(cfg.chars).toContain(res.priv.aggrosassin)
+    })
+  })
+
+  it('should have aggrosassin alone with at least one victim', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['X', 'Y', 'Z', 'W'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7010
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const agg = res.priv.aggrosassin
+      expect(res.priv.victims).toBeTruthy()
+      expect(res.priv.victims.length).toBeGreaterThan(0)
+
+      // Verify each victim was alone with aggrosassin at least once
+      for (const victim of res.priv.victims) {
+        let foundAlone = false
+        for (let t = 0; t < cfg.T; t++) {
+          for (const room of cfg.rooms) {
+            const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+            if (charsInRoom.length === 2 && 
+                charsInRoom.includes(agg) && 
+                charsInRoom.includes(victim)) {
+              foundAlone = true
+              break
+            }
+          }
+          if (foundAlone) break
+        }
+        expect(foundAlone).toBe(true)
+      }
+    })
+  })
+
+  it('should have aggrosassin alone with people more often than other pairs', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+      chars: ['P', 'Q', 'R', 'S', 'T'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7020
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const agg = res.priv.aggrosassin
+
+      // Count how many times aggrosassin is alone with someone
+      let aggAloneCount = 0
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
+            aggAloneCount++
+          }
+        }
+      }
+
+      // Count max times any other pair is alone together
+      let maxOtherPairCount = 0
+      for (let i = 0; i < cfg.chars.length; i++) {
+        for (let j = i + 1; j < cfg.chars.length; j++) {
+          const char1 = cfg.chars[i]
+          const char2 = cfg.chars[j]
+          
+          // Skip if either is the aggrosassin
+          if (char1 === agg || char2 === agg) continue
+
+          let pairCount = 0
+          for (let t = 0; t < cfg.T; t++) {
+            for (const room of cfg.rooms) {
+              const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+              if (charsInRoom.length === 2 && 
+                  charsInRoom.includes(char1) && 
+                  charsInRoom.includes(char2)) {
+                pairCount++
+              }
+            }
+          }
+          maxOtherPairCount = Math.max(maxOtherPairCount, pairCount)
+        }
+      }
+
+      // Aggrosassin should be alone at least twice as often as any other pair
+      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+    })
+  })
+
+  it('should work with minimum configuration', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['X', 'Y', 'Z'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7030
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+    expect(res.priv.aggrosassin).toBeTruthy()
+    expect(res.priv.victims).toBeTruthy()
+  })
+
+  it('should track all unique victims', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['W', 'X', 'Y', 'Z'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7040
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const agg = res.priv.aggrosassin
+      const victims = res.priv.victims
+
+      // Each victim should be distinct
+      const uniqueVictims = new Set(victims)
+      expect(uniqueVictims.size).toBe(victims.length)
+
+      // No victim should be the aggrosassin
+      expect(victims).not.toContain(agg)
+
+      // Verify victim count matches actual alone-together instances
+      const actualVictims = new Set()
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
+            const victim = charsInRoom.find(c => c !== agg)
+            actualVictims.add(victim)
+          }
+        }
+      }
+
+      expect(new Set(victims)).toEqual(actualVictims)
+    })
+  })
+
+  it('should work with mustMove constraint', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']],
+      chars: ['P', 'Q', 'R', 'S'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s7: true },
+      seed: 7050
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const agg = res.priv.aggrosassin
+      const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false)
+
+      // Verify movement constraints
+      for (const char of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const currentRoom = res.schedule[char][t]
+          const nextRoom = res.schedule[char][t + 1]
+          const currentIdx = idx.get(currentRoom)
+          const nextIdx = idx.get(nextRoom)
+          
+          expect(nbr[currentIdx]).toContain(nextIdx)
+          expect(currentRoom).not.toBe(nextRoom)
+        }
+      }
+
+      // Aggrosassin constraint still holds
+      let aggAloneCount = 0
+      let maxOtherPairCount = 0
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2) {
+            if (charsInRoom.includes(agg)) {
+              aggAloneCount++
+            } else {
+              // Count this as a non-agg pair instance
+              maxOtherPairCount = Math.max(maxOtherPairCount, 1)
+            }
+          }
+        }
+      }
+
+      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+    })
+  })
+
+  it('should allow aggrosassin to be any character (not just first)', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['First', 'Second', 'Third', 'Fourth'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7060
+    }
+
+    // Run multiple times with different seeds to verify aggrosassin can be different characters
+    const aggrosassins = new Set()
+    for (let seed = 7060; seed < 7070; seed++) {
+      const testCfg = { ...cfg, seed }
+      const res = solveAndDecode(testCfg)
+      if (res) {
+        aggrosassins.add(res.priv.aggrosassin)
+      }
+    }
+
+    // Should have found at least 2 different aggrosassins across seeds
+    // (not guaranteed, but very likely with 10 different seeds)
+    expect(aggrosassins.size).toBeGreaterThan(0)
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds

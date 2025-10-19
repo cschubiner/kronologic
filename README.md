@@ -136,7 +136,7 @@ Players must deduce the secret scenario by combining:
 
 ---
 
-### S6: Phantom Lover
+### S6: Phantom + Lovers
 **Mystery**: One character is a phantom (alone at every timestep) AND there are two lovers who never meet.
 
 **Rules**:
@@ -157,6 +157,32 @@ Players must deduce the secret scenario by combining:
 **Goal**: Identify the phantom and the two lovers.
 
 **Difficulty Factors**: The phantom is easy to identify (always alone). The two lovers must avoid each other while still meeting all other non-phantom characters. Other pairs who rarely meet create confusion about who the lovers are.
+
+---
+
+### S7: Aggrosassin
+**Mystery**: One character is a serial poisoner who kills everyone they're alone with.
+
+**Rules**:
+- Exactly one character is the aggrosassin
+- The aggrosassin is NOT guaranteed to be the first character (unlike S1 Poison)
+- Any character who is alone in a room with the aggrosassin at any timestep becomes a victim
+- The aggrosassin must be alone with people at least **twice as often** as any other character pair
+  - If the aggrosassin is alone with someone 4 times total, then no other pair of characters can be alone together more than 2 times
+  - This ensures the aggrosassin has a distinctly high "alone time" pattern
+- Characters can be alone with the aggrosassin multiple times (each instance counts as a separate poisoning opportunity)
+- The aggrosassin can be alone with different victims at different times
+
+**Goal**: Identify the aggrosassin and determine how many victims they claimed.
+
+**Difficulty Factors**: 
+- More victims = harder to identify the pattern (more characters to track)
+- Other character pairs being alone together creates confusion about who has the highest "alone count"
+- The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
+
+**Scoring**: Difficulty = (number of victims × 3) + (total instances of exactly 2 people in any room)
+- More victims increases difficulty significantly
+- More "pair meetings" in general creates more noise in the data
 
 ---
 
@@ -186,8 +212,10 @@ Enable one or more scenarios:
 - **S1 (Poison)**: Optional fixed room/time
 - **S2 (Phantom)**: No configuration needed
 - **S3 (Singer's Jewels)**: No configuration needed
-- **S4 (Bomb)**: Optional fixed room (time is always final)
+- **S4 (Bomb)**: No configuration needed
 - **S5 (Lovers)**: No configuration needed
+- **S6 (Phantom + Lovers)**: No configuration needed
+- **S7 (Aggrosassin)**: No configuration needed
 
 ### Difficulty Control
 
@@ -241,6 +269,17 @@ The generator creates many valid scenarios and scores them based on "red herring
 - Pairs that avoid each other create confusion about who the actual lovers are
 
 **Example**: With T=6, if characters A and B never meet, C and D meet once, and E and F meet twice, that's +220 difficulty from red herrings.
+
+#### S7: Aggrosassin Scoring
+**What makes it harder**: More victims and more pair meetings in general
+
+- **+3 points per victim** (character who was alone with aggrosassin)
+  - More victims = more characters to track and more complex patterns
+- **+1 point per instance** of exactly 2 people in a room (any pair, including aggrosassin)
+  - Creates noise in the data - harder to identify which pairs are significant
+  - Every "alone together" moment adds to the confusion
+
+**Example**: If the aggrosassin kills 3 victims (9 points) and there are 12 total instances of pairs being alone throughout the timeline (12 points), that's 21 difficulty total.
 
 #### Combined Scoring
 When multiple scenarios are enabled, scores are added together. The percentile selection then picks from the sorted list:

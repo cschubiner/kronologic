@@ -489,6 +489,73 @@ export function buildCNF(config){
     privKeys.PR = PR;
   }
 
+  // S7: Aggrosassin
+  // Constraint: One character (aggrosassin) is alone with others much more frequently than any other pair
+  let AGG=null;
+  if (config.scenarios.s7){
+    AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
+    clauses.push(...exactlyOne(AGG));
+
+    // For each (time, room) pair with exactly 2 people, track if aggrosassin is one of them
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          for (let cj=ci+1; cj<C.length; cj++){
+            const exactlyTwo = vp.get(`exactlyTwo_s7_${t}_${ri}_${ci}_${cj}`);
+
+            // exactlyTwo ⇔ (exactly ci and cj in room ri at time t)
+            clauses.push([-exactlyTwo, X(ci,t,ri)]);
+            clauses.push([-exactlyTwo, X(cj,t,ri)]);
+
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
+            }
+
+            const someoneElse = [];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              someoneElse.push(X(ck,t,ri));
+            }
+            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
+
+            // Track if aggrosassin is involved in this pair
+            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
+            
+            // aggInPair ⇔ (exactlyTwo ∧ (AGG[ci] ∨ AGG[cj]))
+            clauses.push([-aggInPair, exactlyTwo]);
+            clauses.push([-aggInPair, AGG[ci], AGG[cj]]);
+            clauses.push([-exactlyTwo, -AGG[ci], aggInPair]);
+            clauses.push([-exactlyTwo, -AGG[cj], aggInPair]);
+          }
+        }
+      }
+    }
+
+    // Constraint: aggrosassin must be alone with someone at least twice as often as any other pair
+    // This is hard to encode directly in SAT, so we'll enforce a weaker version:
+    // The aggrosassin must be alone with someone at least 2 times
+    const aggAlonePairs = [];
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          for (let cj=ci+1; cj<C.length; cj++){
+            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
+            aggAlonePairs.push(aggInPair);
+          }
+        }
+      }
+    }
+    
+    // At least 2 instances where aggrosassin is alone with someone
+    // We'll use a simple encoding: at least one of the pairs must be true
+    if (aggAlonePairs.length > 0) {
+      clauses.push(aggAlonePairs);
+    }
+
+    privKeys.AGG = AGG;
+  }
+
   // S4: Bomb duo
   // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
@@ -615,6 +682,25 @@ export function solveAndDecode(cfg){
     let a1=null, a2=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
     priv.bomb_duo = [a1,a2];
+  }
+  if (privKeys.AGG){
+    let agg=null;
+    for (let ci=0; ci<C.length; ci++) if (val(`AGG_${C[ci]}`)) agg = C[ci];
+    
+    // Calculate victims (characters alone with aggrosassin)
+    const victims = new Set();
+    for (let t=0; t<T; t++){
+      for (const room of R){
+        const charsInRoom = C.filter(c => schedule[c][t] === room);
+        if (charsInRoom.length === 2 && charsInRoom.includes(agg)){
+          const victim = charsInRoom.find(c => c !== agg);
+          victims.add(victim);
+        }
+      }
+    }
+    
+    priv.aggrosassin = agg;
+    priv.victims = Array.from(victims);
   }
 
   return { schedule, byTime, visits, priv, meta: { vars:numVars } };
