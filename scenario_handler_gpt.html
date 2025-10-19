@@ -160,6 +160,10 @@
           <div id="privateFacts"></div>
         </div>
         <div class="card">
+          <h2>Generation Statistics</h2>
+          <div id="genStats" class="tiny"></div>
+        </div>
+        <div class="card">
           <h2>Scenario String</h2>
           <div class="hint tiny">This string encodes the entire scenario. Share it or bookmark the URL to recreate this exact scenario.</div>
           <textarea id="scenarioString" class="mono tiny" readonly style="height:80px; font-size:11px; resize:vertical;"></textarea>
@@ -820,7 +824,14 @@ function buildCNF(config){
     }
   }
 
-  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2} };
+  // Collect statistics
+  const stats = {
+    totalVars: vp.count(),
+    totalClauses: clauses.length,
+    avgClauseLength: clauses.reduce((sum, c) => sum + c.length, 0) / clauses.length
+  };
+
+  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2}, stats };
 }
 
 /* ===========================
@@ -1130,10 +1141,12 @@ function getScenarioFromURL() {
    Decode & Clues
    =========================== */
 function solveAndDecode(cfg){
-  const { vp, clauses, privKeys } = buildCNF(cfg);
+  const { vp, clauses, privKeys, stats } = buildCNF(cfg);
   const numVars = vp.count();
   const seed = Number(cfg.seed||0) || 0;
+  const solveStartTime = Date.now();
   const sol = satSolve(clauses, numVars, seed);
+  const solveTime = Date.now() - solveStartTime;
   if (!sol) return null;
 
   // Helper to read var by name
@@ -1202,7 +1215,14 @@ function solveAndDecode(cfg){
     priv.bomb_duo = [a1,a2];
   }
 
-  return { schedule, byTime, visits, priv, meta: { vars:numVars } };
+  return {
+    schedule,
+    byTime,
+    visits,
+    priv,
+    meta: { vars: numVars },
+    stats: { ...stats, solveTimeMs: solveTime }
+  };
 }
 
 /* ===========================
@@ -1343,6 +1363,38 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
+
+    // Display generation statistics
+    const stats = res.stats || {};
+    const avgSolveTime = solutions.reduce((sum, s) => sum + (s.stats?.solveTimeMs || 0), 0) / solutions.length;
+    const statsHtml = `
+      <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;">
+        <span class="muted">SAT Variables:</span>
+        <span><b>${stats.totalVars}</b></span>
+
+        <span class="muted">SAT Clauses:</span>
+        <span><b>${stats.totalClauses}</b></span>
+
+        <span class="muted">Avg Clause Length:</span>
+        <span><b>${stats.avgClauseLength?.toFixed(2)}</b> literals</span>
+
+        <span class="muted">Solve Time (this):</span>
+        <span><b>${stats.solveTimeMs}</b>ms</span>
+
+        <span class="muted">Avg Solve Time:</span>
+        <span><b>${avgSolveTime.toFixed(1)}</b>ms</span>
+
+        <span class="muted">Valid Solutions:</span>
+        <span><b>${solutions.length}</b> / ${sampleCount} (${((solutions.length/sampleCount)*100).toFixed(1)}%)</span>
+
+        <span class="muted">Difficulty Score:</span>
+        <span><b>${res.score.total.toFixed(1)}</b> (${percentile}th percentile)</span>
+
+        <span class="muted">Score Breakdown:</span>
+        <span>${Object.entries(res.score.breakdown).map(([k,v]) => `${k}: ${v.toFixed(0)}`).join(', ') || 'N/A'}</span>
+      </div>
+    `;
+    qs("genStats").innerHTML = statsHtml;
 
     // Display scenario string
     qs("scenarioString").value = encoded;
