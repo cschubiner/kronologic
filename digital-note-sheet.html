@@ -432,6 +432,81 @@
             display: block;
         }
 
+        /* Save status indicator */
+        .save-status {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 850;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .save-status.show {
+            opacity: 1;
+        }
+
+        .save-status.error {
+            background: #ef4444;
+        }
+
+        /* Session management */
+        .session-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 6px;
+            align-items: center;
+        }
+
+        .session-controls .info {
+            flex: 1;
+            font-size: 13px;
+            color: #92400e;
+        }
+
+        .session-controls button {
+            padding: 6px 12px;
+            font-size: 13px;
+            background: #f59e0b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            min-height: 36px;
+        }
+
+        .session-controls button:hover {
+            background: #d97706;
+        }
+
+        @media (max-width: 768px) {
+            .save-status {
+                bottom: 140px;
+                right: 10px;
+                font-size: 11px;
+                padding: 6px 12px;
+            }
+
+            .session-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .session-controls .info {
+                margin-bottom: 8px;
+            }
+        }
+
         /* Floating action buttons for mobile */
         .floating-actions {
             position: fixed;
@@ -572,6 +647,12 @@
     <div class="container">
         <h1>Digital Note Sheet - Kronologic Generator</h1>
 
+        <!-- Session management -->
+        <div class="session-controls" id="sessionControls" style="display: none;">
+            <span class="info">Session restored from previous visit</span>
+            <button onclick="clearSession()">Clear Session</button>
+        </div>
+
         <div class="graph-input-section">
             <h3>Map Graph Definition</h3>
             <p>Enter your map structure using Mermaid graph syntax:</p>
@@ -642,6 +723,9 @@
         <button class="floating-btn redo-btn" id="floatingRedo" onclick="redo()" title="Redo">↷</button>
     </div>
 
+    <!-- Save status indicator -->
+    <div class="save-status" id="saveStatus">Saved</div>
+
     <script>
         // State management
         let state = {
@@ -670,6 +754,151 @@
 
         // Graph elements will be generated from Mermaid syntax
         let graphElements = [];
+
+        // LocalStorage key
+        const STORAGE_KEY = 'kronologic_note_sheet_session';
+
+        // Save status timeout
+        let saveStatusTimeout = null;
+
+        // LocalStorage functions
+        function saveToLocalStorage() {
+            try {
+                const sessionData = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    config: {
+                        timesteps: state.timesteps,
+                        characters: state.characters,
+                        rooms: state.rooms,
+                        graphDefinition: document.getElementById('graphInput').value,
+                        layoutIndex: state.currentLayoutIndex
+                    },
+                    placements: state.placements,
+                    notes: document.getElementById('notesEditor').value,
+                    tracking: getTrackingTableData(),
+                    history: state.history,
+                    historyIndex: state.historyIndex
+                };
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionData));
+                showSaveStatus('Saved', false);
+                return true;
+            } catch (error) {
+                console.error('Failed to save to localStorage:', error);
+                showSaveStatus('Save failed', true);
+                return false;
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (!saved) return false;
+
+                const sessionData = JSON.parse(saved);
+
+                // Validate version
+                if (sessionData.version !== '1.0') {
+                    console.warn('Incompatible session version');
+                    return false;
+                }
+
+                // Restore config
+                state.timesteps = sessionData.config.timesteps;
+                state.characters = sessionData.config.characters;
+                state.rooms = sessionData.config.rooms;
+                state.currentLayoutIndex = sessionData.config.layoutIndex || 0;
+
+                document.getElementById('timestepCount').value = state.timesteps;
+                document.getElementById('characterNames').value = state.characters.map(c => c.name).join(',');
+                document.getElementById('graphInput').value = sessionData.config.graphDefinition;
+
+                // Parse graph
+                const parsed = parseMermaidGraph(sessionData.config.graphDefinition);
+                if (parsed) {
+                    graphElements = parsed.elements;
+                    state.rooms = parsed.roomNames;
+                }
+
+                // Restore placements
+                state.placements = sessionData.placements;
+
+                // Restore notes
+                document.getElementById('notesEditor').value = sessionData.notes || '';
+
+                // Restore history
+                state.history = sessionData.history || [];
+                state.historyIndex = sessionData.historyIndex || -1;
+
+                // Render everything
+                renderMaps();
+                renderTrackingTable();
+
+                // Restore tracking table data
+                if (sessionData.tracking) {
+                    restoreTrackingTableData(sessionData.tracking);
+                }
+
+                updateUndoRedoButtons();
+
+                // Show session controls
+                document.getElementById('sessionControls').style.display = 'flex';
+                document.getElementById('generateGraphBtn').disabled = false;
+
+                return true;
+            } catch (error) {
+                console.error('Failed to load from localStorage:', error);
+                return false;
+            }
+        }
+
+        function getTrackingTableData() {
+            const data = {};
+            const inputs = document.querySelectorAll('.tracking-table input');
+            inputs.forEach(input => {
+                const char = input.dataset.char;
+                const room = input.dataset.room;
+                if (char && room && input.value) {
+                    if (!data[char]) data[char] = {};
+                    data[char][room] = input.value;
+                }
+            });
+            return data;
+        }
+
+        function restoreTrackingTableData(data) {
+            const inputs = document.querySelectorAll('.tracking-table input');
+            inputs.forEach(input => {
+                const char = input.dataset.char;
+                const room = input.dataset.room;
+                if (char && room && data[char] && data[char][room]) {
+                    input.value = data[char][room];
+                }
+            });
+        }
+
+        function showSaveStatus(message, isError) {
+            const indicator = document.getElementById('saveStatus');
+            indicator.textContent = message;
+            indicator.classList.toggle('error', isError);
+            indicator.classList.add('show');
+
+            // Clear previous timeout
+            if (saveStatusTimeout) clearTimeout(saveStatusTimeout);
+
+            // Hide after 2 seconds
+            saveStatusTimeout = setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+
+        function clearSession() {
+            if (confirm('Are you sure you want to clear all data and start fresh? This cannot be undone.')) {
+                localStorage.removeItem(STORAGE_KEY);
+                location.reload();
+            }
+        }
 
         // Available layout algorithms
         const layoutAlgorithms = [
@@ -1186,6 +1415,14 @@
 
             html += '</tbody>';
             table.innerHTML = html;
+
+            // Add event listeners to tracking table inputs
+            const inputs = document.querySelectorAll('.tracking-table input');
+            inputs.forEach(input => {
+                input.addEventListener('input', () => {
+                    saveToLocalStorage();
+                });
+            });
         }
 
         // Undo/Redo functionality
@@ -1207,6 +1444,9 @@
             }
 
             updateUndoRedoButtons();
+
+            // Save to localStorage
+            saveToLocalStorage();
         }
 
         function undo() {
@@ -1299,7 +1539,13 @@
 
         // Initialize on load
         window.addEventListener('load', () => {
-            initializeSheet();
+            // Try to restore from localStorage first
+            const restored = loadFromLocalStorage();
+
+            // If nothing was restored, initialize with defaults
+            if (!restored) {
+                initializeSheet();
+            }
         });
     </script>
 </body>
