@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Kronologic Digital Note Sheet</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0b0f14; --card:#111823; --fg:#e6edf3; --muted:#9fb1c1;
+    --line:#203047; --accent:#4da3ff; --ok:#42d392; --warn:#ff6b6b;
+    --chip-bg:#0e141b;
+  }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+    font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; }
+  header { padding:14px 18px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:12px; }
+  header h1 { margin:0; font-size:16px; color:#cfe6ff; letter-spacing:.4px; }
+  main { padding:16px; display:grid; gap:16px; grid-template-columns: 360px 1fr; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .card h2 { margin:0 0 8px; font-size:13px; color:#cfe6ff; letter-spacing:.3px; }
+  textarea, input, button { font:inherit; }
+  textarea { width:100%; min-height:140px; background:#0e141b; color:var(--fg);
+    border:1px solid #253244; border-radius:10px; padding:10px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  .pill { padding:5px 8px; border-radius:999px; font-size:12px; border:1px solid #253244; background:#0e141b; color:var(--fg); }
+  .btn { padding:8px 10px; border-radius:10px; cursor:pointer; border:1px solid #253244; background:#0e141b; color:var(--fg); }
+  .btn.primary { background:var(--accent); color:#001122; border:none; font-weight:600; }
+  .hint { color:var(--muted); font-size:12px; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); }
+  .grid-responsive { display:grid; gap:12px; }
+  /* Adaptive columns per T */
+  .cols-4 { grid-template-columns: repeat(4, minmax(180px, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(3, minmax(180px, 1fr)); }
+  .mini { background:#0e141b; border:1px solid #24344a; border-radius:12px; padding:8px; }
+  .mini .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .mini .head .time { font-weight:700; font-size:12px; color:#cfe6ff; }
+  .mini svg { width:100%; height:220px; display:block; }
+  .node-label { font:11px sans-serif; fill:#cfe6ff; }
+  .chip { display:inline-flex; align-items:center; gap:4px; border:1px solid #2a3a52;
+    background:var(--chip-bg); border-radius:999px; padding:2px 6px; margin:2px; font-size:12px; }
+  .chip s { text-decoration: line-through; text-decoration-thickness:2px; }
+  .popover {
+    position: fixed; z-index: 50; background:#0f1621; border:1px solid #2a3a52; border-radius:10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.5); padding:8px; min-width:220px;
+  }
+  .pop-title { font-size:12px; color:#cfe6ff; margin-bottom:6px; }
+  .char-opt { display:flex; align-items:center; justify-content:space-between; gap:8px;
+    width:100%; padding:6px 8px; background:#101a27; border:1px solid #253244; border-radius:8px; color:var(--fg); }
+  .char-opt:hover { border-color:#3a5679; }
+  .char-tag { display:inline-flex; align-items:center; gap:6px; }
+  .tag-color { width:10px; height:10px; border-radius:50%; border:1px solid #0005; display:inline-block; }
+  .toolbar { display:flex; gap:6px; border:1px solid #253244; background:#0e141b; padding:4px; border-radius:8px; }
+  .notes { background:#0e141b; border:1px solid #253244; border-radius:10px; min-height:160px; padding:10px; }
+  .notes:focus { outline: 2px solid #335; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { border-bottom:1px solid #223146; padding:6px 8px; text-align:left; }
+  th { color:#cfe6ff; font-size:12px; }
+  .rightcol { display:grid; gap:16px; }
+  .actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kronologic Digital Note Sheet</h1>
+  <span class="hint">Paste Mermaid graph & configure below. Click rooms to place character chips.</span>
+</header>
+
+<main>
+  <!-- Left: Map & Config -->
+  <section class="card">
+    <h2>Graph Input (Mermaid)</h2>
+    <div class="hint">Use standard Mermaid <code>graph LR</code> with <code>---</code> undirected edges. Quote names with spaces.</div>
+    <textarea id="graphText">graph LR
+  Lobby --- "Bay A"
+  Lobby --- "Bay B"
+  "Bay A" --- "Bay B"
+  Lobby --- Street</textarea>
+    <div class="row">
+      <button class="btn" id="previewBtn">Preview Graph</button>
+      <span id="graphStatus" class="hint"></span>
+    </div>
+    <div id="graphPreview" class="mini" style="display:none">
+      <div class="head"><div class="time">Graph Preview</div><div class="hint">Positions used for mini-maps</div></div>
+      <div id="previewCanvas"></div>
+    </div>
+
+    <h2>Config</h2>
+    <div class="row">
+      <label>Characters:</label>
+      <input id="chars" class="pill" value="A, B, C, D, S, J" />
+    </div>
+    <div class="row">
+      <label>Timesteps (T):</label>
+      <input id="timesteps" type="number" min="3" max="8" value="3" class="pill" />
+      <label><input type="checkbox" id="mustMove" checked /> Must move each time</label>
+      <label><input type="checkbox" id="allowStay" /> Allow stay</label>
+    </div>
+    <div class="row actions">
+      <button class="btn primary" id="buildSheetBtn">Build Note Sheet</button>
+      <button class="btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)">Undo</button>
+      <button class="btn" id="redoBtn" title="Redo (Ctrl/Cmd+Y)">Redo</button>
+      <span id="actionStatus" class="hint"></span>
+    </div>
+  </section>
+
+  <!-- Right: Note Sheet -->
+  <section class="rightcol">
+    <!-- Time-step Maps -->
+    <section class="card">
+      <h2>Time-Step Maps</h2>
+      <div id="mapsGrid" class="grid-responsive"></div>
+    </section>
+
+    <!-- Character Clue Tracking Table -->
+    <section class="card">
+      <h2>Character Visits per Location</h2>
+      <div id="visitsTable"></div>
+      <div class="row actions">
+        <button class="btn" id="recountBtn">Recompute From Placements</button>
+        <button class="btn" id="clearCountsBtn">Clear Counts</button>
+      </div>
+    </section>
+
+    <!-- Notes -->
+    <section class="card">
+      <h2>Deduction Notes</h2>
+      <div class="toolbar">
+        <button class="btn" data-cmd="bold"><b>B</b></button>
+        <button class="btn" data-cmd="italic"><i>I</i></button>
+        <button class="btn" data-cmd="insertUnorderedList">• List</button>
+        <button class="btn" data-cmd="insertOrderedList">1. List</button>
+      </div>
+      <div id="notes" class="notes" contenteditable="true">
+        • Manager can't be in Office at T5 because they were in Bay A at T4 and Office isn't adjacent<br>
+        • VIP and Mechanic never share a room (lovers constraint?)<br>
+      </div>
+    </section>
+  </section>
+</main>
+
+<!-- Character selector popover -->
+<div id="selector" class="popover" style="display:none"></div>
+
+<script>
+/* ============== Optional: Cytoscape if present ============== */
+(function tryLoadCytoscape(){
+  const s = document.createElement('script');
+  s.src = './cytoscape.min.js'; // if present locally, we'll use it
+  s.onload = ()=>{ document.body.dataset.cytoscape='ready'; };
+  s.onerror = ()=>{};
+  document.head.appendChild(s);
+})();
+
+/* ============== Mermaid-like graph parser ============== */
+function parseMermaid(text){
+  const lines = text.split(/\\r?\\n/).map(l=>l.trim()).filter(Boolean);
+  const edges = [];
+  const rooms = new Set();
+  const head = lines.find(l => /^graph\\s+/i.test(l));
+  if (!head) ; // direction unused in this sheet
+
+  const reEdge = /(?:"([^"]+)"|([^"\\s-][^\\s-]*))\\s*--\\s*-\\s*(?:"([^"]+)"|([^"\\s-][^\\s-]*))/;
+  for (const raw of lines){
+    if (/^graph\\s+/i.test(raw)) continue;
+    const line = raw.replace(/%%.*$/, '');
+    const m = line.match(reEdge);
+    if (!m) continue;
+    const a = (m[1] ?? m[2] ?? '').trim();
+    const b = (m[3] ?? m[4] ?? '').trim();
+    if (!a || !b) continue;
+    rooms.add(a); rooms.add(b);
+    edges.push([a,b]);
+  }
+  return { rooms: Array.from(rooms), edges };
+}
+
+function buildNeighbors(rooms, edges){
+  const idx = new Map(); rooms.forEach((r,i)=>idx.set(r,i));
+  const nbr = Array.from({length:rooms.length},()=> new Set());
+  edges.forEach(([a,b])=>{
+    if (!idx.has(a) || !idx.has(b)) return;
+    const i=idx.get(a), j=idx.get(b);
+    nbr[i].add(j); nbr[j].add(i);
+  });
+  return { idx, nbr: nbr.map(s=>Array.from(s)) };
+}
+
+function circleLayout(rooms, w=560, h=260){
+  const cx=w/2, cy=h/2, r=Math.min(w,h)*0.35;
+  return rooms.map((_,i)=>({ x: cx + r*Math.cos(2*Math.PI*i/rooms.length),
+                              y: cy + r*Math.sin(2*Math.PI*i/rooms.length) }));
+}
+
+/* ============== Global state ============== */
+let G = { rooms: [], edges: [], layout: [], neighbors: null };
+let T = 3;
+let Characters = [];
+let mustMove = true;
+let allowStay = false;
+
+// timeStepPlacements[timeIndex][roomName] = [ { name, initial, color, strike } ]
+let timeStepPlacements = {};
+// undo/redo stacks
+const undoStack = [];
+const redoStack = [];
+
+function pushUndo(){
+  undoStack.push(JSON.stringify(timeStepPlacements));
+  if (undoStack.length>200) undoStack.shift();
+  redoStack.length = 0; // clear redo on new action
+}
+function undo(){
+  if (!undoStack.length) return;
+  const cur = JSON.stringify(timeStepPlacements);
+  redoStack.push(cur);
+  const prev = undoStack.pop();
+  timeStepPlacements = JSON.parse(prev);
+  renderMaps();
+}
+function redo(){
+  if (!redoStack.length) return;
+  const cur = JSON.stringify(timeStepPlacements);
+  undoStack.push(cur);
+  const next = redoStack.pop();
+  timeStepPlacements = JSON.parse(next);
+  renderMaps();
+}
+
+/* ============== Character utilities ============== */
+function colorForIndex(i){
+  const palette = ['#4da3ff','#ef4444','#10b981','#f59e0b','#a78bfa','#22c55e','#fb7185','#eab308','#60a5fa','#14b8a6'];
+  return palette[i % palette.length];
+}
+function parseChars(input){
+  return input.split(',').map(s=>s.trim()).filter(Boolean).map((name,i)=>({
+    id: name, name, initial: name.slice(0,1).toUpperCase(), color: colorForIndex(i)
+  }));
+}
+
+/* ============== Rendering: preview & maps ============== */
+function renderPreview(){
+  const w=600, h=300;
+  const coords = circleLayout(G.rooms, w, h);
+  G.layout = coords;
+  const idx = new Map(); G.rooms.forEach((r,i)=>idx.set(r,i));
+  const container = document.getElementById('previewCanvas');
+  container.innerHTML = '';
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.width='100%'; svg.style.height='240px';
+
+  // edges
+  for (const [a,b] of G.edges){
+    const i = idx.get(a), j = idx.get(b); if (i==null||j==null) continue;
+    const l = document.createElementNS(svgNS, 'line');
+    l.setAttribute('x1', coords[i].x); l.setAttribute('y1', coords[i].y);
+    l.setAttribute('x2', coords[j].x); l.setAttribute('y2', coords[j].y);
+    l.setAttribute('stroke', '#355074'); l.setAttribute('stroke-width', '2');
+    svg.appendChild(l);
+  }
+  // nodes + labels
+  G.rooms.forEach((name, i)=>{
+    const c = document.createElementNS(svgNS, 'circle');
+    c.setAttribute('cx', coords[i].x); c.setAttribute('cy', coords[i].y);
+    c.setAttribute('r', '14'); c.setAttribute('fill', '#18314d'); c.setAttribute('stroke', '#4da3ff'); c.setAttribute('stroke-width','1.4');
+    svg.appendChild(c);
+    const t = document.createElementNS(svgNS, 'text');
+    t.setAttribute('x', coords[i].x); t.setAttribute('y', coords[i].y - 20);
+    t.setAttribute('class','node-label'); t.setAttribute('text-anchor','middle');
+    t.textContent = name;
+    svg.appendChild(t);
+  });
+
+  container.appendChild(svg);
+  document.getElementById('graphPreview').style.display = 'block';
+}
+
+function mapsGridClassByT(T){
+  if (T <= 4) return 'grid-responsive cols-4';
+  if (T <= 6) return 'grid-responsive cols-3';
+  return 'grid-responsive cols-4';
+}
+
+function ensurePlacementState(){
+  for (let t=1; t<=T; t++){
+    if (!timeStepPlacements[t]) timeStepPlacements[t] = {};
+    for (const room of G.rooms){
+      if (!timeStepPlacements[t][room]) timeStepPlacements[t][room] = [];
+    }
+  }
+}
+
+function renderMaps(){
+  ensurePlacementState();
+  const grid = document.getElementById('mapsGrid');
+  grid.className = mapsGridClassByT(T);
+  grid.innerHTML = '';
+
+  const useCy = document.body.dataset.cytoscape==='ready';
+
+  for (let t=1; t<=T; t++){
+    const card = document.createElement('div'); card.className='mini';
+    card.innerHTML = `
+      <div class="head"><div class="time">TIME ${t}</div>
+      <div class="hint">Click a room to add/remove/toggle chips</div></div>
+      <div id="map_t_${t}"></div>
+    `;
+    grid.appendChild(card);
+
+    if (useCy && window.cytoscape){
+      renderCytoscapeMini(`map_t_${t}`, t);
+    } else {
+      renderSVGMini(`map_t_${t}`, t);
+    }
+  }
+
+  // After maps, rebuild visits table headers
+  buildVisitsTableSkeleton();
+}
+
+function renderSVGMini(containerId, tIndex){
+  const w=340, h=240;
+  const coords = G.layout.length ? G.layout : circleLayout(G.rooms, w, h);
+  const idx = new Map(); G.rooms.forEach((r,i)=>idx.set(r,i));
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.width='100%'; svg.style.height='220px';
+
+  // edges
+  for (const [a,b] of G.edges){
+    const i = idx.get(a), j = idx.get(b); if (i==null||j==null) continue;
+    const l = document.createElementNS(svgNS, 'line');
+    l.setAttribute('x1', coords[i].x); l.setAttribute('y1', coords[i].y);
+    l.setAttribute('x2', coords[j].x); l.setAttribute('y2', coords[j].y);
+    l.setAttribute('stroke', '#355074'); l.setAttribute('stroke-width', '2');
+    svg.appendChild(l);
+  }
+  // nodes: clickable rect “cards” with chips listing
+  G.rooms.forEach((room, i)=>{
+    const x = coords[i].x, y = coords[i].y;
+    // invisible hit rect for click
+    const hit = document.createElementNS(svgNS, 'rect');
+    hit.setAttribute('x', x-55); hit.setAttribute('y', y-36); hit.setAttribute('width', 110); hit.setAttribute('height', 72);
+    hit.setAttribute('fill', 'rgba(0,0,0,0)'); hit.style.cursor = 'pointer';
+    hit.addEventListener('click', (ev)=> openSelector(tIndex, room, ev.clientX, ev.clientY));
+    svg.appendChild(hit);
+
+    const box = document.createElementNS(svgNS, 'rect');
+    box.setAttribute('x', x-55); box.setAttribute('y', y-36); box.setAttribute('width', 110); box.setAttribute('height', 60);
+    box.setAttribute('rx', 10); box.setAttribute('fill', '#101a27'); box.setAttribute('stroke', '#31455e'); box.setAttribute('stroke-width','1.4');
+    svg.appendChild(box);
+
+    const lab = document.createElementNS(svgNS, 'text');
+    lab.setAttribute('x', x); lab.setAttribute('y', y-20);
+    lab.setAttribute('class','node-label'); lab.setAttribute('text-anchor','middle');
+    lab.textContent = room;
+    svg.appendChild(lab);
+
+    // chips display
+    const chips = timeStepPlacements[tIndex][room] || [];
+    const chipGroup = document.createElementNS(svgNS, 'foreignObject');
+    chipGroup.setAttribute('x', x-52); chipGroup.setAttribute('y', y-10);
+    chipGroup.setAttribute('width', 104); chipGroup.setAttribute('height', 40);
+    const div = document.createElement('div'); div.style.display='flex'; div.style.flexWrap='wrap';
+    chips.forEach(ch=>{
+      const chip = document.createElement('span'); chip.className='chip';
+      chip.style.borderColor = ch.color + '80';
+      const inner = ch.strike ? `<s style="color:${ch.color}">${escapeHtml(ch.initial)}</s>` : `<span style="color:${ch.color}">${escapeHtml(ch.initial)}</span>`;
+      chip.innerHTML = inner;
+      // click: toggle strike; right-click: remove
+      chip.addEventListener('click', (e)=>{ e.stopPropagation(); pushUndo(); ch.strike=!ch.strike; renderMaps(); });
+      chip.addEventListener('contextmenu', (e)=>{ e.preventDefault(); e.stopPropagation(); pushUndo(); removeCharacterChip(tIndex, room, ch.name); });
+      div.appendChild(chip);
+    });
+    chipGroup.appendChild(div);
+    svg.appendChild(chipGroup);
+  });
+
+  container.appendChild(svg);
+}
+
+function renderCytoscapeMini(containerId, tIndex){
+  // We’ll just render nodes and edges; chips shown in a floating legend below
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const cy = cytoscape({
+    container,
+    elements: [
+      ...G.rooms.map((name,i)=>({ data: { id: name, label: name } })),
+      ...G.edges.map(([a,b])=>({ data: { id: a+'__'+b, source: a, target: b } }))
+    ],
+    style: [
+      { selector: 'node',
+        style: { 'background-color':'#18314d', 'border-width':1.4, 'border-color':'#4da3ff',
+                 'label':'data(label)', 'color':'#cfe6ff', 'font-size':'10px', 'text-valign':'top', 'text-margin-y':-10 } },
+      { selector: 'edge', style: { 'line-color':'#355074', 'width':2 } }
+    ],
+    layout: { name:'circle', padding:20, fit:true },
+    userZoomingEnabled:false, userPanningEnabled:false, autoungrabify:true
+  });
+  cy.on('tap', 'node', (evt)=>{
+    const room = evt.target.id();
+    const bb = container.getBoundingClientRect();
+    openSelector(tIndex, room, bb.left + evt.renderedPosition.x, bb.top + evt.renderedPosition.y);
+  });
+  // chips list below
+  const legend = document.createElement('div'); legend.style.marginTop='6px';
+  G.rooms.forEach(room=>{
+    const row = document.createElement('div'); row.className='hint';
+    row.innerHTML = `<b>${escapeHtml(room)}</b>: `;
+    (timeStepPlacements[tIndex][room]||[]).forEach(ch=>{
+      const span = document.createElement('span'); span.className='chip'; span.style.borderColor = ch.color + '80';
+      span.innerHTML = ch.strike ? `<s style="color:${ch.color}">${escapeHtml(ch.initial)}</s>` : `<span style="color:${ch.color}">${escapeHtml(ch.initial)}</span>`;
+      span.addEventListener('click', ()=>{ pushUndo(); ch.strike=!ch.strike; renderMaps(); });
+      span.addEventListener('contextmenu',(e)=>{ e.preventDefault(); pushUndo(); removeCharacterChip(tIndex, room, ch.name); });
+      row.appendChild(span);
+    });
+    legend.appendChild(row);
+  });
+  container.appendChild(legend);
+}
+
+/* ============== Character selector popover & chip ops ============== */
+function openSelector(t, room, x, y){
+  const pop = document.getElementById('selector');
+  pop.style.display='block';
+  pop.style.left = Math.round(x+8) + 'px';
+  pop.style.top  = Math.round(y+8) + 'px';
+  pop.innerHTML = `<div class="pop-title">Add to <b>${escapeHtml(room)}</b> at <b>T${t}</b></div>`;
+  Characters.forEach(ch=>{
+    const btn = document.createElement('button');
+    btn.className='char-opt';
+    btn.innerHTML = `<span class="char-tag"><span class="tag-color" style="background:${ch.color}"></span>${escapeHtml(ch.initial)} — ${escapeHtml(ch.name)}</span>
+                     <span class="hint">Click to add</span>`;
+    btn.addEventListener('click', ()=>{ pushUndo(); addCharacterChip(t, room, ch); closeSelector(); });
+    pop.appendChild(btn);
+  });
+}
+function closeSelector(){ const pop = document.getElementById('selector'); pop.style.display='none'; }
+document.addEventListener('click', (e)=>{
+  const pop = document.getElementById('selector');
+  if (pop.style.display==='block' && !pop.contains(e.target)) pop.style.display='none';
+});
+
+function addCharacterChip(t, room, ch){
+  const arr = timeStepPlacements[t][room];
+  if (!arr.find(x=>x.name===ch.name)){
+    arr.push({ name: ch.name, initial: ch.initial, color: ch.color, strike:false });
+    renderMaps();
+  }
+}
+function toggleStrikethrough(t, room, name){
+  const arr = timeStepPlacements[t][room]; const item = arr.find(x=>x.name===name);
+  if (item){ item.strike = !item.strike; renderMaps(); }
+}
+function removeCharacterChip(t, room, name){
+  const arr = timeStepPlacements[t][room];
+  const idx = arr.findIndex(x=>x.name===name);
+  if (idx>=0){ arr.splice(idx,1); renderMaps(); }
+}
+
+/* ============== Visits table ============== */
+function buildVisitsTableSkeleton(){
+  const wrap = document.getElementById('visitsTable');
+  if (!G.rooms.length || !Characters.length){ wrap.innerHTML = '<div class="hint">Build the note sheet to show rooms & characters here.</div>'; return; }
+  let html = '<table><thead><tr><th>Character</th>';
+  for (const r of G.rooms) html += `<th>${escapeHtml(r)}</th>`;
+  html += '</tr></thead><tbody>';
+  for (const c of Characters){
+    html += `<tr><th>${escapeHtml(c.name)}</th>`;
+    for (const r of G.rooms){
+      const id = `cnt_${c.name}__${r}`;
+      html += `<td><input id="${id}" class="pill" style="width:56px;text-align:center" inputmode="numeric" /></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function recomputeCountsFromPlacements(){
+  // zero all
+  for (const c of Characters){
+    for (const r of G.rooms){
+      const id = `cnt_${c.name}__${r}`;
+      const el = document.getElementById(id); if (el) el.value = '0';
+    }
+  }
+  // sum across times
+  for (let t=1; t<=T; t++){
+    for (const r of G.rooms){
+      const arr = timeStepPlacements[t][r];
+      arr.forEach(ch=>{
+        if (!ch.strike){
+          const id = `cnt_${ch.name}__${r}`;
+          const el = document.getElementById(id);
+          if (el){ const v = parseInt(el.value||'0',10); el.value = String(v+1); }
+        }
+      });
+    }
+  }
+}
+
+/* ============== Notes toolbar ============== */
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.toolbar .btn'); if (!btn) return;
+  const cmd = btn.dataset.cmd;
+  document.execCommand(cmd, false, null);
+});
+
+/* ============== Wire UI ============== */
+document.getElementById('previewBtn').addEventListener('click', ()=>{
+  const { rooms, edges } = parseMermaid(document.getElementById('graphText').value);
+  if (rooms.length<2 || edges.length<1){
+    document.getElementById('graphStatus').innerHTML = '<span class="warn">Need ≥ 2 rooms & ≥ 1 door.</span>';
+    return;
+  }
+  G.rooms = rooms; G.edges = edges;
+  G.neighbors = buildNeighbors(rooms, edges);
+  renderPreview();
+  document.getElementById('graphStatus').innerHTML = `<span class="ok">OK:</span> ${rooms.length} rooms, ${edges.length} doors`;
+});
+
+document.getElementById('buildSheetBtn').addEventListener('click', ()=>{
+  const { rooms, edges } = parseMermaid(document.getElementById('graphText').value);
+  if (rooms.length<2 || edges.length<1){
+    document.getElementById('actionStatus').innerHTML = '<span class="warn">Map too small.</span>';
+    return;
+  }
+  G.rooms = rooms; G.edges = edges;
+  G.neighbors = buildNeighbors(rooms, edges);
+  G.layout = circleLayout(rooms, 340, 240);
+
+  T = Math.max(3, Math.min(8, Number(document.getElementById('timesteps').value)||3));
+  Characters = parseChars(document.getElementById('chars').value);
+  mustMove = document.getElementById('mustMove').checked;
+  allowStay = document.getElementById('allowStay').checked;
+
+  timeStepPlacements = {}; ensurePlacementState();
+  undoStack.length = 0; redoStack.length = 0;
+
+  renderMaps();
+  document.getElementById('actionStatus').innerHTML = `<span class="ok">Note sheet built: ${rooms.length} rooms, ${Characters.length} characters, T=${T}</span>`;
+});
+
+document.getElementById('recountBtn').addEventListener('click', ()=>{ recomputeCountsFromPlacements(); });
+document.getElementById('clearCountsBtn').addEventListener('click', ()=>{
+  if (!G.rooms.length || !Characters.length) return;
+  Characters.forEach(c=> G.rooms.forEach(r=>{
+    const el = document.getElementById(`cnt_${c.name}__${r}`); if (el) el.value='';
+  }));
+});
+
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('redoBtn').addEventListener('click', redo);
+
+// Keyboard shortcuts for undo/redo
+document.addEventListener('keydown', (e)=>{
+  const z = (e.key==='z' || e.key==='Z'), y=(e.key==='y'||e.key==='Y');
+  if ((e.ctrlKey || e.metaKey) && z){ e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && y){ e.preventDefault(); redo(); }
+});
+
+/* ============== Helpers ============== */
+function escapeHtml(s){ return s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m])); }
+</script>
+</body>
+</html>
+

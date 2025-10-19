@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Note Sheet - Kronologic Generator</title>
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #333;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: pan-y;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            color: #1a1a1a;
+            font-size: 24px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .controls label {
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .controls input, .controls select {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .controls button {
+            padding: 10px 18px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        .controls button:hover {
+            background: #2563eb;
+        }
+
+        .controls button:active {
+            background: #1d4ed8;
+            transform: scale(0.98);
+        }
+
+        .controls button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        /* Time-step maps grid */
+        .maps-grid {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .maps-grid.cols-4 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .maps-grid.cols-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .maps-grid.cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .map-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .map-header {
+            background: #3b82f6;
+            color: white;
+            padding: 10px;
+            font-weight: 600;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .map-container {
+            height: 300px;
+            position: relative;
+            background: #fafafa;
+        }
+
+        .cytoscape-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Character chips */
+        .character-chips {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .character-chip {
+            display: inline-block;
+            padding: 2px 6px;
+            margin: 2px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            pointer-events: auto;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .character-chip.strikethrough {
+            text-decoration: line-through;
+            text-decoration-color: red;
+            text-decoration-thickness: 2px;
+            opacity: 0.6;
+        }
+
+        /* Character selector popup */
+        .character-selector {
+            position: fixed;
+            background: white;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+            min-width: 250px;
+            max-width: 90vw;
+        }
+
+        .character-selector.hidden {
+            display: none;
+        }
+
+        .character-selector .header {
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 13px;
+        }
+
+        .character-grid {
+            display: grid;
+            gap: 6px;
+        }
+
+        .character-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px;
+            border: 2px solid;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.1s;
+            min-height: 48px;
+            touch-action: manipulation;
+        }
+
+        .character-option:hover {
+            background: #f3f4f6;
+        }
+
+        .character-option:active {
+            background: #e5e7eb;
+            transform: scale(0.97);
+        }
+
+        .character-option .initial {
+            font-weight: 700;
+            width: 20px;
+            text-align: center;
+        }
+
+        .character-selector .existing-chips {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .existing-chips .chip-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px;
+            margin: 2px 0;
+            font-size: 12px;
+        }
+
+        .chip-item button {
+            padding: 8px 12px;
+            font-size: 12px;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            min-height: 36px;
+            touch-action: manipulation;
+            transition: all 0.1s;
+        }
+
+        .chip-item button:hover {
+            background: #4b5563;
+        }
+
+        .chip-item button:active {
+            background: #374151;
+            transform: scale(0.95);
+        }
+
+        .chip-item button.strike {
+            background: #ef4444;
+        }
+
+        .chip-item button.strike:hover {
+            background: #dc2626;
+        }
+
+        .chip-item button.strike:active {
+            background: #b91c1c;
+        }
+
+        /* Character tracking table */
+        .tracking-section {
+            margin: 30px 0;
+        }
+
+        .tracking-section h2 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+
+        .tracking-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .tracking-table th,
+        .tracking-table td {
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .tracking-table th {
+            background: #f3f4f6;
+            font-weight: 600;
+        }
+
+        .tracking-table td.character-name {
+            text-align: left;
+            font-weight: 500;
+            background: #fafafa;
+        }
+
+        .tracking-table input {
+            width: 50px;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #d1d5db;
+            border-radius: 3px;
+            font-size: 16px;
+            min-height: 40px;
+            touch-action: manipulation;
+        }
+
+        /* Notes area */
+        .notes-section {
+            margin: 30px 0;
+        }
+
+        .notes-section h2 {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+
+        .notes-toolbar {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .notes-toolbar button {
+            padding: 10px 14px;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            min-height: 42px;
+            touch-action: manipulation;
+            transition: all 0.1s;
+        }
+
+        .notes-toolbar button:hover {
+            background: #e5e7eb;
+        }
+
+        .notes-toolbar button:active {
+            background: #d1d5db;
+            transform: scale(0.96);
+        }
+
+        .notes-editor {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        .notes-editor:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        /* Graph input section */
+        .graph-input-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .graph-input-section h3 {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+
+        .graph-input-section p {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .graph-input-area {
+            width: 100%;
+            min-height: 120px;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            resize: vertical;
+            background: white;
+        }
+
+        .graph-input-area:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .graph-error {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .graph-error.show {
+            display: block;
+        }
+
+        /* Floating action buttons for mobile */
+        .floating-actions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 900;
+        }
+
+        .floating-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+
+        .floating-btn:active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .floating-btn:disabled {
+            background: #9ca3af;
+            opacity: 0.6;
+        }
+
+        .floating-btn.redo-btn {
+            background: #10b981;
+        }
+
+        @media (min-width: 769px) {
+            .floating-actions {
+                display: none;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .maps-grid.cols-4 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+                margin-bottom: 15px;
+            }
+
+            .controls {
+                gap: 8px;
+            }
+
+            .controls input {
+                font-size: 16px;
+            }
+
+            .maps-grid.cols-4,
+            .maps-grid.cols-3 {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+
+            .map-container {
+                height: 250px;
+            }
+
+            .character-selector {
+                position: fixed;
+                left: 50% !important;
+                top: 50% !important;
+                transform: translate(-50%, -50%);
+                max-height: 80vh;
+                overflow-y: auto;
+            }
+
+            .tracking-table {
+                font-size: 12px;
+            }
+
+            .tracking-table th,
+            .tracking-table td {
+                padding: 6px;
+            }
+
+            .tracking-table input {
+                width: 40px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .maps-grid.cols-4,
+            .maps-grid.cols-3,
+            .maps-grid.cols-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .map-container {
+                height: 280px;
+            }
+
+            .controls label {
+                width: 100%;
+            }
+
+            .controls input[type="text"] {
+                width: 100%;
+            }
+
+            .controls button {
+                flex: 1;
+                min-width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Digital Note Sheet - Kronologic Generator</h1>
+
+        <div class="graph-input-section">
+            <h3>Map Graph Definition</h3>
+            <p>Enter your map structure using Mermaid graph syntax:</p>
+            <textarea class="graph-input-area" id="graphInput" placeholder="graph TD
+  Foyer --- Stairs
+  Foyer --- Gallery
+  Gallery --- Stairs
+  Gallery --- Masks
+  Masks --- DanceRoom
+  Masks --- MusicRoom
+  MusicRoom --- DanceRoom">graph TD
+  Foyer --- Stairs
+  Foyer --- Gallery
+  Gallery --- Stairs
+  Gallery --- Masks
+  Masks --- DanceRoom
+  Masks --- MusicRoom
+  MusicRoom --- DanceRoom</textarea>
+            <div class="graph-error" id="graphError"></div>
+        </div>
+
+        <div class="controls">
+            <label>Timesteps:</label>
+            <input type="number" id="timestepCount" min="3" max="8" value="4">
+
+            <label>Characters:</label>
+            <input type="text" id="characterNames" value="A,B,C,D,S,J" placeholder="Comma-separated names">
+
+            <button onclick="initializeSheet()">Initialize Sheet</button>
+            <button onclick="undo()" id="undoBtn" disabled>Undo</button>
+            <button onclick="redo()" id="redoBtn" disabled>Redo</button>
+        </div>
+
+        <div id="mapsGrid" class="maps-grid cols-4">
+            <!-- Time-step maps will be generated here -->
+        </div>
+
+        <div class="tracking-section">
+            <h2>Character Visits per Location</h2>
+            <table class="tracking-table" id="trackingTable">
+                <!-- Table will be generated here -->
+            </table>
+        </div>
+
+        <div class="notes-section">
+            <h2>Deduction Notes</h2>
+            <div class="notes-toolbar">
+                <button onclick="formatText('bold')"><b>B</b></button>
+                <button onclick="formatText('italic')"><i>I</i></button>
+                <button onclick="formatText('underline')"><u>U</u></button>
+                <button onclick="insertBullet()">• Bullet</button>
+            </div>
+            <textarea class="notes-editor" id="notesEditor" placeholder="Enter your deduction notes here..."></textarea>
+        </div>
+    </div>
+
+    <!-- Character selector popup -->
+    <div id="characterSelector" class="character-selector hidden">
+        <div class="header" id="selectorHeader">Add Character</div>
+        <div class="character-grid" id="characterGrid"></div>
+        <div class="existing-chips" id="existingChips"></div>
+    </div>
+
+    <!-- Floating action buttons for mobile -->
+    <div class="floating-actions">
+        <button class="floating-btn" id="floatingUndo" onclick="undo()" title="Undo">↶</button>
+        <button class="floating-btn redo-btn" id="floatingRedo" onclick="redo()" title="Redo">↷</button>
+    </div>
+
+    <script>
+        // State management
+        let state = {
+            timesteps: 4,
+            characters: [
+                { name: 'A', initial: 'A', color: '#3b82f6' },
+                { name: 'B', initial: 'B', color: '#10b981' },
+                { name: 'C', initial: 'C', color: '#ef4444' },
+                { name: 'D', initial: 'D', color: '#f59e0b' },
+                { name: 'S', initial: 'S', color: '#8b5cf6' },
+                { name: 'J', initial: 'J', color: '#ec4899' }
+            ],
+            rooms: ['Foyer', 'Stairs', 'Gallery', 'Masks', 'DanceRoom', 'MusicRoom'],
+            placements: {}, // { timestep: { room: [{ char, initial, color, strikethrough }] } }
+            cytoscapeInstances: [],
+            history: [],
+            historyIndex: -1,
+            currentSelector: null
+        };
+
+        const characterColors = [
+            '#3b82f6', '#10b981', '#ef4444', '#f59e0b',
+            '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
+        ];
+
+        // Graph elements will be generated from Mermaid syntax
+        let graphElements = [];
+
+        // Parse Mermaid graph syntax
+        function parseMermaidGraph(mermaidText) {
+            const errorDiv = document.getElementById('graphError');
+            errorDiv.classList.remove('show');
+
+            try {
+                const lines = mermaidText.trim().split('\n');
+                const nodes = new Set();
+                const edges = [];
+
+                for (let line of lines) {
+                    line = line.trim();
+
+                    // Skip graph declaration line
+                    if (line.startsWith('graph') || line === '') continue;
+
+                    // Parse edge relationships: "NodeA --- NodeB" or "NodeA --- NodeB --- NodeC"
+                    const parts = line.split('---').map(s => s.trim());
+
+                    if (parts.length < 2) continue;
+
+                    // Add all nodes and create edges between consecutive pairs
+                    for (let i = 0; i < parts.length; i++) {
+                        const node = parts[i];
+                        if (node) nodes.add(node);
+
+                        if (i < parts.length - 1) {
+                            const nextNode = parts[i + 1];
+                            if (nextNode) {
+                                edges.push({ source: node, target: nextNode });
+                            }
+                        }
+                    }
+                }
+
+                if (nodes.size === 0) {
+                    throw new Error('No nodes found in graph definition');
+                }
+
+                // Convert to Cytoscape format
+                const elements = [];
+
+                // Add nodes
+                nodes.forEach(nodeName => {
+                    elements.push({
+                        data: {
+                            id: nodeName.toLowerCase().replace(/\s+/g, ''),
+                            name: nodeName
+                        }
+                    });
+                });
+
+                // Add edges
+                edges.forEach(edge => {
+                    elements.push({
+                        data: {
+                            source: edge.source.toLowerCase().replace(/\s+/g, ''),
+                            target: edge.target.toLowerCase().replace(/\s+/g, '')
+                        }
+                    });
+                });
+
+                return { elements, roomNames: Array.from(nodes) };
+            } catch (error) {
+                errorDiv.textContent = `Error parsing graph: ${error.message}`;
+                errorDiv.classList.add('show');
+                return null;
+            }
+        }
+
+        function initializeSheet() {
+            const timestepCount = parseInt(document.getElementById('timestepCount').value);
+            const characterInput = document.getElementById('characterNames').value;
+            const graphInput = document.getElementById('graphInput').value;
+
+            // Parse the graph
+            const parsed = parseMermaidGraph(graphInput);
+            if (!parsed) {
+                return; // Error message already shown
+            }
+
+            graphElements = parsed.elements;
+            state.rooms = parsed.roomNames;
+
+            state.timesteps = timestepCount;
+            state.characters = characterInput.split(',').map((name, idx) => {
+                const trimmed = name.trim();
+                return {
+                    name: trimmed,
+                    initial: trimmed[0].toUpperCase(),
+                    color: characterColors[idx % characterColors.length]
+                };
+            });
+
+            // Reset placements
+            state.placements = {};
+            for (let t = 1; t <= timestepCount; t++) {
+                state.placements[t] = {};
+                state.rooms.forEach(room => {
+                    state.placements[t][room] = [];
+                });
+            }
+
+            // Clear history
+            state.history = [];
+            state.historyIndex = -1;
+            updateUndoRedoButtons();
+
+            // Render
+            renderMaps();
+            renderTrackingTable();
+            saveState();
+        }
+
+        function renderMaps() {
+            const grid = document.getElementById('mapsGrid');
+            grid.innerHTML = '';
+
+            // Determine grid columns
+            let cols = 4;
+            if (state.timesteps >= 5 && state.timesteps <= 6) cols = 3;
+            else if (state.timesteps >= 7) cols = 4;
+
+            grid.className = `maps-grid cols-${cols}`;
+
+            // Clear previous Cytoscape instances
+            state.cytoscapeInstances.forEach(cy => cy.destroy());
+            state.cytoscapeInstances = [];
+
+            // Create map cards
+            for (let t = 1; t <= state.timesteps; t++) {
+                const card = document.createElement('div');
+                card.className = 'map-card';
+                card.innerHTML = `
+                    <div class="map-header">TIME ${t}</div>
+                    <div class="map-container">
+                        <div id="cy-${t}" class="cytoscape-container"></div>
+                    </div>
+                `;
+                grid.appendChild(card);
+
+                // Initialize Cytoscape
+                setTimeout(() => {
+                    const cy = cytoscape({
+                        container: document.getElementById(`cy-${t}`),
+                        elements: graphElements,
+                        layout: {
+                            name: 'cose',
+                            fit: true,
+                            padding: 20,
+                            nodeRepulsion: 8000,
+                            idealEdgeLength: 80,
+                            animate: false
+                        },
+                        style: [
+                            {
+                                selector: 'node',
+                                style: {
+                                    'label': 'data(name)',
+                                    'font-size': '11px',
+                                    'text-valign': 'center',
+                                    'text-halign': 'center',
+                                    'background-color': '#ffffff',
+                                    'border-width': 3,
+                                    'border-color': '#9ca3af',
+                                    'width': 80,
+                                    'height': 80,
+                                    'text-wrap': 'wrap',
+                                    'text-max-width': 70,
+                                    'line-height': 1.4,
+                                    'font-weight': 500
+                                }
+                            },
+                            {
+                                selector: 'edge',
+                                style: {
+                                    'width': 2,
+                                    'line-color': '#d1d5db',
+                                    'curve-style': 'bezier'
+                                }
+                            }
+                        ],
+                        autoungrabify: true,
+                        userZoomingEnabled: false,
+                        userPanningEnabled: false,
+                        boxSelectionEnabled: false
+                    });
+
+                    // Add click handler
+                    cy.on('tap', 'node', function(evt) {
+                        const node = evt.target;
+                        const roomName = node.data('name');
+                        showCharacterSelector(t, roomName, evt.originalEvent);
+                    });
+
+                    // Update node colors based on placements
+                    updateNodeColors(cy, t);
+
+                    state.cytoscapeInstances.push(cy);
+                }, 50);
+            }
+        }
+
+        function updateNodeColors(cy, timestep) {
+            cy.nodes().forEach(node => {
+                const roomName = node.data('name');
+                const placements = state.placements[timestep][roomName];
+
+                // Build label with room name and character initials
+                let label = roomName;
+
+                if (placements && placements.length > 0) {
+                    const activeChars = placements.filter(p => !p.strikethrough);
+                    const struckChars = placements.filter(p => p.strikethrough);
+
+                    if (activeChars.length > 0 || struckChars.length > 0) {
+                        label += '\n\n';
+
+                        // Add active characters
+                        if (activeChars.length > 0) {
+                            label += activeChars.map(p => p.initial).join(' ');
+                        }
+
+                        // Add struck characters with indicator
+                        if (struckChars.length > 0) {
+                            if (activeChars.length > 0) label += ' ';
+                            label += struckChars.map(p => '✗' + p.initial).join(' ');
+                        }
+                    }
+
+                    // Has characters - use first character's color
+                    const firstChar = activeChars[0];
+                    if (firstChar) {
+                        node.style('border-color', firstChar.color);
+                        node.style('border-width', 4);
+                    } else {
+                        node.style('border-color', '#ef4444');
+                        node.style('border-width', 3);
+                    }
+                } else {
+                    // Empty
+                    node.style('border-color', '#9ca3af');
+                    node.style('border-width', 3);
+                }
+
+                node.style('label', label);
+            });
+        }
+
+        function showCharacterSelector(timestep, roomName, event) {
+            const selector = document.getElementById('characterSelector');
+            const header = document.getElementById('selectorHeader');
+            const grid = document.getElementById('characterGrid');
+            const existingChips = document.getElementById('existingChips');
+            const backdrop = createBackdrop();
+
+            state.currentSelector = { timestep, roomName };
+
+            header.textContent = `${roomName} at Time ${timestep}`;
+
+            // Render character options
+            grid.innerHTML = '';
+            state.characters.forEach(char => {
+                const btn = document.createElement('button');
+                btn.className = 'character-option';
+                btn.style.borderColor = char.color;
+                btn.innerHTML = `
+                    <span class="initial" style="color: ${char.color}">${char.initial}</span>
+                    <span class="name">${char.name}</span>
+                `;
+                btn.onclick = () => addCharacterChip(timestep, roomName, char);
+                grid.appendChild(btn);
+            });
+
+            // Show existing chips
+            const placements = state.placements[timestep][roomName] || [];
+            if (placements.length > 0) {
+                existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">Current:</div>';
+                placements.forEach(placement => {
+                    const chipItem = document.createElement('div');
+                    chipItem.className = 'chip-item';
+                    chipItem.innerHTML = `
+                        <span style="color: ${placement.color}; font-weight: 600;">${placement.initial}</span>
+                        <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through;' : ''}">${placement.char}</span>
+                        <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}')">
+                            ${placement.strikethrough ? 'Unstrike' : 'Strike'}
+                        </button>
+                        <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}')">Remove</button>
+                    `;
+                    existingChips.appendChild(chipItem);
+                });
+            } else {
+                existingChips.innerHTML = '';
+            }
+
+            // Position selector - center on mobile, near click on desktop
+            if (window.innerWidth <= 768) {
+                backdrop.style.display = 'block';
+                selector.style.left = '50%';
+                selector.style.top = '50%';
+                selector.style.transform = 'translate(-50%, -50%)';
+            } else {
+                selector.style.left = `${event.pageX + 10}px`;
+                selector.style.top = `${event.pageY + 10}px`;
+                selector.style.transform = 'none';
+            }
+
+            selector.classList.remove('hidden');
+
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', closeSelector);
+                document.addEventListener('touchstart', closeSelector);
+            }, 100);
+        }
+
+        function closeSelector(e) {
+            const selector = document.getElementById('characterSelector');
+            const backdrop = document.getElementById('selectorBackdrop');
+            if (!selector.contains(e.target)) {
+                selector.classList.add('hidden');
+                if (backdrop) backdrop.style.display = 'none';
+                document.removeEventListener('click', closeSelector);
+                document.removeEventListener('touchstart', closeSelector);
+            }
+        }
+
+        // Add backdrop overlay for mobile
+        function createBackdrop() {
+            let backdrop = document.getElementById('selectorBackdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.id = 'selectorBackdrop';
+                backdrop.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none;';
+                backdrop.onclick = () => {
+                    document.getElementById('characterSelector').classList.add('hidden');
+                    backdrop.style.display = 'none';
+                };
+                document.body.appendChild(backdrop);
+            }
+            return backdrop;
+        }
+
+        function addCharacterChip(timestep, roomName, char) {
+            // Check if already exists
+            const existing = state.placements[timestep][roomName].find(p => p.char === char.name);
+            if (existing) return;
+
+            state.placements[timestep][roomName].push({
+                char: char.name,
+                initial: char.initial,
+                color: char.color,
+                strikethrough: false
+            });
+
+            updateMiniMapVisuals(timestep);
+            saveState();
+
+            // Refresh selector
+            if (state.currentSelector) {
+                const selector = document.getElementById('characterSelector');
+                const rect = selector.getBoundingClientRect();
+                showCharacterSelector(timestep, roomName, {
+                    pageX: rect.left + window.scrollX,
+                    pageY: rect.top + window.scrollY
+                });
+            }
+        }
+
+        function toggleStrikethrough(timestep, roomName, charName) {
+            const placement = state.placements[timestep][roomName].find(p => p.char === charName);
+            if (placement) {
+                placement.strikethrough = !placement.strikethrough;
+                updateMiniMapVisuals(timestep);
+                saveState();
+
+                // Refresh selector
+                if (state.currentSelector) {
+                    const selector = document.getElementById('characterSelector');
+                    const rect = selector.getBoundingClientRect();
+                    showCharacterSelector(timestep, roomName, {
+                        pageX: rect.left + window.scrollX,
+                        pageY: rect.top + window.scrollY
+                    });
+                }
+            }
+        }
+
+        function removeCharacterChip(timestep, roomName, charName) {
+            state.placements[timestep][roomName] = state.placements[timestep][roomName].filter(p => p.char !== charName);
+            updateMiniMapVisuals(timestep);
+            saveState();
+
+            // Refresh selector
+            if (state.currentSelector) {
+                const selector = document.getElementById('characterSelector');
+                const rect = selector.getBoundingClientRect();
+                showCharacterSelector(timestep, roomName, {
+                    pageX: rect.left + window.scrollX,
+                    pageY: rect.top + window.scrollY
+                });
+            }
+        }
+
+        function updateMiniMapVisuals(timestep) {
+            const cyIndex = timestep - 1;
+            if (state.cytoscapeInstances[cyIndex]) {
+                updateNodeColors(state.cytoscapeInstances[cyIndex], timestep);
+            }
+        }
+
+        function renderTrackingTable() {
+            const table = document.getElementById('trackingTable');
+
+            let html = '<thead><tr><th>Character</th>';
+            state.rooms.forEach(room => {
+                html += `<th>${room}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            state.characters.forEach(char => {
+                html += `<tr><td class="character-name">${char.name}</td>`;
+                state.rooms.forEach(room => {
+                    html += `<td><input type="number" min="0" max="${state.timesteps}" placeholder="0" data-char="${char.name}" data-room="${room}"></td>`;
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody>';
+            table.innerHTML = html;
+        }
+
+        // Undo/Redo functionality
+        function saveState() {
+            const stateSnapshot = JSON.stringify({
+                placements: state.placements,
+                notes: document.getElementById('notesEditor').value
+            });
+
+            // Remove any states after current index
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(stateSnapshot);
+            state.historyIndex++;
+
+            // Limit history to 50 states
+            if (state.history.length > 50) {
+                state.history.shift();
+                state.historyIndex--;
+            }
+
+            updateUndoRedoButtons();
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                restoreState(state.history[state.historyIndex]);
+                updateUndoRedoButtons();
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                restoreState(state.history[state.historyIndex]);
+                updateUndoRedoButtons();
+            }
+        }
+
+        function restoreState(stateStr) {
+            const snapshot = JSON.parse(stateStr);
+            state.placements = snapshot.placements;
+            document.getElementById('notesEditor').value = snapshot.notes;
+
+            // Update all mini-maps
+            for (let t = 1; t <= state.timesteps; t++) {
+                updateMiniMapVisuals(t);
+            }
+        }
+
+        function updateUndoRedoButtons() {
+            const canUndo = state.historyIndex > 0;
+            const canRedo = state.historyIndex < state.history.length - 1;
+
+            document.getElementById('undoBtn').disabled = !canUndo;
+            document.getElementById('redoBtn').disabled = !canRedo;
+            document.getElementById('floatingUndo').disabled = !canUndo;
+            document.getElementById('floatingRedo').disabled = !canRedo;
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+                e.preventDefault();
+                redo();
+            }
+        });
+
+        // Notes formatting
+        function formatText(command) {
+            const editor = document.getElementById('notesEditor');
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const selectedText = editor.value.substring(start, end);
+
+            // Simple markdown-style formatting
+            let formatted = selectedText;
+            switch(command) {
+                case 'bold':
+                    formatted = `**${selectedText}**`;
+                    break;
+                case 'italic':
+                    formatted = `*${selectedText}*`;
+                    break;
+                case 'underline':
+                    formatted = `__${selectedText}__`;
+                    break;
+            }
+
+            editor.value = editor.value.substring(0, start) + formatted + editor.value.substring(end);
+            editor.focus();
+            editor.setSelectionRange(start, start + formatted.length);
+        }
+
+        function insertBullet() {
+            const editor = document.getElementById('notesEditor');
+            const start = editor.selectionStart;
+            const bullet = '\n• ';
+            editor.value = editor.value.substring(0, start) + bullet + editor.value.substring(start);
+            editor.focus();
+            editor.setSelectionRange(start + bullet.length, start + bullet.length);
+        }
+
+        // Auto-save notes
+        document.getElementById('notesEditor').addEventListener('input', () => {
+            saveState();
+        });
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initializeSheet();
+        });
+    </script>
+</body>
+</html>
