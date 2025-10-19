@@ -1205,10 +1205,12 @@
                             label += activeChars.map(p => p.initial).join(' ');
                         }
 
-                        // Add struck characters with indicator
+                        // Add struck characters with strikethrough
                         if (struckChars.length > 0) {
                             if (activeChars.length > 0) label += ' ';
-                            label += struckChars.map(p => '✗' + p.initial).join(' ');
+                            // Note: Cytoscape doesn't support text-decoration in labels
+                            // So we'll use a different visual indicator
+                            label += struckChars.map(p => `[${p.initial}]`).join(' ');
                         }
                     }
 
@@ -1264,8 +1266,8 @@
                     const chipItem = document.createElement('div');
                     chipItem.className = 'chip-item';
                     chipItem.innerHTML = `
-                        <span style="color: ${placement.color}; font-weight: 600;">${placement.initial}</span>
-                        <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through;' : ''}">${placement.char}</span>
+                        <span style="color: ${placement.color}; font-weight: 600; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.initial}</span>
+                        <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.char}</span>
                         <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}')">
                             ${placement.strikethrough ? 'Unstrike' : 'Strike'}
                         </button>
@@ -1382,8 +1384,8 @@
                     const chipItem = document.createElement('div');
                     chipItem.className = 'chip-item';
                     chipItem.innerHTML = `
-                        <span style="color: ${placement.color}; font-weight: 600;">${placement.initial}</span>
-                        <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through;' : ''}">${placement.char}</span>
+                        <span style="color: ${placement.color}; font-weight: 600; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.initial}</span>
+                        <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.char}</span>
                         <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}')">
                             ${placement.strikethrough ? 'Unstrike' : 'Strike'}
                         </button>
