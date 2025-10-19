@@ -85,6 +85,19 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S3: The Singer's Jewels
+**Mystery**: A priceless necklace keeps changing hands. The first thief is the first person alone with it in the first listed room (the “Dance Hall”), and any time the holder meets exactly one other person, the jewels pass.
+
+**Rules**:
+- At least one character must visit the first room defined in the map during the timeline
+- Beyond the guaranteed visit, schedules remain unconstrained; the passing narrative is left for downstream clue logic
+
+**Goal**: Track who entered the key room and build the story of how the jewels moved.
+
+**Difficulty Factors**: With more characters and longer timelines, multiple suspects may plausibly be first to reach the room, complicating deduction.
+
+---
+
 ### S4: Bomb Duo
 **Mystery**: Two accomplices are planning something suspicious.
 
@@ -172,6 +185,7 @@ Players must deduce the secret scenario by combining:
 Enable one or more scenarios:
 - **S1 (Poison)**: Optional fixed room/time
 - **S2 (Phantom)**: No configuration needed
+- **S3 (Singer's Jewels)**: No configuration needed
 - **S4 (Bomb)**: Optional fixed room (time is always final)
 - **S5 (Lovers)**: No configuration needed
 

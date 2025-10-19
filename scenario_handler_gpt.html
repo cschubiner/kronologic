@@ -111,7 +111,7 @@
       <label><input type="radio" name="scenario" id="s2" value="s2" /> S2: Phantom (one character is alone at every time)</label>
     </div>
     <div class="row">
-      <label><input type="radio" name="scenario" id="s3" value="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
+      <label><input type="radio" name="scenario" id="s3" value="s3" /> S3: Singer's Jewels (someone must enter the first listed room)</label>
     </div>
     <div class="row">
       <label><input type="radio" name="scenario" id="s4" value="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
@@ -853,6 +853,12 @@ function scoreScenario(res, cfg) {
     scores.bomb = scoreBomb(res, cfg);
     score += scores.bomb;
   }
+
+  // S3: Singer's Jewels scoring
+  if (cfg.scenarios.s3) {
+    scores.jewels = scoreJewels(res, cfg);
+    score += scores.jewels;
+  }
   
   return { total: score, breakdown: scores };
 }
@@ -965,6 +971,30 @@ function scorePoison(res, cfg) {
   return score;
 }
 
+function scoreJewels(res, cfg) {
+  // Complexity rises when many moments feature exactly two occupants,
+  // creating extra hand-off opportunities in the narrative.
+  const T = cfg.T;
+  const rooms = cfg.rooms;
+  const chars = cfg.chars;
+  let score = 0;
+
+  const jewelRoom = rooms[0];
+
+  for (let t = 0; t < T; t++) {
+    for (const room of rooms) {
+      let count = 0;
+      for (const char of chars) {
+        if (res.schedule[char][t] === room) count++;
+      }
+      if (count === 2) {
+        score += room === jewelRoom ? 80 : 40;
+      }
+    }
+  }
+
+  return score;
+}
 function scoreBomb(res, cfg) {
   // Higher score = harder puzzle
   // Measure: How often bombers are with other people (camouflage)
@@ -1245,7 +1275,7 @@ qs("genBtn").addEventListener("click", async ()=>{
     scenarios: {
       s1: scenarioValue === 's1',
       s2: scenarioValue === 's2' || scenarioValue === 's6',
-      s3: false, // placeholder
+      s3: scenarioValue === 's3',
       s4: scenarioValue === 's4',
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s1_room: qs("s1_room").value.trim() || null,
@@ -1610,4 +1640,3 @@ window.addEventListener('DOMContentLoaded', ()=>{
 </script>
 </body>
 </html>
-

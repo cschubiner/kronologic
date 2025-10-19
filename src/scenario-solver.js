@@ -258,6 +258,18 @@ export function buildCNF(config){
   // =========== Scenarios ===========
   const privKeys = {};
 
+  // S3: Ensure first listed room is visited at least once
+  if (config.scenarios.s3){
+    if (!R.length) throw new Error('S3 requires at least one room');
+    const firstRoomVar = [];
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        firstRoomVar.push(X(ci, t, 0));
+      }
+    }
+    clauses.push(firstRoomVar);
+  }
+
   // S2: Phantom alone at every time
   let PH = null;
   if (config.scenarios.s2){

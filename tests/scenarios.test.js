@@ -556,6 +556,57 @@ describe('S2: Phantom Scenario', () => {
   })
 })
 
+describe("S3: Singer's Jewels Scenario", () => {
+  it('should ensure the first room is visited at least once', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Library'],
+      edges: [['Atrium', 'Library']],
+      chars: ['A', 'B'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5000
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const firstRoom = cfg.rooms[0]
+    let visited = false
+    for (const char of cfg.chars) {
+      for (let t = 0; t < cfg.T; t++) {
+        if (res.schedule[char][t] === firstRoom) {
+          visited = true
+          break
+        }
+      }
+      if (visited) break
+    }
+    expect(visited).toBe(true)
+  })
+
+  it('should work with mustMove constraint', () => {
+    const cfg = {
+      rooms: ['Hall', 'Kitchen', 'Study'],
+      edges: [['Hall', 'Kitchen'], ['Kitchen', 'Study']],
+      chars: ['A', 'B', 'C'],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s3: true },
+      seed: 5010
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const firstRoom = cfg.rooms[0]
+    const visited = cfg.chars.some(char => res.schedule[char].includes(firstRoom))
+    expect(visited).toBe(true)
+  })
+})
+
 describe('S4: Bomb Duo Scenario', () => {
   it('should have bombers as ONLY pair ever alone together', () => {
     const cfg = {
