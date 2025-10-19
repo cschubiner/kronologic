@@ -713,6 +713,11 @@
     <!-- Character selector popup -->
     <div id="characterSelector" class="character-selector hidden">
         <div class="header" id="selectorHeader">Add Character</div>
+        <div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
+            <label style="display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: #374151;">Character Count:</label>
+            <input type="number" id="roomCountInput" min="0" max="10" placeholder="0" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 14px; min-height: 40px;" onchange="updateRoomCount(event)">
+            <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">How many characters were in this room at this time?</div>
+        </div>
         <div id="bulkActions">
             <div style="display: flex; gap: 6px; justify-content: center;">
                 <button style="padding: 8px 14px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 38px; flex: 1;" onclick="strikeAllCharsInRoom(event)">Strike All</button>
@@ -746,6 +751,7 @@
             ],
             rooms: ['Foyer', 'Stairs', 'Gallery', 'Masks', 'DanceRoom', 'MusicRoom'],
             placements: {}, // { timestep: { room: [{ char, initial, color, strikethrough }] } }
+            roomCounts: {}, // { timestep: { room: count } }
             cytoscapeInstances: [],
             history: [],
             historyIndex: -1,
@@ -781,6 +787,7 @@
                         layoutIndex: state.currentLayoutIndex
                     },
                     placements: state.placements,
+                    roomCounts: state.roomCounts,
                     notes: document.getElementById('notesEditor').value,
                     tracking: getTrackingTableData(),
                     history: state.history,
@@ -827,8 +834,9 @@
                     state.rooms = parsed.roomNames;
                 }
 
-                // Restore placements
+                // Restore placements and counts
                 state.placements = sessionData.placements;
+                state.roomCounts = sessionData.roomCounts || {};
 
                 // Restore notes
                 document.getElementById('notesEditor').value = sessionData.notes || '';
@@ -1066,12 +1074,15 @@
                 };
             });
 
-            // Reset placements
+            // Reset placements and counts
             state.placements = {};
+            state.roomCounts = {};
             for (let t = 1; t <= timestepCount; t++) {
                 state.placements[t] = {};
+                state.roomCounts[t] = {};
                 state.rooms.forEach(room => {
                     state.placements[t][room] = [];
+                    state.roomCounts[t][room] = null;
                 });
             }
 
@@ -1195,9 +1206,15 @@
             cy.nodes().forEach(node => {
                 const roomName = node.data('name');
                 const placements = state.placements[timestep][roomName];
+                const roomCount = state.roomCounts[timestep][roomName];
 
                 // Build label with room name and character initials
                 let label = roomName;
+
+                // Add room count if set
+                if (roomCount !== null && roomCount !== undefined) {
+                    label += `\n[${roomCount}]`;
+                }
 
                 if (placements && placements.length > 0) {
                     const activeChars = placements.filter(p => !p.strikethrough);
@@ -1244,11 +1261,16 @@
             const header = document.getElementById('selectorHeader');
             const grid = document.getElementById('characterGrid');
             const existingChips = document.getElementById('existingChips');
+            const roomCountInput = document.getElementById('roomCountInput');
             const backdrop = createBackdrop();
 
             state.currentSelector = { timestep, roomName };
 
             header.textContent = `${roomName} at Time ${timestep}`;
+
+            // Set current room count
+            const currentCount = state.roomCounts[timestep][roomName];
+            roomCountInput.value = currentCount !== null && currentCount !== undefined ? currentCount : '';
 
             // Render character options
             grid.innerHTML = '';
@@ -1448,6 +1470,20 @@
             refreshExistingChips(timestep, roomName);
         }
 
+        function updateRoomCount(event) {
+            if (event) event.stopPropagation();
+            if (!state.currentSelector) return;
+
+            const { timestep, roomName } = state.currentSelector;
+            const value = event.target.value;
+            
+            // Store the count (null if empty)
+            state.roomCounts[timestep][roomName] = value === '' ? null : parseInt(value);
+            
+            updateMiniMapVisuals(timestep);
+            saveState();
+        }
+
         function renderTrackingTable() {
             const table = document.getElementById('trackingTable');
 
@@ -1481,6 +1517,7 @@
         function saveState() {
             const stateSnapshot = JSON.stringify({
                 placements: state.placements,
+                roomCounts: state.roomCounts,
                 notes: document.getElementById('notesEditor').value
             });
 
@@ -1520,6 +1557,7 @@
         function restoreState(stateStr) {
             const snapshot = JSON.parse(stateStr);
             state.placements = snapshot.placements;
+            state.roomCounts = snapshot.roomCounts || {};
             document.getElementById('notesEditor').value = snapshot.notes;
 
             // Update all mini-maps
