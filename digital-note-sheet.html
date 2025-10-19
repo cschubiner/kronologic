@@ -752,6 +752,141 @@
             <textarea class="notes-editor" id="notesEditor" placeholder="Enter your deduction notes here..."></textarea>
         </div>
 
+        <div class="tracking-section">
+            <h2>Scenario Reference Guide</h2>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 13px; line-height: 1.6;">
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S1: Poison (Assassin)</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> One character poisoned someone at a specific time and location.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>The assassin is always the <strong>first character</strong> in your character list</li>
+                            <li>Exactly one victim (not the assassin) was poisoned</li>
+                            <li>At exactly one (time, room) pair (the "poison moment"):
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>The assassin and victim are both present</li>
+                                    <li>NO other characters are present (exactly 2 people total)</li>
+                                </ul>
+                            </li>
+                            <li>At ALL other (time, room) pairs where the assassin is present:
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>Either the assassin is completely alone (1 person), OR</li>
+                                    <li>At least 2 other people are present with the assassin (3+ people total)</li>
+                                    <li>The assassin is NEVER alone with exactly one other person except at the poison moment</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify the victim, poison time, and poison room.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S2: Phantom</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> One character was mysteriously alone at every single timestep.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Exactly one character is the phantom</li>
+                            <li>At EVERY timestep (t=1, t=2, ..., t=T):
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>The phantom is in some room</li>
+                                    <li>NO other character is in the same room as the phantom</li>
+                                    <li>The phantom is completely isolated at that timestep</li>
+                                </ul>
+                            </li>
+                            <li>All non-phantom characters must share a room with at least one other character at some point during the timeline</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify which character is the phantom.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S4: Bomb Duo</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> Two accomplices are planning something suspicious.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Exactly two characters are the bombers (A1 and A2)</li>
+                            <li>The bombers are distinct (A1 ≠ A2)</li>
+                            <li><strong>Critical constraint:</strong> For ANY (time, room) pair, if exactly 2 characters are present in that room at that time, those 2 characters MUST be the bombers</li>
+                            <li>Equivalently: The bombers are the ONLY pair who can ever be alone together</li>
+                            <li>Other character groupings are allowed:
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>1 person (anyone can be alone, including bombers)</li>
+                                    <li>3+ people (any combination, including with or without bombers)</li>
+                                </ul>
+                            </li>
+                            <li>But exactly 2 people in a room is ONLY allowed if those 2 are the bombers</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify the two bombers.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S5: Lovers</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> Two characters are secret lovers who never meet.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Exactly two characters are the lovers (L1 and L2)</li>
+                            <li>The lovers are distinct (L1 ≠ L2)</li>
+                            <li>The lovers NEVER share a room at any timestep:
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>For ALL (time, room) pairs: L1 and L2 are never both present</li>
+                                </ul>
+                            </li>
+                            <li><strong>Every pair of non-lovers must meet at least once:</strong>
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>For any two characters who are NOT both lovers, they must share a room at some (time, room) pair</li>
+                                    <li>This ensures all non-lovers encounter each other at least once</li>
+                                    <li>The lovers themselves never meet each other</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify the two lovers.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S6: Phantom + Lovers</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> One character is a phantom (alone at every timestep) AND there are two lovers who never meet.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Combines S2 (Phantom) and S5 (Lovers) constraints</li>
+                            <li>Exactly one character is the phantom:
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>At EVERY timestep, the phantom is alone in their room</li>
+                                    <li>NO other character shares a room with the phantom at any time</li>
+                                    <li>The phantom is in their own category - neither a lover nor a non-lover</li>
+                                </ul>
+                            </li>
+                            <li>Exactly two characters are the lovers (L1 and L2):
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>The lovers NEVER share a room at any timestep</li>
+                                    <li>The lovers are distinct from the phantom</li>
+                                    <li><strong>Neither lover can be the phantom</strong> (phantom is always alone, so can't have a relationship)</li>
+                                </ul>
+                            </li>
+                            <li><strong>Every pair of non-phantom, non-lovers must meet at least once:</strong>
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>For any two characters who are NOT lovers AND NOT the phantom, they must share a room at some point</li>
+                                    <li>This ensures all "regular" characters encounter each other</li>
+                                    <li>The phantom is excluded from this requirement (they never meet anyone)</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify the phantom and the two lovers.</p>
+                    </div>
+                </details>
+
+                <p style="margin-top: 12px; font-size: 12px; color: #6b7280; font-style: italic;">
+                    Note: Only ONE scenario is active per puzzle. Use this guide to understand the rules and constraints for the scenario you're solving.
+                </p>
+            </div>
+        </div>
+
         <div style="margin: 20px 0; padding: 15px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px;">
             <button onclick="strikeAllEverywhere()" style="width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; min-height: 48px;">
                 Strike All Characters for All Rooms for All Times
