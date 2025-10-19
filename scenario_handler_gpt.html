@@ -585,9 +585,30 @@ function buildCNF(config){
           }
         }
         
-        // If neither ci nor cj is a lover, they must meet
-        // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj]) ∨ (at least one pairMeets is true)
-        clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...pairMeets]);
+        // If neither ci nor cj is a lover (or they're not THE lover pair), they must meet
+        // The pair (ci, cj) are lovers iff: (L1[ci] ∧ L2[cj]) ∨ (L1[cj] ∧ L2[ci])
+        // So they're NOT the lover pair iff: ¬((L1[ci] ∧ L2[cj]) ∨ (L1[cj] ∧ L2[ci]))
+        // Which is: (¬L1[ci] ∨ ¬L2[cj]) ∧ (¬L1[cj] ∨ ¬L2[ci])
+        // If they're not the lover pair, they must meet: at least one pairMeets is true
+        
+        // Create helper variables for "this pair is the lovers"
+        const isLoverPair1 = vp.get(`isLoverPair1_${ci}_${cj}`);
+        const isLoverPair2 = vp.get(`isLoverPair2_${ci}_${cj}`);
+        
+        // isLoverPair1 ⇔ (L1[ci] ∧ L2[cj])
+        clauses.push([-isLoverPair1, L1[ci]]);
+        clauses.push([-isLoverPair1, L2[cj]]);
+        clauses.push([-L1[ci], -L2[cj], isLoverPair1]);
+        
+        // isLoverPair2 ⇔ (L1[cj] ∧ L2[ci])
+        clauses.push([-isLoverPair2, L1[cj]]);
+        clauses.push([-isLoverPair2, L2[ci]]);
+        clauses.push([-L1[cj], -L2[ci], isLoverPair2]);
+        
+        // If NOT (isLoverPair1 ∨ isLoverPair2), then they must meet
+        // ¬(isLoverPair1 ∨ isLoverPair2) ⇒ (at least one pairMeets)
+        // (isLoverPair1 ∨ isLoverPair2) ∨ (at least one pairMeets)
+        clauses.push([isLoverPair1, isLoverPair2, ...pairMeets]);
       }
     }
   }
