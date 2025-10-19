@@ -1680,7 +1680,25 @@ describe('S7: Aggrosassin Scenario', () => {
     testWithThreshold(cfg, (res, cfg) => {
       const agg = res.priv.aggrosassin
 
-      // Count how many times aggrosassin is alone with someone
+      // Count how many timesteps aggrosassin kills (is alone with exactly 1 other)
+      let killTimesteps = 0
+      for (let t = 0; t < cfg.T; t++) {
+        let killedThisTimestep = false
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
+            killedThisTimestep = true
+            break
+          }
+        }
+        if (killedThisTimestep) killTimesteps++
+      }
+
+      // Aggrosassin must kill in at least half of the timesteps
+      const minKills = Math.ceil(cfg.T / 2)
+      expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
+
+      // Count how many times aggrosassin is alone with someone (total instances)
       let aggAloneCount = 0
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
@@ -1806,6 +1824,24 @@ describe('S7: Aggrosassin Scenario', () => {
           expect(currentRoom).not.toBe(nextRoom)
         }
       }
+
+      // Count how many timesteps aggrosassin kills
+      let killTimesteps = 0
+      for (let t = 0; t < cfg.T; t++) {
+        let killedThisTimestep = false
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
+            killedThisTimestep = true
+            break
+          }
+        }
+        if (killedThisTimestep) killTimesteps++
+      }
+
+      // Must kill in at least half of timesteps
+      const minKills = Math.ceil(cfg.T / 2)
+      expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
       // Aggrosassin constraint still holds
       let aggAloneCount = 0

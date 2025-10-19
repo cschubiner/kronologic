@@ -533,24 +533,62 @@ export function buildCNF(config){
     }
 
     // Constraint: aggrosassin must be alone with someone at least twice as often as any other pair
-    // This is hard to encode directly in SAT, so we'll enforce a weaker version:
-    // The aggrosassin must be alone with someone at least 2 times
-    const aggAlonePairs = [];
+    // AND must kill (be alone with exactly 1 other) in at least half of the total timesteps
+    
+    // For each timestep, track if aggrosassin kills someone (is alone with exactly 1 other)
+    const aggKillsAtTimestep = [];
     for (let t=0; t<T; t++){
+      const killsThisTimestep = vp.get(`aggKills_t${t}`);
+      aggKillsAtTimestep.push(killsThisTimestep);
+      
+      // killsThisTimestep is true if aggrosassin is in a pair at this timestep
+      const pairsAtThisTime = [];
       for (let ri=0; ri<R.length; ri++){
         for (let ci=0; ci<C.length; ci++){
           for (let cj=ci+1; cj<C.length; cj++){
             const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
-            aggAlonePairs.push(aggInPair);
+            pairsAtThisTime.push(aggInPair);
           }
         }
       }
+      
+      // killsThisTimestep ⇔ (at least one aggInPair is true at this timestep)
+      clauses.push([-killsThisTimestep, ...pairsAtThisTime]);
+      for (const pair of pairsAtThisTime){
+        clauses.push([-pair, killsThisTimestep]);
+      }
     }
     
-    // At least 2 instances where aggrosassin is alone with someone
-    // We'll use a simple encoding: at least one of the pairs must be true
-    if (aggAlonePairs.length > 0) {
-      clauses.push(aggAlonePairs);
+    // Constraint: At least ceil(T/2) of the aggKillsAtTimestep variables must be true
+    // We'll use a simple encoding: at least ceil(T/2) must be true
+    const minKills = Math.ceil(T / 2);
+    
+    // For small T, we can use a direct encoding
+    // For each subset of size (T - minKills + 1), at least one must be true
+    if (T <= 10) {
+      // Generate all combinations of (T - minKills + 1) timesteps
+      // At least one of these must have a kill
+      const mustHaveKills = T - minKills + 1;
+      
+      // Simple approach: for every subset of size mustHaveKills, at least one must be true
+      // This is equivalent to: at most (mustHaveKills - 1) can be false
+      // Which means: at least (T - mustHaveKills + 1) = minKills must be true
+      
+      // Use a cardinality constraint: at least minKills of aggKillsAtTimestep must be true
+      // Simple encoding: for every subset of (T - minKills + 1) variables, at least one must be true
+      function generateSubsets(arr, size) {
+        if (size === 0) return [[]];
+        if (arr.length === 0) return [];
+        const [first, ...rest] = arr;
+        const withoutFirst = generateSubsets(rest, size);
+        const withFirst = generateSubsets(rest, size - 1).map(subset => [first, ...subset]);
+        return [...withoutFirst, ...withFirst];
+      }
+      
+      const subsets = generateSubsets(aggKillsAtTimestep, mustHaveKills);
+      for (const subset of subsets) {
+        clauses.push(subset);
+      }
     }
 
     privKeys.AGG = AGG;

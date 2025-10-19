@@ -923,6 +923,12 @@
                             <li>Exactly one character is the aggrosassin</li>
                             <li>The aggrosassin is NOT guaranteed to be the first character (unlike S1 Poison)</li>
                             <li>Any character who is alone in a room with the aggrosassin at any timestep becomes a victim</li>
+                            <li>The aggrosassin must <strong>kill (be alone with exactly one other person) in at least half of the total timesteps</strong>:
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>For example, with T=6 timesteps, the aggrosassin must kill in at least 3 different timesteps</li>
+                                    <li>This ensures the aggrosassin is actively hunting throughout the timeline</li>
+                                </ul>
+                            </li>
                             <li>The aggrosassin must be alone with people at least <strong>twice as often</strong> as any other character pair:
                                 <ul style="margin: 4px 0; padding-left: 20px;">
                                     <li>If the aggrosassin is alone with someone 4 times total, then no other pair can be alone together more than 2 times</li>
