@@ -74,17 +74,15 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S4: Bomb Duo
-**Mystery**: Two accomplices planted a bomb that explodes at the final timestep.
+**Mystery**: Two accomplices are planning something suspicious.
 
 **Rules**:
 - Two characters are the bombers
-- The bomb explodes at the **final timestep** (always)
-- The bombers were alone together in the plant room at the final time
 - **Critical**: The bombers are the ONLY pair who are ever alone together (exactly 2 people in a room) at ANY time
 - Other characters can be in groups of 1, 3, 4, 5, 6... but never exactly 2 (except the bombers)
 - **All non-bombers must share a room with at least one other person at some point** (they cannot be completely isolated)
 
-**Goal**: Identify the two bombers and which room they planted the bomb in.
+**Goal**: Identify the two bombers.
 
 **Difficulty Factors**: The constraint is very restrictive, making valid scenarios rare but distinctive.
 
