@@ -171,6 +171,22 @@
   </section>
 
   <section class="card">
+    <h2>Starting Information</h2>
+    <div class="starting-info-interface">
+      <div class="row">
+        <label>Timestep:</label>
+        <select id="startingTime" class="pill"></select>
+        <label>Number of characters:</label>
+        <input id="startingCharCount" type="number" min="1" max="10" class="pill" value="3" style="width:80px;" />
+        <button class="primary" id="showStartingInfoBtn">Show Starting Positions</button>
+      </div>
+      <div id="startingInfoAnswer" class="answer-box" style="display:none;">
+        <div class="answer-shared" id="startingInfoShared"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>Question Interface</h2>
     <div class="question-interface">
       <div class="question-type">
@@ -1201,11 +1217,13 @@ function setupQuestionInterface(res, cfg){
   const locCharLocation = qs("locCharLocation");
   const locCharChar = qs("locCharChar");
   const locTimeTime = qs("locTimeTime");
+  const startingTime = qs("startingTime");
 
   locTimeLocation.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join("");
   locCharLocation.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join("");
   locCharChar.innerHTML = chars.map(c => `<option value="${c}">${c}</option>`).join("");
   locTimeTime.innerHTML = Array.from({length:T}, (_,i) => `<option value="${i+1}">t=${i+1}</option>`).join("");
+  startingTime.innerHTML = Array.from({length:T}, (_,i) => `<option value="${i+1}"${i===0?' selected':''}>t=${i+1}</option>`).join("");
 
   // Toggle between question types
   qs("askLocTimeBtn").onclick = ()=>{
@@ -1315,6 +1333,34 @@ function setupQuestionInterface(res, cfg){
         btn.textContent = "👁️ Show";
       }
     };
+  };
+
+  // Starting Information handler
+  qs("showStartingInfoBtn").onclick = ()=>{
+    const time = Number(startingTime.value);
+    const charCount = Math.min(chars.length, Math.max(1, Number(qs("startingCharCount").value) || 3));
+    
+    // Deterministically select characters based on time (for consistency)
+    // Use a simple hash to pick characters
+    let hash = time * 7919; // Prime number for better distribution
+    const selectedChars = [];
+    const availableChars = [...chars];
+    
+    for (let i = 0; i < charCount && availableChars.length > 0; i++) {
+      hash = (hash * 31 + i) & 0x7fffffff;
+      const idx = hash % availableChars.length;
+      selectedChars.push(availableChars[idx]);
+      availableChars.splice(idx, 1);
+    }
+    
+    // Get locations for selected characters at the specified time
+    const locations = selectedChars.map(char => {
+      const location = res.schedule[char][time-1];
+      return `<b>${char}</b>: ${location}`;
+    });
+    
+    qs("startingInfoShared").innerHTML = `🟢 At t=${time}, the following character locations are revealed:<br/><br/>` + locations.join('<br/>');
+    qs("startingInfoAnswer").style.display = "block";
   };
 
   // Default to Location + Time
