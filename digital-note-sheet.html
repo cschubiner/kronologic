@@ -713,10 +713,10 @@
     <!-- Character selector popup -->
     <div id="characterSelector" class="character-selector hidden">
         <div class="header" id="selectorHeader">Add Character</div>
-        <div id="bulkActions" style="display: none; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #e5e7eb;">
+        <div id="bulkActions">
             <div style="display: flex; gap: 6px; justify-content: center;">
-                <button style="padding: 8px 14px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 38px; flex: 1;" onclick="strikeAllChips(event)">Strike All</button>
-                <button style="padding: 8px 14px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 38px; flex: 1;" onclick="unstrikeAllChips(event)">Unstrike All</button>
+                <button style="padding: 8px 14px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 38px; flex: 1;" onclick="strikeAllCharsInRoom(event)">Strike All</button>
+                <button style="padding: 8px 14px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 38px; flex: 1;" onclick="unstrikeAllCharsInRoom(event)">Unstrike All</button>
             </div>
         </div>
         <div class="character-grid" id="characterGrid"></div>
@@ -1244,20 +1244,11 @@
             const header = document.getElementById('selectorHeader');
             const grid = document.getElementById('characterGrid');
             const existingChips = document.getElementById('existingChips');
-            const bulkActions = document.getElementById('bulkActions');
             const backdrop = createBackdrop();
 
             state.currentSelector = { timestep, roomName };
 
             header.textContent = `${roomName} at Time ${timestep}`;
-
-            // Show/hide bulk actions based on whether there are placements
-            const placements = state.placements[timestep][roomName] || [];
-            if (placements.length > 0) {
-                bulkActions.style.display = 'block';
-            } else {
-                bulkActions.style.display = 'none';
-            }
 
             // Render character options
             grid.innerHTML = '';
@@ -1392,15 +1383,7 @@
 
         function refreshExistingChips(timestep, roomName) {
             const existingChips = document.getElementById('existingChips');
-            const bulkActions = document.getElementById('bulkActions');
             const placements = state.placements[timestep][roomName] || [];
-
-            // Show/hide bulk actions based on whether there are placements
-            if (placements.length > 0) {
-                bulkActions.style.display = 'block';
-            } else {
-                bulkActions.style.display = 'none';
-            }
 
             if (placements.length > 0) {
                 existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">Current:</div>';
@@ -1422,29 +1405,44 @@
             }
         }
 
-        function strikeAllChips(event) {
+        function strikeAllCharsInRoom(event) {
             if (event) event.stopPropagation();
             if (!state.currentSelector) return;
 
             const { timestep, roomName } = state.currentSelector;
-            const placements = state.placements[timestep][roomName] || [];
-            placements.forEach(placement => {
-                placement.strikethrough = true;
+            
+            // Add all characters to this room with strikethrough
+            state.characters.forEach(char => {
+                const existing = state.placements[timestep][roomName].find(p => p.char === char.name);
+                if (existing) {
+                    existing.strikethrough = true;
+                } else {
+                    state.placements[timestep][roomName].push({
+                        char: char.name,
+                        initial: char.initial,
+                        color: char.color,
+                        strikethrough: true
+                    });
+                }
             });
+            
             updateMiniMapVisuals(timestep);
             saveState();
             refreshExistingChips(timestep, roomName);
         }
 
-        function unstrikeAllChips(event) {
+        function unstrikeAllCharsInRoom(event) {
             if (event) event.stopPropagation();
             if (!state.currentSelector) return;
 
             const { timestep, roomName } = state.currentSelector;
             const placements = state.placements[timestep][roomName] || [];
+            
+            // Unstrike all existing placements
             placements.forEach(placement => {
                 placement.strikethrough = false;
             });
+            
             updateMiniMapVisuals(timestep);
             saveState();
             refreshExistingChips(timestep, roomName);
