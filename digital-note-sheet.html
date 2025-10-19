@@ -1258,8 +1258,10 @@
                 grid.appendChild(btn);
             });
 
-            // Show existing chips
+            // Show existing chips and bulk actions
             const placements = state.placements[timestep][roomName] || [];
+            existingChips.innerHTML = '';
+            
             if (placements.length > 0) {
                 existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 8px;">Current:</div>';
                 placements.forEach(placement => {
@@ -1275,18 +1277,16 @@
                     `;
                     existingChips.appendChild(chipItem);
                 });
-
-                // Add Strike All / Unstrike All buttons at the bottom
-                const bulkActions = document.createElement('div');
-                bulkActions.style.cssText = 'display: flex; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;';
-                bulkActions.innerHTML = `
-                    <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
-                    <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
-                `;
-                existingChips.appendChild(bulkActions);
-            } else {
-                existingChips.innerHTML = '';
             }
+
+            // Always add Strike All / Unstrike All buttons (even if no placements yet)
+            const bulkActions = document.createElement('div');
+            bulkActions.style.cssText = 'display: flex; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;';
+            bulkActions.innerHTML = `
+                <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
+                <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
+            `;
+            existingChips.appendChild(bulkActions);
 
             // Position selector - center on mobile, near click on desktop
             if (window.innerWidth <= 768) {
@@ -1389,6 +1389,8 @@
             const existingChips = document.getElementById('existingChips');
             const placements = state.placements[timestep][roomName] || [];
 
+            existingChips.innerHTML = '';
+            
             if (placements.length > 0) {
                 existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 8px;">Current:</div>';
                 placements.forEach(placement => {
@@ -1404,18 +1406,16 @@
                     `;
                     existingChips.appendChild(chipItem);
                 });
-
-                // Add Strike All / Unstrike All buttons at the bottom
-                const bulkActions = document.createElement('div');
-                bulkActions.style.cssText = 'display: flex; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;';
-                bulkActions.innerHTML = `
-                    <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
-                    <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
-                `;
-                existingChips.appendChild(bulkActions);
-            } else {
-                existingChips.innerHTML = '';
             }
+
+            // Always add Strike All / Unstrike All buttons (even if no placements yet)
+            const bulkActions = document.createElement('div');
+            bulkActions.style.cssText = 'display: flex; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;';
+            bulkActions.innerHTML = `
+                <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
+                <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
+            `;
+            existingChips.appendChild(bulkActions);
         }
 
         function strikeAllChips(timestep, roomName, event) {
