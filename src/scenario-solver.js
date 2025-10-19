@@ -292,6 +292,15 @@ export function buildCNF(config){
     clauses.push(...exactlyOne(L1));
     clauses.push(...exactlyOne(L2));
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -L1[ci], -L2[ci] ]); }
+    
+    // If both S2 and S5 are enabled, phantom cannot be a lover
+    if (PH){
+      for (let ci=0; ci<C.length; ci++){
+        clauses.push([ -PH[ci], -L1[ci] ]);
+        clauses.push([ -PH[ci], -L2[ci] ]);
+      }
+    }
+    
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
         for (let c1=0; c1<C.length; c1++){
