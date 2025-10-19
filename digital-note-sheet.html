@@ -312,10 +312,18 @@
             color: #1a1a1a;
         }
 
+        .tracking-table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -20px;
+            padding: 0 20px;
+        }
+
         .tracking-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
+            min-width: 600px;
         }
 
         .tracking-table th,
@@ -627,18 +635,25 @@
                 overflow-y: auto;
             }
 
+            .tracking-table-wrapper {
+                margin: 0 -15px;
+                padding: 0 15px;
+            }
+
             .tracking-table {
                 font-size: 12px;
             }
 
             .tracking-table th,
             .tracking-table td {
-                padding: 6px;
+                padding: 6px 4px;
+                white-space: nowrap;
             }
 
             .tracking-table input {
                 width: 40px;
                 font-size: 14px;
+                padding: 6px 4px;
             }
         }
 
@@ -718,9 +733,11 @@
 
         <div class="tracking-section">
             <h2>Character Visits per Location</h2>
-            <table class="tracking-table" id="trackingTable">
-                <!-- Table will be generated here -->
-            </table>
+            <div class="tracking-table-wrapper">
+                <table class="tracking-table" id="trackingTable">
+                    <!-- Table will be generated here -->
+                </table>
+            </div>
         </div>
 
         <div class="notes-section">
