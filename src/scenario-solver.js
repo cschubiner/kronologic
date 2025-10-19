@@ -49,19 +49,27 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   }
 
   function chooseVar(){
-    // Heuristic: pick variable from a random non-satisfied clause
-    for (let tries=0; tries<1000; tries++){
-      const ci = Math.floor(rng()*clauses.length);
-      const c = clauses[ci];
-      if (c.length===1 && c[0]===0) continue; // satisfied
-      if (c.length>0){
-        // pick literal with smallest abs assignment or random
-        let lit = c[Math.floor(rng()*c.length)];
-        return Math.abs(lit);
+    // Prefer a unit clause first; otherwise take first literal from shortest clause.
+    let bestClause = null;
+    for (const c of clauses){
+      if (c.length===1){
+        const lit = c[0];
+        if (lit===0) continue;
+        const v = Math.abs(lit);
+        if (assigns[v]===0) return v;
+      } else if (c.length>1){
+        if (!bestClause || c.length < bestClause.length) bestClause = c;
       }
     }
-    // fallback
-    for (let v=1; v<=numVars; v++) if (assigns[v]===0) return v;
+    if (bestClause){
+      for (const lit of bestClause){
+        const v = Math.abs(lit);
+        if (assigns[v]===0) return v;
+      }
+    }
+    for (let v=1; v<=numVars; v++){
+      if (assigns[v]===0) return v;
+    }
     return 0;
   }
 
