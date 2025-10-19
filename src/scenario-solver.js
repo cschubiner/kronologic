@@ -197,6 +197,29 @@ function buildTotalizer(vars, vp, clauses, prefix){
         }
       }
     }
+
+    for (let i=0; i<out.length; i++){
+      const support = [];
+      if (i < left.length) support.push(left[i]);
+      if (i < right.length) support.push(right[i]);
+
+      for (let a=0; a<left.length; a++){
+        for (let b=0; b<right.length; b++){
+          if (a + b + 1 !== i) continue;
+          const comb = vp.get(`${prefix}_${id}_comb_${i}_${a}_${b}`);
+          clauses.push([-comb, left[a]]);
+          clauses.push([-comb, right[b]]);
+          clauses.push([comb, -left[a], -right[b]]);
+          support.push(comb);
+        }
+      }
+
+      if (support.length === 0){
+        clauses.push([-out[i]]);
+      } else {
+        clauses.push([-out[i], ...support]);
+      }
+    }
     return out;
   }
 
