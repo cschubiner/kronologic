@@ -1,19 +1,19 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-Core solver logic lives in `src/scenario-solver.js`, which exports the SAT routines plus `solveAndDecode` and helper utilities such as `neighbors`. Tests reside in `tests/`, currently centered on `scenarios.test.js` for scenario validation. Static prototypes for the web experience are kept in `scenario_handler_gpt.html` and `digital-note-sheet.html`, while shared configuration (coverage, globals) sits in `vitest.config.js`. Treat the repository root as the working directory for scripts and fixtures.
+`src/scenario-solver.js` houses the SAT solver, decoder, and helpers. Tests live in `tests/scenarios.test.js`, Vitest settings in `vitest.config.js`, and the static HTML prototypes (`scenario_handler_gpt.html`, `digital-note-sheet.html`) cover manual checks.
 
 ## Build, Test, and Development Commands
-Install dependencies once with `npm install`. Use `npx vitest` for an interactive test run when iterating on solver changes, and `npx vitest run --coverage` before proposing a PR to generate the V8 reports configured in `vitest.config.js`. The HTML tools are static; launch a lightweight server such as `npx serve .` or open the files directly in a browser when you need manual checks.
+Install dependencies with `bun install`. Iterate with `bun test`, run `bun test --coverage` before submitting, and preview HTML tools with `bun x serve .` or by opening them directly.
 
 ## Coding Style & Naming Conventions
-JavaScript sources follow ES module syntax with two-space indentation and trailing commas avoided unless required. Use `camelCase` for functions and variables, reserve `SCREAMING_SNAKE_CASE` for constants, and keep exported API names descriptive (`solveAndDecode`, `varPool`). Inline comments should clarify constraint intent rather than restating code. Run `npx prettier --check "src/**/*.js" "tests/**/*.js"` if you edit formatting-sensitive sections.
+Use ES modules, two-space indentation, and `camelCase`; reserve `SCREAMING_SNAKE_CASE` for constants. Keep functions tight, comment only on tricky constraints, and format with `bun x prettier --check "src/**/*.js" "tests/**/*.js"` after solver or test edits.
 
 ## Testing Guidelines
-Vitest is the canonical framework; place new files beside `tests/scenarios.test.js` and suffix them with `.test.js`. Mirror the existing pattern of driving solver runs with seeded configs and assert behavior via helper utilities like `testWithThreshold`. When adding scenarios, include a deterministic seed range and codify edge constraints (e.g., poison timings) so regressions surface quickly. Coverage output from `npx vitest run --coverage` should show meaningful exercise of newly added branches.
+Vitest runs under Bun; add suites as `tests/*.test.js`. Reuse `testWithThreshold` for seeded reproducibility, assert schedule invariants and private data, note failing seeds in errors, and confirm coverage with `bun test --coverage`.
 
 ## Commit & Pull Request Guidelines
-Follow the conventional commit style present in history (`feat: ...`, `refactor: ...`, `docs: ...`). Commits should bundle logically complete changes and mention scenario names or solver components touched. Pull requests need a summary of the gameplay impact, reproduction or test instructions (`npx vitest run`), and references to any tracked issues. Include screenshots or seed logs if UI HTML or scenario outputs change to help reviewers verify behavior quickly.
+Use conventional prefixes (`feat:`, `refactor:`, `docs:`) and keep commits scoped. Mention affected scenarios or solver sections. Pull requests should summarize player impact, state the verification command (`bun test`), and attach screenshots or seed logs when HTML or generated schedules change.
 
 ## Scenario Configuration Tips
-Configs passed to `solveAndDecode` include rooms, edges, characters, timeline length (`T`), and `scenarios` flags. When introducing a new constraint, document the expected private fields and schedule invariants in the README and add at least one test case that runs the solver across multiple seeds (use `cfg.seed` offsets as shown in existing suites) to ensure stability under randomized sampling.
+Solver configs take `rooms`, `edges`, `chars`, timeline `T`, and scenario flags. Document new private fields in the README, pair changes with multi-seed tests (vary `cfg.seed`), and describe how clues shift so scenario authors can brief players.
