@@ -795,10 +795,21 @@ function setupQuestionInterface(res, cfg){
     }
     
     const count = charsAtLocation.length;
-    const identities = charsAtLocation.join(", ") || "none";
     
-    qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} were in ${location} at t=${time}`;
-    qs("locTimePrivate").innerHTML = `⚪ Private: The character${count===1?' was':'s were'}: <b>${identities}</b>`;
+    // Deterministically pick one character to reveal (based on location + time hash)
+    let revealedChar = "none";
+    if (count > 0) {
+      // Simple hash: sum char codes of location + time
+      let hash = time;
+      for (let i = 0; i < location.length; i++) {
+        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+      }
+      const idx = hash % charsAtLocation.length;
+      revealedChar = charsAtLocation[idx];
+    }
+    
+    qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} ${count===1?'was':'were'} in ${location} at t=${time}`;
+    qs("locTimePrivate").innerHTML = `⚪ Private: One character present: <b>${revealedChar}</b>`;
     qs("locTimeAnswer").style.display = "block";
   };
 
@@ -817,10 +828,24 @@ function setupQuestionInterface(res, cfg){
         times.push(t+1);
       }
     }
-    const timesList = times.length > 0 ? times.map(t => `t=${t}`).join(", ") : "never";
+    
+    // Deterministically pick one time to reveal (based on location + character hash)
+    let revealedTime = "never";
+    if (times.length > 0) {
+      // Simple hash: sum char codes of location + character
+      let hash = 0;
+      for (let i = 0; i < location.length; i++) {
+        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+      }
+      for (let i = 0; i < character.length; i++) {
+        hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
+      }
+      const idx = hash % times.length;
+      revealedTime = `t=${times[idx]}`;
+    }
     
     qs("locCharShared").innerHTML = `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
-    qs("locCharPrivate").innerHTML = `⚪ Private: Visited at: <b>${timesList}</b>`;
+    qs("locCharPrivate").innerHTML = `⚪ Private: One time visited: <b>${revealedTime}</b>`;
     qs("locCharAnswer").style.display = "block";
   };
 
