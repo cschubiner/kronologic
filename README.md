@@ -94,7 +94,7 @@ Players must deduce the secret scenario by combining:
 - Two characters are the lovers
 - They are **never** in the same room at the same time
 - They avoid each other completely throughout all timesteps
-- **All non-lovers must share a room with at least one other person at some point** (they cannot be completely isolated)
+- **Every pair of non-lovers must meet at least once** (all non-lovers must encounter each other)
 - **If S2 (Phantom) is also enabled**: The phantom MUST be one of the two lovers (since the phantom is alone at all times, they can never meet their lover)
 
 **Goal**: Identify the two lovers.

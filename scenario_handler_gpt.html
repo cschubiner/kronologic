@@ -117,7 +117,7 @@
       <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; non-lovers must have company at least once; if S2 enabled, phantom must NOT be a lover)</label>
+      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; every pair of non-lovers must meet at least once; if S2 enabled, phantom must NOT be a lover)</label>
     </div>
 
     <div class="row">
@@ -235,7 +235,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S4 (Bomb Duo), S5 (Lovers + non-isolation), S2+S5 (phantom NOT a lover).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S4 (Bomb Duo), S5 (Lovers + all non-lovers meet), S2+S5 (phantom NOT a lover).</div>
 
 <script>
 /* ===========================
@@ -566,26 +566,26 @@ function buildCNF(config){
       }
     }
     
-    // Non-lovers must share a room with someone at least once
+    // Every pair of non-lovers must meet at least once
     for (let ci=0; ci<C.length; ci++){
-      const atLeastOnceWithOthers = [];
-      for (let t=0; t<T; t++){
-        for (let ri=0; ri<R.length; ri++){
-          for (let cj=0; cj<C.length; cj++){
-            if (ci===cj) continue;
-            // Create variable: both ci and cj in room ri at time t
-            const withOther = vp.get(`loverNonAlone_${ci}_${t}_${ri}_${cj}`);
-            // withOther ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
-            clauses.push([-withOther, X(ci,t,ri)]);
-            clauses.push([-withOther, X(cj,t,ri)]);
-            clauses.push([-X(ci,t,ri), -X(cj,t,ri), withOther]);
-            atLeastOnceWithOthers.push(withOther);
+      for (let cj=ci+1; cj<C.length; cj++){
+        // Create variable: ci and cj meet at least once
+        const pairMeets = [];
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const bothThere = vp.get(`loverPairMeet_${ci}_${cj}_${t}_${ri}`);
+            // bothThere ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
+            clauses.push([-bothThere, X(ci,t,ri)]);
+            clauses.push([-bothThere, X(cj,t,ri)]);
+            clauses.push([-X(ci,t,ri), -X(cj,t,ri), bothThere]);
+            pairMeets.push(bothThere);
           }
         }
+        
+        // If neither ci nor cj is a lover, they must meet
+        // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj]) ∨ (at least one pairMeets is true)
+        clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...pairMeets]);
       }
-      // If NOT a lover, must have at least one "with others" moment
-      // (L1[ci] ∨ L2[ci]) ∨ (at least one withOther is true)
-      clauses.push([L1[ci], L2[ci], ...atLeastOnceWithOthers]);
     }
   }
 

@@ -315,29 +315,29 @@ export function buildCNF(config){
       }
     }
     
-    // Non-lovers must share a room with someone at least once
+    // Every pair of non-lovers must meet at least once
     for (let ci=0; ci<C.length; ci++){
-      const atLeastOnceWithOthers = [];
-      for (let t=0; t<T; t++){
-        for (let ri=0; ri<R.length; ri++){
-          for (let cj=0; cj<C.length; cj++){
-            if (ci===cj) continue;
-            // Create variable: both ci and cj in room ri at time t
-            const withOther = vp.get(`loverNonAlone_${ci}_${t}_${ri}_${cj}`);
-            // withOther ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
-            clauses.push([-withOther, X(ci,t,ri)]);
-            clauses.push([-withOther, X(cj,t,ri)]);
-            clauses.push([-X(ci,t,ri), -X(cj,t,ri), withOther]);
-            atLeastOnceWithOthers.push(withOther);
+      for (let cj=ci+1; cj<C.length; cj++){
+        // Create variable: ci and cj meet at least once
+        const pairMeets = [];
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const bothThere = vp.get(`loverPairMeet_${ci}_${cj}_${t}_${ri}`);
+            // bothThere ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
+            clauses.push([-bothThere, X(ci,t,ri)]);
+            clauses.push([-bothThere, X(cj,t,ri)]);
+            clauses.push([-X(ci,t,ri), -X(cj,t,ri), bothThere]);
+            pairMeets.push(bothThere);
           }
         }
-      }
-      // If NOT a lover (and NOT phantom if S2 enabled), must have at least one "with others" moment
-      // (L1[ci] ∨ L2[ci] ∨ PH[ci]) ∨ (at least one withOther is true)
-      if (PH) {
-        clauses.push([L1[ci], L2[ci], PH[ci], ...atLeastOnceWithOthers]);
-      } else {
-        clauses.push([L1[ci], L2[ci], ...atLeastOnceWithOthers]);
+        
+        // If neither ci nor cj is a lover (and neither is phantom if S2 enabled), they must meet
+        // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj] ∨ PH[ci] ∨ PH[cj]) ∨ (at least one pairMeets is true)
+        if (PH) {
+          clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], PH[ci], PH[cj], ...pairMeets]);
+        } else {
+          clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...pairMeets]);
+        }
       }
     }
     
