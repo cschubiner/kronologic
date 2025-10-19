@@ -206,3 +206,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 .aider*
+
+# Node.js / Bun
+node_modules/
+coverage/
+.DS_Store
+*.log
