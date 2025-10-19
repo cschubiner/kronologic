@@ -648,7 +648,15 @@ export function buildCNF(config){
       if (requiredKills > killTimes.length){
         clauses.push([-AGG[ci]]);
       } else {
+        // Must have at least requiredKills timesteps where aggrosassin kills
         clauses.push([-AGG[ci], total[requiredKills-1]]);
+      }
+      
+      // Must have at least one victim (at least one kill must happen)
+      if (killTimes.length > 0) {
+        clauses.push([-AGG[ci], ...killTimes]);
+      } else {
+        clauses.push([-AGG[ci]]);
       }
     }
 
