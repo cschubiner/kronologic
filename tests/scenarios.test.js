@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { solveAndDecode, neighbors } from '../src/scenario-solver.js'
 
 describe('S1: Poison Scenario', () => {
-  it('should make first character the assassin', () => {
+  it('should always make first character the assassin', () => {
     // Test with multiple seeds to ensure consistency
     for (let seed = 0; seed < 5; seed++) {
       const cfg = {
@@ -151,9 +151,218 @@ describe('S1: Poison Scenario', () => {
     expect(res).not.toBeNull()
     expect(res.priv.poison_time).toBe(3)
   })
+
+  it('should ensure victim is distinct from assassin', () => {
+    for (let seed = 300; seed < 305; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['Assassin', 'Victim1', 'Victim2', 'Bystander'],
+        T: 4,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s1: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+      expect(res.priv.assassin).toBe('Assassin')
+      expect(res.priv.victim).not.toBe('Assassin')
+      expect(res.priv.victim).toBeTruthy()
+    }
+  })
+
+  it('should have exactly one poison moment', () => {
+    for (let seed = 310; seed < 315; seed++) {
+      const cfg = {
+        rooms: ['Kitchen', 'Library', 'Study'],
+        edges: [['Kitchen', 'Library'], ['Library', 'Study']],
+        chars: ['A', 'B', 'C', 'D'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s1: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const assassin = res.priv.assassin
+      const victim = res.priv.victim
+      const poisonTime = res.priv.poison_time - 1
+      const poisonRoom = res.priv.poison_room
+
+      // Count moments where assassin is with exactly one other person
+      let aloneWithOneCount = 0
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.length === 2 && charsInRoom.includes(assassin)) {
+            aloneWithOneCount++
+            // This should only happen at the poison moment
+            expect(t).toBe(poisonTime)
+            expect(room).toBe(poisonRoom)
+            expect(charsInRoom).toContain(victim)
+          }
+        }
+      }
+
+      // Exactly one poison moment
+      expect(aloneWithOneCount).toBe(1)
+    }
+  })
+
+  it('should never have assassin with exactly 2 people total except at poison moment', () => {
+    for (let seed = 320; seed < 325; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['Assassin', 'V', 'X', 'Y', 'Z'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s1: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const assassin = res.priv.assassin
+      const poisonTime = res.priv.poison_time - 1
+      const poisonRoom = res.priv.poison_room
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.includes(assassin) && charsInRoom.length === 2) {
+            // Only allowed at poison moment
+            expect(t).toBe(poisonTime)
+            expect(room).toBe(poisonRoom)
+          }
+        }
+      }
+    }
+  })
+
+  it('should work with both fixed room and time', () => {
+    for (let seed = 330; seed < 333; seed++) {
+      const cfg = {
+        rooms: ['Office', 'Hallway', 'Closet'],
+        edges: [['Office', 'Hallway'], ['Hallway', 'Closet']],
+        chars: ['A', 'B', 'C'],
+        T: 4,
+        mustMove: false,
+        allowStay: true,
+        scenarios: {
+          s1: true,
+          s1_room: 'Hallway',
+          s1_time: '2'
+        },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+      expect(res.priv.poison_room).toBe('Hallway')
+      expect(res.priv.poison_time).toBe(2)
+      
+      // Verify the constraint is satisfied
+      const assassin = res.priv.assassin
+      const victim = res.priv.victim
+      const charsInHallwayAtT2 = cfg.chars.filter(c => res.schedule[c][1] === 'Hallway')
+      
+      expect(charsInHallwayAtT2).toHaveLength(2)
+      expect(charsInHallwayAtT2).toContain(assassin)
+      expect(charsInHallwayAtT2).toContain(victim)
+    }
+  })
+
+  it('should allow assassin to be alone or with 3+ people at non-poison times', () => {
+    for (let seed = 340; seed < 343; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['Assassin', 'V1', 'V2', 'V3', 'V4'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s1: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const assassin = res.priv.assassin
+      const poisonTime = res.priv.poison_time - 1
+      const poisonRoom = res.priv.poison_room
+
+      let foundAlone = false
+      let foundWithMany = false
+
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[assassin][t]
+        const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+        
+        if (t === poisonTime && room === poisonRoom) {
+          // Poison moment - should be exactly 2
+          expect(charsInRoom).toHaveLength(2)
+        } else {
+          // Non-poison moment - can be 1 or 3+
+          if (charsInRoom.length === 1) foundAlone = true
+          if (charsInRoom.length >= 3) foundWithMany = true
+          expect(charsInRoom.length).not.toBe(2)
+        }
+      }
+
+      // At least one of these patterns should exist (not strictly required, but likely)
+      expect(foundAlone || foundWithMany).toBe(true)
+    }
+  })
 })
 
 describe('S2: Phantom Scenario', () => {
+  it('should have exactly one phantom', () => {
+    for (let seed = 150; seed < 155; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['P1', 'P2', 'P3', 'P4'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+      expect(res.priv.phantom).toBeTruthy()
+      
+      // Verify only one character is the phantom
+      let phantomCount = 0
+      for (const char of cfg.chars) {
+        let aloneAtAllTimes = true
+        for (let t = 0; t < cfg.T; t++) {
+          const room = res.schedule[char][t]
+          const others = cfg.chars.filter(c => c !== char && res.schedule[c][t] === room)
+          if (others.length > 0) {
+            aloneAtAllTimes = false
+            break
+          }
+        }
+        if (aloneAtAllTimes) phantomCount++
+      }
+      
+      expect(phantomCount).toBe(1)
+    }
+  })
+
   it('should have phantom alone at every timestep', () => {
     // Test with multiple seeds
     for (let seed = 100; seed < 110; seed++) {

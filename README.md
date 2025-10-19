@@ -51,13 +51,19 @@ Players must deduce the secret scenario by combining:
 
 **Rules**:
 - The assassin is always the **first character** in your character list (by default "A")
-- At the poison time/location, the assassin was **alone with exactly one other person** (the victim)
-- This is the **ONLY time** the assassin is ever alone with just one other person
-- At all other times, the assassin is either completely alone, or with 2+ people
+- Exactly one victim (not the assassin) was poisoned
+- At exactly one (time, room) pair (the "poison moment"):
+  - The assassin and victim are both present
+  - NO other characters are present (exactly 2 people total)
+- At ALL other (time, room) pairs where the assassin is present:
+  - Either the assassin is completely alone (1 person), OR
+  - The assassin is with 2+ other people (3+ people total)
+  - The assassin is NEVER alone with exactly one other person except at the poison moment
+- You can optionally fix the poison room and/or poison time
 
-**Goal**: Identify when, where, and who was poisoned.
+**Goal**: Identify the victim, poison time, and poison room.
 
-**Difficulty Factors**: Other characters being in pairs at various times creates red herrings.
+**Difficulty Factors**: Other character pairs being alone together at various times creates red herrings that look like potential poison moments.
 
 ---
 
@@ -65,13 +71,17 @@ Players must deduce the secret scenario by combining:
 **Mystery**: One character was mysteriously alone at every single timestep.
 
 **Rules**:
-- One character is the phantom
-- At every timestep (t=1, t=2, ..., t=T), the phantom is in a room by themselves
-- All other characters must share a room with someone at least once
+- Exactly one character is the phantom
+- At EVERY timestep (t=1, t=2, ..., t=T):
+  - The phantom is in some room
+  - NO other character is in the same room as the phantom
+  - The phantom is completely isolated at that timestep
+- All non-phantom characters must share a room with at least one other character at some point during the timeline
+  - This prevents non-phantoms from being completely isolated throughout all timesteps
 
 **Goal**: Identify which character is the phantom.
 
-**Difficulty Factors**: Characters who are alone frequently (but not always) are harder to distinguish from the true phantom.
+**Difficulty Factors**: Characters who are alone frequently (but not at every timestep) are harder to distinguish from the true phantom. The more timesteps a non-phantom spends alone, the harder the puzzle.
 
 ---
 
@@ -79,13 +89,18 @@ Players must deduce the secret scenario by combining:
 **Mystery**: Two accomplices are planning something suspicious.
 
 **Rules**:
-- Two characters are the bombers
-- **Critical**: The bombers are the ONLY pair who are ever alone together (exactly 2 people in a room) at ANY time
-- Other characters can be in groups of 1, 3, 4, 5, 6... but never exactly 2 (except the bombers)
+- Exactly two characters are the bombers (A1 and A2)
+- The bombers are distinct (A1 ≠ A2)
+- **Critical constraint**: For ANY (time, room) pair, if exactly 2 characters are present in that room at that time, those 2 characters MUST be the bombers
+- Equivalently: The bombers are the ONLY pair who can ever be alone together
+- Other character groupings are allowed:
+  - 1 person (anyone can be alone, including bombers)
+  - 3+ people (any combination, including with or without bombers)
+- But exactly 2 people in a room is ONLY allowed if those 2 are the bombers
 
 **Goal**: Identify the two bombers.
 
-**Difficulty Factors**: The constraint is very restrictive, making valid scenarios rare but distinctive.
+**Difficulty Factors**: The constraint is very restrictive. Bombers being in larger groups (camouflage) and groups of exactly 3 people (near-misses) increase difficulty.
 
 ---
 
@@ -93,14 +108,18 @@ Players must deduce the secret scenario by combining:
 **Mystery**: Two characters are secret lovers who never meet.
 
 **Rules**:
-- Two characters are the lovers
-- They are **never** in the same room at the same time
-- They avoid each other completely throughout all timesteps
-- **Every pair of non-lovers must meet at least once** (all non-lovers must encounter each other)
+- Exactly two characters are the lovers (L1 and L2)
+- The lovers are distinct (L1 ≠ L2)
+- The lovers NEVER share a room at any timestep:
+  - For ALL (time, room) pairs: L1 and L2 are never both present
+- **Every pair of non-lovers must meet at least once**:
+  - For any two characters who are NOT both lovers, they must share a room at some (time, room) pair
+  - This ensures all non-lovers encounter each other at least once
+  - The lovers themselves never meet each other
 
 **Goal**: Identify the two lovers.
 
-**Difficulty Factors**: Other pairs who rarely meet create confusion.
+**Difficulty Factors**: Other character pairs who rarely meet (but do meet at least once) create confusion about who the actual lovers are. Pairs that meet exactly once are strong red herrings.
 
 ---
 
@@ -109,14 +128,20 @@ Players must deduce the secret scenario by combining:
 
 **Rules**:
 - Combines S2 (Phantom) and S5 (Lovers) constraints
-- One character is the phantom - alone at every single timestep
-- The phantom is also one of two lovers who never meet
-- All other characters (non-phantom, non-lovers) must share a room with someone at least once
-- **Every pair of non-lovers must meet at least once** (all non-lovers must encounter each other)
+- Exactly one character is the phantom:
+  - At EVERY timestep, the phantom is alone in their room
+  - NO other character shares a room with the phantom at any time
+- Exactly two characters are the lovers (L1 and L2):
+  - The lovers NEVER share a room at any timestep
+  - The phantom MUST be one of the two lovers (either L1 or L2)
+- All non-phantom, non-lover characters must share a room with someone at least once
+- **Every pair of non-lovers must meet at least once**:
+  - For any two characters who are NOT both lovers, they must share a room at some point
+  - This includes the phantom's lover (who must meet all non-lovers)
 
 **Goal**: Identify the phantom and their lover.
 
-**Difficulty Factors**: The phantom constraint makes one lover obvious (they're always alone), but identifying their lover among the remaining characters is challenging. Other pairs who rarely meet create confusion.
+**Difficulty Factors**: The phantom is easy to identify (always alone), but their lover is hidden among the other characters. The lover must avoid the phantom while still meeting everyone else. Other pairs who rarely meet create confusion.
 
 ---
 
