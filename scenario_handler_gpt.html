@@ -41,6 +41,8 @@
   .answer-box { margin-top:12px; padding:12px; border-radius:8px; background:#0e141b; border:1px solid #253244; }
   .answer-shared { color:#42d392; font-weight:600; margin-bottom:8px; }
   .answer-private { color:#9fb1c1; font-size:12px; }
+  .answer-private.hidden { filter: blur(8px); user-select: none; }
+  .private-toggle { float:right; font-size:11px; padding:2px 8px; }
   select.pill { padding:6px 10px; }
 </style>
 </head>
@@ -158,7 +160,8 @@
               </div>
               <div id="locTimeAnswer" class="answer-box" style="display:none;">
                 <div class="answer-shared" id="locTimeShared"></div>
-                <div class="answer-private" id="locTimePrivate"></div>
+                <button class="ghost private-toggle" id="locTimeToggle">👁️ Show</button>
+                <div class="answer-private hidden" id="locTimePrivate"></div>
               </div>
             </div>
             
@@ -172,7 +175,8 @@
               </div>
               <div id="locCharAnswer" class="answer-box" style="display:none;">
                 <div class="answer-shared" id="locCharShared"></div>
-                <div class="answer-private" id="locCharPrivate"></div>
+                <button class="ghost private-toggle" id="locCharToggle">👁️ Show</button>
+                <div class="answer-private hidden" id="locCharPrivate"></div>
               </div>
             </div>
           </div>
@@ -781,6 +785,30 @@ function setupQuestionInterface(res, cfg){
     qs("locCharAnswer").style.display = "none";
   };
 
+  // Toggle private info visibility
+  qs("locTimeToggle").onclick = ()=>{
+    const privateEl = qs("locTimePrivate");
+    const btn = qs("locTimeToggle");
+    if (privateEl.classList.contains("hidden")) {
+      privateEl.classList.remove("hidden");
+      btn.textContent = "👁️ Hide";
+    } else {
+      privateEl.classList.add("hidden");
+      btn.textContent = "👁️ Show";
+    }
+  };
+  qs("locCharToggle").onclick = ()=>{
+    const privateEl = qs("locCharPrivate");
+    const btn = qs("locCharToggle");
+    if (privateEl.classList.contains("hidden")) {
+      privateEl.classList.remove("hidden");
+      btn.textContent = "👁️ Hide";
+    } else {
+      privateEl.classList.add("hidden");
+      btn.textContent = "👁️ Show";
+    }
+  };
+
   // Location + Time question
   qs("askLocTimeSubmit").onclick = ()=>{
     const location = locTimeLocation.value;
@@ -810,6 +838,8 @@ function setupQuestionInterface(res, cfg){
     
     qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} ${count===1?'was':'were'} in ${location} at t=${time}`;
     qs("locTimePrivate").innerHTML = `⚪ Private: One character present: <b>${revealedChar}</b>`;
+    qs("locTimePrivate").classList.add("hidden");
+    qs("locTimeToggle").textContent = "👁️ Show";
     qs("locTimeAnswer").style.display = "block";
   };
 
@@ -846,6 +876,8 @@ function setupQuestionInterface(res, cfg){
     
     qs("locCharShared").innerHTML = `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
     qs("locCharPrivate").innerHTML = `⚪ Private: One time visited: <b>${revealedTime}</b>`;
+    qs("locCharPrivate").classList.add("hidden");
+    qs("locCharToggle").textContent = "👁️ Show";
     qs("locCharAnswer").style.display = "block";
   };
 
