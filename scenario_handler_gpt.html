@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Scenario Handler (Offline SAT)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9fb1c1; --accent:#4da3ff; --bad:#ff6b6b; --good:#42d392; --card:#121821; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; }
+  header { padding:16px 20px; border-bottom:1px solid #18222f; display:flex; gap:16px; align-items:center; }
+  header h1 { margin:0; font-size:16px; letter-spacing:.5px; color:#cfe6ff; }
+  .wrap { display:grid; grid-template-columns: 420px 1fr; gap:16px; padding:16px; }
+  .card { background:var(--card); border:1px solid #18222f; border-radius:12px; padding:12px; }
+  .card h2 { margin:0 0 8px; font-size:13px; color:#cfe6ff; letter-spacing:.4px; }
+  textarea, input, select, button { font: inherit; }
+  textarea { width:100%; height:180px; background:#0e141b; color:var(--fg); border:1px solid #253244; border-radius:10px; padding:10px; }
+  .row { display:flex; gap:8px; align-items:center; margin:6px 0; flex-wrap:wrap; }
+  .row label { color:var(--muted); font-size:12px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { background:#0e141b; border:1px dashed #31455e; padding:6px 8px; border-radius:999px; }
+  .pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #253244; color:#d8e6f6; background:#0e141b; }
+  button.primary { background:var(--accent); color:#001122; border:none; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
+  button.ghost { background:#0e141b; color:var(--fg); border:1px solid #253244; padding:8px 10px; border-radius:10px; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { border-bottom:1px solid #223146; padding:6px 8px; text-align:left; }
+  th { color:#cfe6ff; font-weight:600; font-size:12px; }
+  .muted { color:var(--muted); }
+  .warn { color:var(--bad); }
+  .ok { color:var(--good); }
+  .tiny { font-size:12px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  .hint { color:#9fb1c1; font-size:12px; }
+  .footer { padding:10px 16px; border-top:1px solid #18222f; color:#7ea2c7; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scenario Handler — Offline SAT</h1>
+  <span class="hint">Paste Mermaid-like graph, set constraints, then Generate.</span>
+</header>
+
+<div class="wrap">
+  <section class="card">
+    <h2>Map (Mermaid-like)</h2>
+    <div class="hint tiny">Use undirected edges with <span class="mono">---</span>. Node IDs are room names (quote names with spaces).</div>
+    <textarea id="mermaidInput">graph LR
+  Lobby --- "Bay A"
+  Lobby --- "Bay B"
+  Lobby --- Office
+  Office --- Supply
+  Lobby --- Street</textarea>
+    <div class="row">
+      <label for="chars">Characters:</label>
+      <input id="chars" class="pill" value="Manager, Mechanic, VIP, Owner, Attendant, Soprano" />
+      <label for="steps">Timesteps (T):</label>
+      <input id="steps" type="number" min="2" max="10" class="pill" value="6" />
+    </div>
+    <div class="row">
+      <label>Movement:</label>
+      <label><input type="checkbox" id="mustMove" checked /> Must move each time</label>
+      <label><input type="checkbox" id="allowStay" /> Allow stay (overrides “must move”)</label>
+    </div>
+    <div class="row">
+      <label for="seed">Seed:</label>
+      <input id="seed" class="pill" value="0" />
+      <button class="ghost" id="validateBtn">Validate Map</button>
+    </div>
+
+    <h2>Scenarios</h2>
+    <div class="row">
+      <label><input type="checkbox" id="s1" /> S1: Poison (assassin alone at poison time & room)</label>
+    </div>
+    <div class="row tiny">
+      <label>Poison room (optional exact):</label>
+      <input id="s1_room" class="pill" placeholder="e.g., Office" />
+      <label>Poison time (1..T):</label>
+      <input id="s1_time" class="pill" placeholder="e.g., 3" />
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="s2" /> S2: Phantom (one character is alone at every time)</label>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits <i>alone together</i> at plant time & room)</label>
+    </div>
+    <div class="row tiny">
+      <label>Plant room (optional exact):</label>
+      <input id="s4_room" class="pill" placeholder="e.g., Lobby" />
+      <label>Plant time (1..T):</label>
+      <input id="s4_time" class="pill" placeholder="e.g., 4" />
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet / same room same time)</label>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="genBtn">Generate</button>
+      <span id="status" class="hint"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Results</h2>
+    <div id="resultsHint" class="hint tiny">No results yet.</div>
+    <div id="results" style="display:none">
+      <div class="grid">
+        <div class="card">
+          <h2>Schedule (Characters × Time)</h2>
+          <div id="schedule"></div>
+        </div>
+        <div class="card">
+          <h2>Counts by Time</h2>
+          <div id="byTime"></div>
+        </div>
+        <div class="card">
+          <h2>Visits</h2>
+          <div id="visits"></div>
+        </div>
+        <div class="card">
+          <h2>Private Facts</h2>
+          <div id="privateFacts"></div>
+        </div>
+        <div class="card">
+          <h2>Raw JSON</h2>
+          <pre class="mono tiny" id="rawJson"></pre>
+          <button class="ghost" id="downloadBtn">Download JSON</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios supported: S1, S2, S4, S5.</div>
+
+<script>
+/* ===========================
+   Minimal SAT (DPLL + Unit)
+   =========================== */
+function satSolve(clauses, numVars, randSeed=0) {
+  // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
+  // Returns: assignment array with 1..numVars: true/false, or null if UNSAT
+  const rng = mulberry32(randSeed);
+  let assigns = new Array(numVars+1).fill(0); // 0=unassigned, 1=true, -1=false
+  let occPos = Array.from({length:numVars+1}, ()=>[]);
+  let occNeg = Array.from({length:numVars+1}, ()=>[]);
+  for (let i=0;i<clauses.length;i++){
+    const c = clauses[i];
+    for (const lit of c){
+      const v = Math.abs(lit);
+      if (lit>0) occPos[v].push(i); else occNeg[v].push(i);
+    }
+  }
+
+  function unitProp(queue){
+    while (queue.length){
+      const lit = queue.pop();
+      const v = Math.abs(lit);
+      const val = lit>0 ? 1 : -1;
+      if (assigns[v] !== 0){
+        if (assigns[v] !== val) return false; // conflict
+        continue;
+      }
+      assigns[v] = val;
+      // Satisfy clauses containing lit
+      const satList = val>0 ? occPos[v] : occNeg[v];
+      for (const ci of satList){ clauses[ci] = [0]; } // mark satisfied
+      // For clauses containing ~lit, remove ~lit
+      const remList = val>0 ? occNeg[v] : occPos[v];
+      for (const ci of remList){
+        if (clauses[ci].length===1 && clauses[ci][0]===0) continue;
+        // remove -lit
+        let arr = clauses[ci];
+        let idx = arr.indexOf(-lit);
+        if (idx>=0){ arr.splice(idx,1); }
+        if (arr.length===0) return false; // empty => conflict
+        if (arr.length===1){
+          const u = arr[0];
+          if (u!==0) queue.push(u);
+        }
+      }
+    }
+    return true;
+  }
+
+  function chooseVar(){
+    // Heuristic: pick variable from a random non-satisfied clause
+    for (let tries=0; tries<1000; tries++){
+      const ci = Math.floor(rng()*clauses.length);
+      const c = clauses[ci];
+      if (c.length===1 && c[0]===0) continue; // satisfied
+      if (c.length>0){
+        // pick literal with smallest abs assignment or random
+        let lit = c[Math.floor(rng()*c.length)];
+        return Math.abs(lit);
+      }
+    }
+    // fallback
+    for (let v=1; v<=numVars; v++) if (assigns[v]===0) return v;
+    return 0;
+  }
+
+  // initial unit clauses
+  let initQ = [];
+  for (const c of clauses){ if (c.length===1 && c[0]!==0) initQ.push(c[0]); }
+  if (!unitProp(initQ)) return null;
+
+  function dfs(){
+    // check all satisfied?
+    let allSat = true;
+    for (const c of clauses){
+      if (c.length===0) return false;
+      if (!(c.length===1 && c[0]===0)) { allSat=false; break; }
+    }
+    if (allSat) return true;
+
+    const v = chooseVar();
+    if (v===0) return true; // nothing left
+    // branch true, then false
+    for (const tryVal of [true,false]){
+      // clone state (clauses + assigns) cheaply via snapshots
+      const snapshotClauses = clauses.map(c=>c.slice());
+      const snapshotAssigns = assigns.slice();
+      if (unitProp([tryVal ? v : -v])){
+        if (dfs()) return true;
+      }
+      // restore
+      clauses = snapshotClauses;
+      assigns = snapshotAssigns;
+    }
+    return false;
+  }
+
+  if (!dfs()) return null;
+
+  // build boolean array
+  const out = new Array(numVars+1);
+  for (let v=1; v<=numVars; v++){
+    out[v] = assigns[v]===1;
+    if (assigns[v]===0) out[v]=false; // default
+  }
+  return out;
+}
+function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
+
+/* ===========================
+   CNF Builder Helpers
+   =========================== */
+function varPool(){
+  let next = 1;
+  const id = new Map();
+  const rev = new Map();
+  return {
+    get(name){
+      if (!id.has(name)){ id.set(name, next); rev.set(next, name); next++; }
+      return id.get(name);
+    },
+    count(){ return next-1; },
+    rev
+  };
+}
+function atLeastOne(cl){ // OR over literals (already in int form)
+  return [cl];
+}
+function atMostOne(vars){ // pairwise
+  const out = [];
+  for (let i=0;i<vars.length;i++) for (let j=i+1;j<vars.length;j++){
+    out.push([-vars[i], -vars[j]]);
+  }
+  return out;
+}
+function exactlyOne(vars){
+  return [...atLeastOne(vars), ...atMostOne(vars)];
+}
+function impl(aLit, bLit){ // a ⇒ b  ->  (-a ∨ b)
+  return [[-aLit, bLit]];
+}
+
+/* ===========================
+   Mermaid-ish Parser
+   =========================== */
+function parseMermaid(txt){
+  // very forgiving: look for lines containing X --- Y
+  const rooms = new Set();
+  const edges = [];
+  const re = /["]?([^"\-]+?)["]?\s*---\s*["]?([^"\-]+?)["]?/;
+  const lines = txt.split(/\r?\n/);
+  for (let line of lines){
+    line = line.trim();
+    if (!line || line.startsWith("graph")) continue;
+    const m = line.match(re);
+    if (m){
+      const a = m[1].trim();
+      const b = m[2].trim();
+      rooms.add(a); rooms.add(b);
+      edges.push([a,b]);
+    }
+  }
+  return { rooms: Array.from(rooms), edges };
+}
+function neighbors(rooms, edges, includeSelf){
+  const idx = new Map(); rooms.forEach((r,i)=>idx.set(r,i));
+  const nbr = Array.from({length: rooms.length}, ()=> new Set());
+  for (const [a,b] of edges){
+    if (!idx.has(a) || !idx.has(b)) continue;
+    const i = idx.get(a), j = idx.get(b);
+    nbr[i].add(j); nbr[j].add(i);
+  }
+  if (includeSelf){ for (let i=0;i<rooms.length;i++) nbr[i].add(i); }
+  return { idx, nbr: nbr.map(s=>Array.from(s)) };
+}
+
+/* ===========================
+   Problem Encoding
+   =========================== */
+function buildCNF(config){
+  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?,time?}, s5}, seed}
+  const vp = varPool();
+  const clauses = [];
+
+  const R = config.rooms, C = config.chars, T = config.T;
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, config.allowStay && !config.mustMove);
+
+  // Helper to get variable IDs
+  const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
+
+  // Exactly one room per (c,t)
+  for (let ci=0; ci<C.length; ci++){
+    for (let t=0; t<T; t++){
+      const vars = [];
+      for (let ri=0; ri<R.length; ri++) vars.push(X(ci,t,ri));
+      clauses.push(...exactlyOne(vars));
+    }
+  }
+
+  // Movement constraints
+  for (let ci=0; ci<C.length; ci++){
+    for (let t=0; t<T-1; t++){
+      for (let ri=0; ri<R.length; ri++){
+        const allowed = nbr[ri];
+        if (!config.allowStay && config.mustMove){
+          // ensure next is in neighbors and not same room (we built nbr without self)
+        }
+        const rhs = allowed.map(r2 => X(ci, t+1, r2));
+        // (¬X[c,t,ri] ∨ (OR next))
+        clauses.push([ -X(ci,t,ri), ...rhs ]);
+      }
+    }
+  }
+
+  // =========== Scenarios ===========
+  const priv = {}; // which we'll fill later from assignment
+
+  // S2: Phantom alone at every time
+  let PH = null;
+  if (config.scenarios.s2){
+    PH = C.map((_,ci)=> vp.get(`PH_${C[ci]}`));
+    clauses.push(...exactlyOne(PH));
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          for (let cj=0; cj<C.length; cj++){
+            if (ci===cj) continue;
+            // (Ph(ci) ∧ X(ci,t,ri)) ⇒ ¬X(cj,t,ri)
+            clauses.push([ -PH[ci], -X(ci,t,ri), -X(cj,t,ri) ]);
+          }
+        }
+      }
+    }
+  }
+
+  // S5: Lovers never meet (two distinct characters never share a room/time)
+  let L1=null, L2=null;
+  if (config.scenarios.s5){
+    L1 = C.map((_,ci)=> vp.get(`L1_${C[ci]}`));
+    L2 = C.map((_,ci)=> vp.get(`L2_${C[ci]}`));
+    clauses.push(...exactlyOne(L1));
+    clauses.push(...exactlyOne(L2));
+    // distinct lovers: not the same char in both
+    for (let ci=0; ci<C.length; ci++){ clauses.push([ -L1[ci], -L2[ci] ]); }
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let c1=0; c1<C.length; c1++){
+          for (let c2=0; c2<C.length; c2++){
+            if (c1===c2) continue;
+            // (L1[c1] ∧ L2[c2]) ⇒ ¬(X[c1,t,ri] ∧ X[c2,t,ri])
+            // CNF: ¬L1[c1] ∨ ¬L2[c2] ∨ ¬X[c1,t,ri] ∨ ¬X[c2,t,ri]
+            clauses.push([ -L1[c1], -L2[c2], -X(c1,t,ri), -X(c2,t,ri) ]);
+          }
+        }
+      }
+    }
+  }
+
+  // S1: Poison — assassin alone at poison time & room
+  let A=null, PT=null, PR=null;
+  if (config.scenarios.s1){
+    A  = C.map((_,ci)=> vp.get(`A_${C[ci]}`));
+    PT = Array.from({length:T}, (_,t)=> vp.get(`PT_${t}`));
+    PR = R.map((_,ri)=> vp.get(`PR_${R[ri]}`));
+    clauses.push(...exactlyOne(A));
+    clauses.push(...exactlyOne(PT));
+    clauses.push(...exactlyOne(PR));
+    // Optional fixed room/time pins
+    if (config.scenarios.s1_room){
+      const ri = Ridx.get(config.scenarios.s1_room);
+      if (ri!=null) clauses.push([ PR[ri] ]); // force true
+    }
+    if (config.scenarios.s1_time){
+      const t = Number(config.scenarios.s1_time)-1;
+      if (!Number.isNaN(t) && t>=0 && t<T) clauses.push([ PT[t] ]);
+    }
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          // If A[ci] & PT[t] & PR[ri] then X(ci,t,ri)
+          clauses.push([ -A[ci], -PT[t], -PR[ri], X(ci,t,ri) ]);
+          // And everyone else not in (t,ri)
+          for (let cj=0; cj<C.length; cj++){
+            if (cj===ci) continue;
+            clauses.push([ -A[ci], -PT[t], -PR[ri], -X(cj,t,ri) ]);
+          }
+        }
+      }
+    }
+  }
+
+  // S4: Bomb duo — two culprits A1/A2 alone together at plant time & room
+  let A1=null, A2=null, KT=null, KR=null;
+  if (config.scenarios.s4){
+    A1 = C.map((_,ci)=> vp.get(`A1_${C[ci]}`));
+    A2 = C.map((_,ci)=> vp.get(`A2_${C[ci]}`));
+    KT = Array.from({length:T}, (_,t)=> vp.get(`KT_${t}`));
+    KR = R.map((_,ri)=> vp.get(`KR_${R[ri]}`));
+    clauses.push(...exactlyOne(A1));
+    clauses.push(...exactlyOne(A2));
+    // distinct
+    for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
+    clauses.push(...exactlyOne(KT));
+    clauses.push(...exactlyOne(KR));
+    // Optional pins
+    if (config.scenarios.s4_room){
+      const ri = Ridx.get(config.scenarios.s4_room);
+      if (ri!=null) clauses.push([ KR[ri] ]);
+    }
+    if (config.scenarios.s4_time){
+      const t = Number(config.scenarios.s4_time)-1;
+      if (!Number.isNaN(t) && t>=0 && t<T) clauses.push([ KT[t] ]);
+    }
+    // Enforce A1 in place, A2 in place, and nobody else there
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          // A1(ci) & KT & KR => X(ci,t,ri)
+          clauses.push([ -A1[ci], -KT[t], -KR[ri], X(ci,t,ri) ]);
+          // A2(ci) & KT & KR => X(ci,t,ri)
+          clauses.push([ -A2[ci], -KT[t], -KR[ri], X(ci,t,ri) ]);
+          // Any character d present at (t,ri) must be either A1 or A2
+          // (KT & KR & X(d,t,ri)) ⇒ (A1(d) ∨ A2(d))
+          // CNF: ¬KT ∨ ¬KR ∨ ¬X(d,t,ri) ∨ A1(d) ∨ A2(d)
+          clauses.push([ -KT[t], -KR[ri], -X(ci,t,ri), A1[ci], A2[ci] ]);
+        }
+      }
+    }
+  }
+
+  return { vp, clauses, privKeys: {PH, L1, L2, A, PT, PR, A1, A2, KT, KR} };
+}
+
+/* ===========================
+   Decode & Clues
+   =========================== */
+function solveAndDecode(cfg){
+  const { vp, clauses, privKeys } = buildCNF(cfg);
+  const numVars = vp.count();
+  const seed = Number(cfg.seed||0) || 0;
+  const sol = satSolve(clauses, numVars, seed);
+  if (!sol) return null;
+
+  // Helper to read var by name
+  const val = name => sol[ vp.get(name) ]===true;
+
+  const R = cfg.rooms, C = cfg.chars, T = cfg.T;
+  // schedule
+  const schedule = {};
+  for (let ci=0; ci<C.length; ci++){
+    const row = [];
+    for (let t=0; t<T; t++){
+      let found = "(none)";
+      for (let ri=0; ri<R.length; ri++){
+        if (val(`X_${C[ci]}_${t}_${R[ri]}`)){ found = R[ri]; break; }
+      }
+      row.push(found);
+    }
+    schedule[C[ci]] = row;
+  }
+
+  // by-time counts
+  const byTime = {};
+  for (let t=0; t<T; t++){
+    const counts = {}; R.forEach(r=>counts[r]=0);
+    for (let ci=0; ci<C.length; ci++){
+      const r = schedule[C[ci]][t];
+      if (counts[r]!=null) counts[r]++;
+    }
+    byTime[t+1] = counts;
+  }
+
+  // visits
+  const visits = {};
+  for (let ci=0; ci<C.length; ci++){
+    const v = {}; R.forEach(r=>v[r]=0);
+    for (let t=0; t<T; t++){ v[ schedule[C[ci]][t] ]++; }
+    visits[C[ci]] = v;
+  }
+
+  // private facts
+  const priv = {};
+  if (privKeys.PH){
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`PH_${C[ci]}`)) { priv.phantom = C[ci]; break; }
+    }
+  }
+  if (privKeys.L1 && privKeys.L2){
+    let l1=null, l2=null;
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`L1_${C[ci]}`)) l1 = C[ci];
+      if (val(`L2_${C[ci]}`)) l2 = C[ci];
+    }
+    if (l1 && l2) priv.lovers = [l1,l2];
+  }
+  if (privKeys.A && privKeys.PT && privKeys.PR){
+    let assassin=null, pTime=null, pRoom=null;
+    for (let ci=0; ci<C.length; ci++) if (val(`A_${C[ci]}`)) assassin = C[ci];
+    for (let t=0; t<T; t++) if (val(`PT_${t}`)) pTime = t+1;
+    for (let ri=0; ri<R.length; ri++) if (val(`PR_${R[ri]}`)) pRoom = R[ri];
+    priv.assassin = assassin; priv.poison_time = pTime; priv.poison_room = pRoom;
+  }
+  if (privKeys.A1 && privKeys.A2 && privKeys.KT && privKeys.KR){
+    let a1=null, a2=null, kTime=null, kRoom=null;
+    for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
+    for (let t=0; t<T; t++) if (val(`KT_${t}`)) kTime = t+1;
+    for (let ri=0; ri<R.length; ri++) if (val(`KR_${R[ri]}`)) kRoom = R[ri];
+    priv.bomb_duo = [a1,a2]; priv.plant_time = kTime; priv.plant_room = kRoom;
+  }
+
+  return { schedule, byTime, visits, priv, meta: { vars:numVars } };
+}
+
+/* ===========================
+   UI glue
+   =========================== */
+function qs(id){ return document.getElementById(id); }
+function renderTable(container, obj, headerLeft){
+  const el = typeof container==="string"? qs(container) : container;
+  let html = "<table><thead><tr>";
+  if (headerLeft) html += `<th>${headerLeft}</th>`;
+  const keys = Object.keys(obj);
+  const isArrayRows = Array.isArray(obj[keys[0]]);
+  const cols = isArrayRows ? obj[keys[0]].length : Object.keys(obj[keys[0]] || {}).length;
+  if (isArrayRows){
+    for (let i=0;i<cols;i++) html += `<th>t=${i+1}</th>`;
+    html += "</tr></thead><tbody>";
+    for (const rowKey of keys){
+      html += `<tr><th>${rowKey}</th>`;
+      for (const val of obj[rowKey]) html += `<td>${val}</td>`;
+      html += `</tr>`;
+    }
+  } else {
+    const subkeys = Object.keys(obj[keys[0]]||{});
+    for (const sk of subkeys) html += `<th>${sk}</th>`;
+    html += "</tr></thead><tbody>";
+    for (const rowKey of keys){
+      html += `<tr><th>${rowKey}</th>`;
+      for (const sk of subkeys) html += `<td>${obj[rowKey][sk]}</td>`;
+      html += `</tr>`;
+    }
+  }
+  html += "</tbody></table>";
+  el.innerHTML = html;
+}
+
+qs("validateBtn").addEventListener("click", ()=>{
+  const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
+  const msg = (rooms.length>=2 && edges.length>=1)
+    ? `<span class="ok">OK:</span> ${rooms.length} rooms, ${edges.length} doors`
+    : `<span class="warn">Need ≥2 rooms and ≥1 door.</span>`;
+  qs("status").innerHTML = msg;
+});
+
+qs("genBtn").addEventListener("click", ()=>{
+  qs("status").textContent = "Solving…";
+  const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
+  const chars = qs("chars").value.split(",").map(s=>s.trim()).filter(Boolean);
+  const T = Math.max(2, Math.min(10, Number(qs("steps").value)||6));
+  const mustMove = qs("mustMove").checked;
+  const allowStay = qs("allowStay").checked;
+  const seed = Number(qs("seed").value)||0;
+
+  if (rooms.length<2 || edges.length<1){ qs("status").innerHTML = `<span class="warn">Map too small.</span>`; return; }
+  if (chars.length<2){ qs("status").innerHTML = `<span class="warn">Add at least 2 characters.</span>`; return; }
+
+  const cfg = {
+    rooms, edges, chars, T, mustMove, allowStay, seed,
+    scenarios: {
+      s1: qs("s1").checked,
+      s2: qs("s2").checked,
+      s3: false, // placeholder
+      s4: qs("s4").checked,
+      s5: qs("s5").checked,
+      s1_room: qs("s1_room").value.trim() || null,
+      s1_time: qs("s1_time").value.trim() || null,
+      s4_room: qs("s4_room").value.trim() || null,
+      s4_time: qs("s4_time").value.trim() || null
+    }
+  };
+
+  try{
+    const res = solveAndDecode(cfg);
+    if (!res){ qs("status").innerHTML = `<span class="warn">No solution (UNSAT). Try relaxing constraints or changing T/characters.</span>`; return; }
+    qs("status").innerHTML = `<span class="ok">Solved.</span> Vars=${res.meta.vars}`;
+    qs("resultsHint").style.display = "none";
+    qs("results").style.display = "block";
+    renderTable("schedule", res.schedule, "Character");
+    renderTable("byTime", res.byTime, "Time");
+    renderTable("visits", res.visits, "Character");
+
+    // Private facts
+    const pf = [];
+    if (res.priv.phantom) pf.push(`<div>Phantom: <b>${res.priv.phantom}</b></div>`);
+    if (res.priv.lovers) pf.push(`<div>Lovers: <b>${res.priv.lovers[0]}</b> + <b>${res.priv.lovers[1]}</b></div>`);
+    if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
+    if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b> @ t=${res.priv.plant_time}, room=${res.priv.plant_room}</div>`);
+    if (pf.length===0) pf.push(`<div class="muted">None</div>`);
+    qs("privateFacts").innerHTML = pf.join("");
+
+    const raw = { schedule: res.schedule, by_time: res.byTime, visits: res.visits, private: res.priv, meta: res.meta };
+    qs("rawJson").textContent = JSON.stringify(raw, null, 2);
+
+    qs("downloadBtn").onclick = ()=>{
+      const blob = new Blob([JSON.stringify(raw,null,2)], {type:"application/json"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "scenario_solution.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+  }catch(e){
+    console.error(e);
+    qs("status").innerHTML = `<span class="warn">Error: ${e.message}</span>`;
+  }
+});
+</script>
+</body>
+</html>
+
