@@ -598,62 +598,57 @@ function buildCNF(config){
       }
     }
     
-    // Enforce: No other time/room can have exactly 2 people
-    // For every (t, room) except the plant moment, ensure it's not exactly 2 people
+    // Enforce: ONLY A1 and A2 can ever be alone together (exactly 2 people in a room)
+    // For all times and rooms, if exactly 2 people are present, they must be A1 and A2
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
-        // Skip the plant time/room combination
-        const isPlantMoment = vp.get(`isPlant_${t}_${ri}`);
-        // isPlantMoment <=> (t == plantTime && KR[ri])
-        if (t === plantTime) {
-          clauses.push(...impl(KR[ri], isPlantMoment));
-          clauses.push(...impl(isPlantMoment, KR[ri]));
-        } else {
-          // Not plant time, so isPlantMoment must be false
-          clauses.push([-isPlantMoment]);
-        }
-        
-        // Count how many characters are in room ri at time t
-        // We need to forbid exactly 2 unless it's the plant moment
-        // Create variables for each possible pair being the only two present
+        // For each pair of characters
         for (let ci=0; ci<C.length; ci++){
           for (let cj=ci+1; cj<C.length; cj++){
-            // Variable: ci and cj are the ONLY two in room ri at time t
-            const onlyTwo = vp.get(`onlyTwo_${t}_${ri}_${ci}_${cj}`);
+            // If ci and cj are both in room ri at time t, and no one else is there,
+            // then ci and cj must be A1 and A2 (in either order)
             
-            // onlyTwo => X(ci,t,ri) and X(cj,t,ri)
-            clauses.push([-onlyTwo, X(ci,t,ri)]);
-            clauses.push([-onlyTwo, X(cj,t,ri)]);
+            // Create helper variable: exactly ci and cj in room ri at time t
+            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
             
-            // onlyTwo => no other character in room ri at time t
+            // exactlyTwo => X(ci,t,ri) AND X(cj,t,ri)
+            clauses.push([-exactlyTwo, X(ci,t,ri)]);
+            clauses.push([-exactlyTwo, X(cj,t,ri)]);
+            
+            // exactlyTwo => no other character in room
             for (let ck=0; ck<C.length; ck++){
               if (ck === ci || ck === cj) continue;
-              clauses.push([-onlyTwo, -X(ck,t,ri)]);
+              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
             }
             
-            // If X(ci,t,ri) and X(cj,t,ri) and no others, then onlyTwo
-            // This is complex, so we'll just forbid onlyTwo unless it's the plant moment with A1/A2
-            // onlyTwo => isPlantMoment
-            clauses.push([-onlyTwo, isPlantMoment]);
+            // If X(ci,t,ri) AND X(cj,t,ri) AND (no others), then exactlyTwo
+            // We need: (X(ci,t,ri) ∧ X(cj,t,ri) ∧ ∀k≠ci,cj: ¬X(ck,t,ri)) => exactlyTwo
+            // Equivalently: exactlyTwo ∨ ¬X(ci,t,ri) ∨ ¬X(cj,t,ri) ∨ (∃k: X(ck,t,ri))
+            const someoneElse = [];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              someoneElse.push(X(ck,t,ri));
+            }
+            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
             
-            // If isPlantMoment, then the only valid onlyTwo is A1 and A2
-            // isPlantMoment & onlyTwo => (A1[ci] & A2[cj]) or (A1[cj] & A2[ci])
-            const validPair = vp.get(`validPair_${ci}_${cj}`);
-            // validPair <=> (A1[ci] & A2[cj]) or (A1[cj] & A2[ci])
+            // exactlyTwo => (ci,cj) must be (A1,A2) in some order
+            // exactlyTwo => (A1[ci] ∧ A2[cj]) ∨ (A1[cj] ∧ A2[ci])
+            // CNF: exactlyTwo => pair1 ∨ pair2
             const pair1 = vp.get(`pair1_${ci}_${cj}`);
             const pair2 = vp.get(`pair2_${ci}_${cj}`);
-            clauses.push(...impl(pair1, A1[ci]));
-            clauses.push(...impl(pair1, A2[cj]));
-            clauses.push([-A1[ci], -A2[cj], pair1]);
-            clauses.push(...impl(pair2, A1[cj]));
-            clauses.push(...impl(pair2, A2[ci]));
-            clauses.push([-A1[cj], -A2[ci], pair2]);
-            clauses.push([-validPair, pair1, pair2]);
-            clauses.push([-pair1, validPair]);
-            clauses.push([-pair2, validPair]);
             
-            // onlyTwo & isPlantMoment => validPair
-            clauses.push([-onlyTwo, -isPlantMoment, validPair]);
+            // pair1 <=> (A1[ci] ∧ A2[cj])
+            clauses.push([-pair1, A1[ci]]);
+            clauses.push([-pair1, A2[cj]]);
+            clauses.push([-A1[ci], -A2[cj], pair1]);
+            
+            // pair2 <=> (A1[cj] ∧ A2[ci])
+            clauses.push([-pair2, A1[cj]]);
+            clauses.push([-pair2, A2[ci]]);
+            clauses.push([-A1[cj], -A2[ci], pair2]);
+            
+            // exactlyTwo => (pair1 ∨ pair2)
+            clauses.push([-exactlyTwo, pair1, pair2]);
           }
         }
       }
