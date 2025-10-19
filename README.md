@@ -2,6 +2,11 @@
 
 A deduction game where players ask questions about character movements through rooms over time to solve mysteries. This tool generates valid scenarios with configurable difficulty using SAT solving.
 
+## Quick Links
+
+- **[Scenario Generator](scenario_handler_gpt.html)** - Generate mystery scenarios with configurable difficulty
+- **[Digital Note Sheet](digital-note-sheet.html)** - Interactive note-taking tool for tracking deductions during gameplay
+
 ## How the Game Works
 
 ### Core Mechanics
