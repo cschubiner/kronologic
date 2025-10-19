@@ -7,20 +7,24 @@
 <style>
   :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9fb1c1; --accent:#4da3ff; --bad:#ff6b6b; --good:#42d392; --card:#121821; }
   body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; }
-  header { padding:16px 20px; border-bottom:1px solid #18222f; display:flex; gap:16px; align-items:center; }
+  header { padding:16px 20px; border-bottom:1px solid #18222f; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
   header h1 { margin:0; font-size:16px; letter-spacing:.5px; color:#cfe6ff; }
-  .wrap { display:grid; grid-template-columns: 420px 1fr; gap:16px; padding:16px; }
+  .wrap { display:grid; grid-template-columns: 1fr; gap:16px; padding:16px; }
+  @media (min-width: 1024px) {
+    .wrap { grid-template-columns: 420px 1fr; }
+  }
   .card { background:var(--card); border:1px solid #18222f; border-radius:12px; padding:12px; }
   .card h2 { margin:0 0 8px; font-size:13px; color:#cfe6ff; letter-spacing:.4px; }
-  textarea, input, select, button { font: inherit; }
-  textarea { width:100%; height:180px; background:#0e141b; color:var(--fg); border:1px solid #253244; border-radius:10px; padding:10px; }
+  textarea, input, select, button { font: inherit; box-sizing:border-box; }
+  textarea { width:100%; height:180px; background:#0e141b; color:var(--fg); border:1px solid #253244; border-radius:10px; padding:10px; box-sizing:border-box; }
   .row { display:flex; gap:8px; align-items:center; margin:6px 0; flex-wrap:wrap; }
+  .row input[type="text"], .row input[type="number"] { min-width:0; flex:1 1 auto; }
   .row label { color:var(--muted); font-size:12px; }
   .chips { display:flex; gap:6px; flex-wrap:wrap; }
   .chip { background:#0e141b; border:1px dashed #31455e; padding:6px 8px; border-radius:999px; }
-  .pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #253244; color:#d8e6f6; background:#0e141b; }
-  button.primary { background:var(--accent); color:#001122; border:none; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; }
-  button.ghost { background:#0e141b; color:var(--fg); border:1px solid #253244; padding:8px 10px; border-radius:10px; cursor:pointer; }
+  .pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #253244; color:#d8e6f6; background:#0e141b; min-width:0; }
+  button.primary { background:var(--accent); color:#001122; border:none; padding:10px 14px; border-radius:10px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  button.ghost { background:#0e141b; color:var(--fg); border:1px solid #253244; padding:8px 10px; border-radius:10px; cursor:pointer; white-space:nowrap; }
   table { width:100%; border-collapse:collapse; white-space:nowrap; }
   .table-scroll { overflow-x:auto; max-width:100%; }
   th, td { border-bottom:1px solid #223146; padding:6px 8px; text-align:left; }
@@ -29,13 +33,22 @@
   .warn { color:var(--bad); }
   .ok { color:var(--good); }
   .tiny { font-size:12px; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+  .grid { display:grid; grid-template-columns: 1fr; gap:12px; }
+  @media (min-width: 768px) {
+    .grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-  .hint { color:#9fb1c1; font-size:12px; }
-  .footer { padding:10px 16px; border-top:1px solid #18222f; color:#7ea2c7; }
+  .hint { color:#9fb1c1; font-size:12px; word-break:break-word; }
+  .footer { padding:10px 16px; border-top:1px solid #18222f; color:#7ea2c7; font-size:11px; }
+  @media (max-width: 640px) {
+    header h1 { font-size:14px; }
+    .hint { font-size:11px; }
+    textarea { height:120px; font-size:13px; }
+    button.primary, button.ghost { padding:8px 12px; font-size:13px; }
+  }
   .question-interface { margin-top:16px; }
-  .question-type { display:flex; gap:12px; margin-bottom:12px; }
-  .question-type button { flex:1; }
+  .question-type { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .question-type button { flex:1; min-width:140px; }
   .question-form { display:none; }
   .question-form.active { display:block; }
   .answer-box { margin-top:12px; padding:12px; border-radius:8px; background:#0e141b; border:1px solid #253244; }
