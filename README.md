@@ -192,15 +192,90 @@ Higher percentiles select scenarios with more confusing patterns.
 - **Deterministic**: Same seed produces same scenario
 - **Pure JavaScript**: Runs entirely in browser, no server needed
 
+## Note-Taking Interface
+
+The **note-sheet.html** file provides an interactive note-taking tool designed for players to track their deductions during gameplay.
+
+### Features
+
+**Time-Step Mini-Maps**
+- Visual representation of the location graph for each timestep
+- Click any room to add/remove character placements
+- Color-coded character chips show who you believe was where
+- Strikethrough mode (click chip) marks "NOT here" deductions
+- Adaptive grid layout (responsive for mobile/tablet/desktop)
+
+**Character Placement Tracking**
+- Add character initials to rooms by clicking
+- Toggle strikethrough to mark negative deductions (e.g., "Detective was NOT in Office at t=3")
+- Remove placements with × button
+- Visual feedback: room borders change color when characters are placed
+
+**Visit Count Table**
+- Track how many times each character visited each location
+- Input boxes for recording shared information from questions
+- Helps identify patterns and contradictions
+
+**Deduction Notes**
+- Rich text editor with formatting (bold, italic, lists)
+- Record logical chains and elimination reasoning
+- Auto-saves to browser localStorage
+
+**Undo/Redo System**
+- Full history tracking (up to 50 states)
+- Keyboard shortcuts: Ctrl+Z (undo), Ctrl+Y (redo)
+- Recover from mistakes easily
+
+**Data Persistence**
+- Auto-saves all placements, counts, and notes to localStorage
+- Export to JSON file for backup or sharing
+- Survives page refresh
+
+### Intended Workflow
+
+1. **Generate a scenario** using the main generator (scenario_handler_gpt.html)
+2. **Open note-sheet.html** in a separate tab/window
+3. **As you ask questions**, record information:
+   - Shared counts go in the visit tracking table
+   - Private character sightings get placed on the time-step maps
+   - Logical deductions go in the notes area
+4. **Use visual patterns** to spot contradictions:
+   - If a character appears in two places at once, you made an error
+   - Strikethrough helps track "impossible" placements
+   - Color-coding makes it easy to see character movements
+5. **Solve the mystery** by combining all information sources
+
+### Integration with Main Generator
+
+The note sheet is designed to work alongside the scenario generator:
+- Generator provides the **questions and answers**
+- Note sheet provides the **workspace for deduction**
+- Players manually transfer information between the two tools
+- This separation keeps private information truly private (each player has their own note sheet)
+
+### Example Use Case
+
+**Scenario**: S2 (Phantom) with 6 characters, 6 timesteps
+
+1. Player asks: "How many characters in Gallery at t=3?" → Answer: "2 characters"
+2. Player records "2" in their notes
+3. Player's private info: "One character present: Detective"
+4. Player clicks Gallery on t=3 mini-map, adds Detective chip
+5. Later, player learns Detective was also in Foyer at t=3 (contradiction!)
+6. Player uses strikethrough on Gallery placement to mark it as wrong
+7. Player writes in notes: "Detective NOT in Gallery at t=3 - must be in Foyer"
+
 ## Example Workflow
 
 1. Generate 100 scenarios at 75th percentile with S2 (Phantom) enabled
 2. System creates 100 valid solutions, scores them by difficulty
 3. Selects a scenario from the 60-80th percentile range
 4. Players ask questions using the Question Interface
-5. Players deduce which character is the phantom based on:
+5. Players use the note-taking interface to track deductions
+6. Players deduce which character is the phantom based on:
    - How many people were in each room at each time (shared)
    - Specific character sightings (private to each player)
+   - Logical elimination using their notes
 
 ## Tips for Game Masters
 
