@@ -114,12 +114,7 @@
       <label><input type="checkbox" id="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits <i>alone together</i> at final time, only pair ever alone)</label>
-    </div>
-    <div class="row tiny">
-      <label>Plant room (optional exact):</label>
-      <input id="s4_room" class="pill" placeholder="e.g., Lobby" />
-      <span class="muted tiny">(Bomb always explodes at final timestep)</span>
+      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
     </div>
     <div class="row">
       <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet / same room same time)</label>
@@ -700,41 +695,16 @@ function buildCNF(config){
     }
   }
 
-  // S4: Bomb duo — two culprits A1/A2 alone together at plant time & room
-  // Bomb explodes at final timestep, and they are the ONLY pair ever alone together
-  let A1=null, A2=null, KR=null;
+  // S4: Bomb duo — A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
+  let A1=null, A2=null;
   if (config.scenarios.s4){
     A1 = C.map((_,ci)=> vp.get(`A1_${C[ci]}`));
     A2 = C.map((_,ci)=> vp.get(`A2_${C[ci]}`));
-    KR = R.map((_,ri)=> vp.get(`KR_${R[ri]}`));
     clauses.push(...exactlyOne(A1));
     clauses.push(...exactlyOne(A2));
     // distinct
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
-    clauses.push(...exactlyOne(KR));
-    
-    // Bomb always explodes at final timestep (T-1 in 0-indexed)
-    const plantTime = T - 1;
-    
-    // Optional pin for room only (time is fixed to final)
-    if (config.scenarios.s4_room){
-      const ri = Ridx.get(config.scenarios.s4_room);
-      if (ri!=null) clauses.push([ KR[ri] ]);
-    }
-    
-    // Enforce A1 and A2 are in the plant room at final time, and nobody else
-    for (let ri=0; ri<R.length; ri++){
-      for (let ci=0; ci<C.length; ci++){
-        // A1(ci) & KR(ri) => X(ci, plantTime, ri)
-        clauses.push([ -A1[ci], -KR[ri], X(ci, plantTime, ri) ]);
-        // A2(ci) & KR(ri) => X(ci, plantTime, ri)
-        clauses.push([ -A2[ci], -KR[ri], X(ci, plantTime, ri) ]);
-        // Any character at (plantTime, ri) must be A1 or A2
-        // (KR(ri) & X(ci, plantTime, ri)) => (A1(ci) ∨ A2(ci))
-        clauses.push([ -KR[ri], -X(ci, plantTime, ri), A1[ci], A2[ci] ]);
-      }
-    }
-    
+
     // Enforce: ONLY A1 and A2 can ever be alone together (exactly 2 people in a room)
     // For all times and rooms, if exactly 2 people are present, they must be A1 and A2
     for (let t=0; t<T; t++){
@@ -792,7 +762,7 @@ function buildCNF(config){
     }
   }
 
-  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2, KR} };
+  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2} };
 }
 
 /* ===========================
@@ -1050,11 +1020,10 @@ function solveAndDecode(cfg){
     for (let ri=0; ri<R.length; ri++) if (val(`PR_${R[ri]}`)) pRoom = R[ri];
     priv.assassin = assassin; priv.victim = victim; priv.poison_time = pTime; priv.poison_room = pRoom;
   }
-  if (privKeys.A1 && privKeys.A2 && privKeys.KR){
-    let a1=null, a2=null, kRoom=null;
+  if (privKeys.A1 && privKeys.A2){
+    let a1=null, a2=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
-    for (let ri=0; ri<R.length; ri++) if (val(`KR_${R[ri]}`)) kRoom = R[ri];
-    priv.bomb_duo = [a1,a2]; priv.plant_time = T; priv.plant_room = kRoom;
+    priv.bomb_duo = [a1,a2];
   }
 
   return { schedule, byTime, visits, priv, meta: { vars:numVars } };
@@ -1125,8 +1094,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s4: qs("s4").checked,
       s5: qs("s5").checked,
       s1_room: qs("s1_room").value.trim() || null,
-      s1_time: qs("s1_time").value.trim() || null,
-      s4_room: qs("s4_room").value.trim() || null
+      s1_time: qs("s1_time").value.trim() || null
     }
   };
 
@@ -1183,7 +1151,7 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.phantom) pf.push(`<div>Phantom: <b>${res.priv.phantom}</b></div>`);
     if (res.priv.lovers) pf.push(`<div>Lovers: <b>${res.priv.lovers[0]}</b> + <b>${res.priv.lovers[1]}</b></div>`);
     if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
-    if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b> @ t=${res.priv.plant_time}, room=${res.priv.plant_room}</div>`);
+    if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
 

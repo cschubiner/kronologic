@@ -429,30 +429,14 @@ export function buildCNF(config){
   }
 
   // S4: Bomb duo
-  let A1=null, A2=null, KR=null;
+  // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
+  let A1=null, A2=null;
   if (config.scenarios.s4){
     A1 = C.map((_,ci)=> vp.get(`A1_${C[ci]}`));
     A2 = C.map((_,ci)=> vp.get(`A2_${C[ci]}`));
-    KR = R.map((_,ri)=> vp.get(`KR_${R[ri]}`));
     clauses.push(...exactlyOne(A1));
     clauses.push(...exactlyOne(A2));
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
-    clauses.push(...exactlyOne(KR));
-
-    const plantTime = T - 1;
-
-    if (config.scenarios.s4_room){
-      const ri = Ridx.get(config.scenarios.s4_room);
-      if (ri!=null) clauses.push([ KR[ri] ]);
-    }
-
-    for (let ri=0; ri<R.length; ri++){
-      for (let ci=0; ci<C.length; ci++){
-        clauses.push([ -A1[ci], -KR[ri], X(ci, plantTime, ri) ]);
-        clauses.push([ -A2[ci], -KR[ri], X(ci, plantTime, ri) ]);
-        clauses.push([ -KR[ri], -X(ci, plantTime, ri), A1[ci], A2[ci] ]);
-      }
-    }
 
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
@@ -493,7 +477,6 @@ export function buildCNF(config){
     }
     privKeys.A1 = A1;
     privKeys.A2 = A2;
-    privKeys.KR = KR;
   }
 
   return { vp, clauses, privKeys };
@@ -565,11 +548,10 @@ export function solveAndDecode(cfg){
     for (let ri=0; ri<R.length; ri++) if (val(`PR_${R[ri]}`)) pRoom = R[ri];
     priv.assassin = assassin; priv.victim = victim; priv.poison_time = pTime; priv.poison_room = pRoom;
   }
-  if (privKeys.A1 && privKeys.A2 && privKeys.KR){
-    let a1=null, a2=null, kRoom=null;
+  if (privKeys.A1 && privKeys.A2){
+    let a1=null, a2=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
-    for (let ri=0; ri<R.length; ri++) if (val(`KR_${R[ri]}`)) kRoom = R[ri];
-    priv.bomb_duo = [a1,a2]; priv.plant_time = T; priv.plant_room = kRoom;
+    priv.bomb_duo = [a1,a2];
   }
 
   return { schedule, byTime, visits, priv, meta: { vars:numVars } };
