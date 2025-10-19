@@ -1389,6 +1389,7 @@
             bulkActions.innerHTML = `
                 <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
                 <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
+                <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="removeAllChips(${timestep}, '${roomName}', event)">Remove All</button>
             `;
             existingChips.appendChild(bulkActions);
 
@@ -1512,12 +1513,13 @@
                 });
             }
 
-            // Always add Strike All / Unstrike All buttons (even if no placements yet)
+            // Always add Strike All / Unstrike All / Remove All buttons (even if no placements yet)
             const bulkActions = document.createElement('div');
             bulkActions.style.cssText = 'display: flex; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;';
             bulkActions.innerHTML = `
                 <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
                 <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
+                <button style="flex: 1; padding: 8px 12px; font-size: 12px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer; min-height: 36px;" onclick="removeAllChips(${timestep}, '${roomName}', event)">Remove All</button>
             `;
             existingChips.appendChild(bulkActions);
         }
@@ -1564,6 +1566,17 @@
                     });
                 }
             });
+            
+            updateMiniMapVisuals(timestep);
+            saveState();
+            refreshExistingChips(timestep, roomName);
+        }
+
+        function removeAllChips(timestep, roomName, event) {
+            if (event) event.stopPropagation();
+            
+            // Remove all characters from this room at this timestep
+            state.placements[timestep][roomName] = [];
             
             updateMiniMapVisuals(timestep);
             saveState();
