@@ -161,6 +161,48 @@ function exactlyOne(vars){
   return [...atLeastOne(vars), ...atMostOne(vars)];
 }
 
+function buildTotalizer(vars, vp, clauses, prefix){
+  let nodeCounter = 0;
+
+  function helper(list, tag){
+    if (!list.length) return [];
+    if (list.length === 1) return [list[0]];
+
+    const mid = Math.floor(list.length / 2);
+    const left = helper(list.slice(0, mid), `${tag}L`);
+    const right = helper(list.slice(mid), `${tag}R`);
+
+    const id = `${tag}_${nodeCounter++}`;
+    const outLen = left.length + right.length;
+    const out = new Array(outLen);
+
+    for (let i=0; i<outLen; i++){
+      out[i] = vp.get(`${prefix}_${id}_${i+1}`);
+    }
+
+    for (let i=1; i<out.length; i++){
+      clauses.push([-out[i], out[i-1]]);
+    }
+    for (let i=0; i<left.length; i++){
+      clauses.push([-left[i], out[i]]);
+    }
+    for (let j=0; j<right.length; j++){
+      clauses.push([-right[j], out[j]]);
+    }
+    for (let i=0; i<left.length; i++){
+      for (let j=0; j<right.length; j++){
+        const idx = i + j + 1;
+        if (idx < out.length){
+          clauses.push([-left[i], -right[j], out[idx]]);
+        }
+      }
+    }
+    return out;
+  }
+
+  return helper(vars, prefix);
+}
+
 /* ===========================
    Mermaid-ish Parser
    =========================== */
@@ -490,104 +532,123 @@ export function buildCNF(config){
   }
 
   // S7: Aggrosassin
-  // Constraint: One character (aggrosassin) is alone with others much more frequently than any other pair
   let AGG=null;
   if (config.scenarios.s7){
+    if (T < 2) throw new Error('S7 requires at least two timesteps');
+    if (C.length < 2) throw new Error('S7 requires at least two characters');
+
+    const requiredKills = Math.max(2, Math.ceil(T / 2));
+    if (C.length - 1 < requiredKills){
+      throw new Error('S7 requires at least as many potential victims as required kills');
+    }
+
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
-    // For each (time, room) pair with exactly 2 people, track if aggrosassin is one of them
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        for (let ci=0; ci<C.length; ci++){
-          for (let cj=ci+1; cj<C.length; cj++){
-            const exactlyTwo = vp.get(`exactlyTwo_s7_${t}_${ri}_${ci}_${cj}`);
+    const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
+    const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
 
-            // exactlyTwo ⇔ (exactly ci and cj in room ri at time t)
-            clauses.push([-exactlyTwo, X(ci,t,ri)]);
-            clauses.push([-exactlyTwo, X(cj,t,ri)]);
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        const kt = vp.get(`AGGKillTime_${C[ci]}_${t}`);
+        killTimeVars[ci][t] = kt;
+        clauses.push([-kt, AGG[ci]]);
+      }
 
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        const victimsAtTimes = [];
+        for (let t=0; t<T; t++){
+          const kv = vp.get(`AGGKillVictim_${C[ci]}_${C[vj]}_${t}`);
+          killVictimVars[ci][vj][t] = kv;
+          victimsAtTimes.push(kv);
+          clauses.push([-kv, AGG[ci]]);
+          clauses.push([-kv, killTimeVars[ci][t]]);
+        }
+        if (victimsAtTimes.length > 1){
+          clauses.push(...atMostOne(victimsAtTimes));
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        const choices = [];
+        for (let vj=0; vj<C.length; vj++){
+          if (ci === vj) continue;
+          const kv = killVictimVars[ci][vj][t];
+          if (kv) choices.push(kv);
+        }
+        if (choices.length){
+          clauses.push([-killTimeVars[ci][t], ...choices]);
+        } else {
+          clauses.push([-killTimeVars[ci][t]]);
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        for (let t=0; t<T; t++){
+          const kv = killVictimVars[ci][vj][t];
+          if (!kv) continue;
+          const detailVars = [];
+          for (let ri=0; ri<R.length; ri++){
+            const detail = vp.get(`AGGKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+            detailVars.push(detail);
+            clauses.push([-detail, AGG[ci]]);
+            clauses.push([-detail, kv]);
+            clauses.push([-detail, X(ci,t,ri)]);
+            clauses.push([-detail, X(vj,t,ri)]);
             for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
+              if (ck === ci || ck === vj) continue;
+              clauses.push([-detail, -X(ck,t,ri)]);
             }
 
-            const someoneElse = [];
+            const reverse = [ -AGG[ci], -X(ci,t,ri), -X(vj,t,ri) ];
             for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === cj) continue;
-              someoneElse.push(X(ck,t,ri));
+              if (ck === ci || ck === vj) continue;
+              reverse.push( X(ck,t,ri) );
             }
-            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
-
-            // Track if aggrosassin is involved in this pair
-            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
-            
-            // aggInPair ⇔ (exactlyTwo ∧ (AGG[ci] ∨ AGG[cj]))
-            clauses.push([-aggInPair, exactlyTwo]);
-            clauses.push([-aggInPair, AGG[ci], AGG[cj]]);
-            clauses.push([-exactlyTwo, -AGG[ci], aggInPair]);
-            clauses.push([-exactlyTwo, -AGG[cj], aggInPair]);
+            reverse.push(detail);
+            clauses.push(reverse);
+          }
+          if (detailVars.length){
+            clauses.push([-kv, ...detailVars]);
+          } else {
+            clauses.push([-kv]);
           }
         }
       }
     }
 
-    // Constraint: aggrosassin must be alone with someone at least twice as often as any other pair
-    // AND must kill (be alone with exactly 1 other) in at least half of the total timesteps
-    
-    // For each timestep, track if aggrosassin kills someone (is alone with exactly 1 other)
-    const aggKillsAtTimestep = [];
-    for (let t=0; t<T; t++){
-      const killsThisTimestep = vp.get(`aggKills_t${t}`);
-      aggKillsAtTimestep.push(killsThisTimestep);
-      
-      // killsThisTimestep is true if aggrosassin is in a pair at this timestep
-      const pairsAtThisTime = [];
-      for (let ri=0; ri<R.length; ri++){
-        for (let ci=0; ci<C.length; ci++){
-          for (let cj=ci+1; cj<C.length; cj++){
-            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
-            pairsAtThisTime.push(aggInPair);
+    for (let ak=0; ak<C.length; ak++){
+      for (let ci=0; ci<C.length; ci++){
+        if (ci === ak) continue;
+        for (let cj=ci+1; cj<C.length; cj++){
+          if (cj === ak) continue;
+          for (let t=0; t<T; t++){
+            for (let ri=0; ri<R.length; ri++){
+              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
+              for (let ck=0; ck<C.length; ck++){
+                if (ck === ak || ck === ci || ck === cj) continue;
+                clause.push( X(ck,t,ri) );
+              }
+              clauses.push(clause);
+            }
           }
         }
       }
-      
-      // killsThisTimestep ⇔ (at least one aggInPair is true at this timestep)
-      clauses.push([-killsThisTimestep, ...pairsAtThisTime]);
-      for (const pair of pairsAtThisTime){
-        clauses.push([-pair, killsThisTimestep]);
-      }
     }
-    
-    // Constraint: At least ceil(T/2) of the aggKillsAtTimestep variables must be true
-    // We'll use a simple encoding: at least ceil(T/2) must be true
-    const minKills = Math.ceil(T / 2);
-    
-    // For small T, we can use a direct encoding
-    // For each subset of size (T - minKills + 1), at least one must be true
-    if (T <= 10) {
-      // Generate all combinations of (T - minKills + 1) timesteps
-      // At least one of these must have a kill
-      const mustHaveKills = T - minKills + 1;
-      
-      // Simple approach: for every subset of size mustHaveKills, at least one must be true
-      // This is equivalent to: at most (mustHaveKills - 1) can be false
-      // Which means: at least (T - mustHaveKills + 1) = minKills must be true
-      
-      // Use a cardinality constraint: at least minKills of aggKillsAtTimestep must be true
-      // Simple encoding: for every subset of (T - minKills + 1) variables, at least one must be true
-      function generateSubsets(arr, size) {
-        if (size === 0) return [[]];
-        if (arr.length === 0) return [];
-        const [first, ...rest] = arr;
-        const withoutFirst = generateSubsets(rest, size);
-        const withFirst = generateSubsets(rest, size - 1).map(subset => [first, ...subset]);
-        return [...withoutFirst, ...withFirst];
-      }
-      
-      const subsets = generateSubsets(aggKillsAtTimestep, mustHaveKills);
-      for (const subset of subsets) {
-        clauses.push(subset);
+
+    for (let ci=0; ci<C.length; ci++){
+      const killTimes = killTimeVars[ci];
+      const total = buildTotalizer(killTimes, vp, clauses, `AGGTotal_${C[ci]}`);
+      if (requiredKills > killTimes.length){
+        clauses.push([-AGG[ci]]);
+      } else {
+        clauses.push([-AGG[ci], total[requiredKills-1]]);
       }
     }
 
