@@ -922,7 +922,8 @@ function scorePoison(res, cfg) {
 
 function scoreBomb(res, cfg) {
   // Higher score = harder puzzle
-  // Measure: How many other pairs are alone together at various times
+  // Measure: How often bombers are with other people (camouflage)
+  // and how many "near miss" groups of 3 exist
   const [bomber1, bomber2] = res.priv.bomb_duo;
   const plantTime = res.priv.plant_time - 1;
   const plantRoom = res.priv.plant_room;
@@ -931,26 +932,30 @@ function scoreBomb(res, cfg) {
   
   let score = 0;
   
-  // Check all other pairs
-  for (let i = 0; i < chars.length; i++) {
-    for (let j = i + 1; j < chars.length; j++) {
-      const c1 = chars[i], c2 = chars[j];
-      if ((c1 === bomber1 && c2 === bomber2) || (c1 === bomber2 && c2 === bomber1)) continue;
+  // Count times when bombers are together WITH other people (not alone)
+  for (let t = 0; t < T; t++) {
+    const room1 = res.schedule[bomber1][t];
+    const room2 = res.schedule[bomber2][t];
+    
+    if (room1 === room2) {
+      const othersInRoom = chars.filter(c => 
+        c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1
+      ).length;
       
-      // Check if they're alone together at any time
-      for (let t = 0; t < T; t++) {
-        const room1 = res.schedule[c1][t];
-        const room2 = res.schedule[c2][t];
-        
-        if (room1 === room2) {
-          const othersInRoom = chars.filter(c => 
-            c !== c1 && c !== c2 && res.schedule[c][t] === room1
-          ).length;
-          
-          if (othersInRoom === 0 && (t !== plantTime || room1 !== plantRoom)) {
-            score += 60; // Red herring pair
-          }
-        }
+      if (othersInRoom > 0) {
+        // Bombers together but not alone - camouflage
+        score += 40;
+      }
+    }
+  }
+  
+  // Count "near miss" situations: groups of exactly 3 people
+  // These are confusing because they're "almost" a suspicious pair
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 3) {
+        score += 30; // Near-miss group
       }
     }
   }

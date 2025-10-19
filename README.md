@@ -157,12 +157,15 @@ The generator creates many valid scenarios and scores them based on "red herring
 **Example**: With T=6 timesteps, if character B is alone 5 times (but not all 6), that's a strong red herring worth ~83 points.
 
 #### S4: Bomb Duo Scoring
-**What makes it harder**: Other character pairs being alone together (which shouldn't exist per the rules)
+**What makes it harder**: Bombers being camouflaged in larger groups, and "near miss" groups of 3
 
-- **+60 points** for each pair of characters (not the bombers) who are alone together at any time/room
-- Since the bomb duo should be the ONLY pair ever alone, any other pairs are major red herrings
+- **+40 points** each time the bombers are together in a room WITH other people (not alone)
+  - This camouflages them since they're not obviously the "only pair"
+- **+30 points** for each group of exactly 3 people at any time/room
+  - Groups of 3 are "near misses" - one person away from being a suspicious pair
+  - Creates confusion about what counts as a "pair"
 
-**Example**: If the constraint is slightly relaxed or near-violations exist in the search space, these get scored.
+**Example**: If bombers meet in the Library with 2 other people at t=2 and t=4, that's +80. If there are 4 groups of 3 people throughout the timeline, that's +120 more, for +200 total difficulty.
 
 #### S5: Lovers Scoring
 **What makes it harder**: Character pairs who rarely meet
