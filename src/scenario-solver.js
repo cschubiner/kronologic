@@ -293,7 +293,8 @@ export function buildCNF(config){
     clauses.push(...exactlyOne(L2));
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -L1[ci], -L2[ci] ]); }
 
-    // If both S2 and S5 are enabled, phantom must NOT be a lover
+    // If both S2 and S5 are enabled (S6), phantom must NOT be a lover
+    // The phantom is in their own category - neither lover nor non-lover
     if (PH){
       for (let ci=0; ci<C.length; ci++){
         // PH[ci] => NOT L1[ci] AND NOT L2[ci]
@@ -316,6 +317,7 @@ export function buildCNF(config){
     }
     
     // Every pair of non-lovers must meet at least once
+    // (Phantom is excluded from this - they're neither lover nor non-lover)
     for (let ci=0; ci<C.length; ci++){
       for (let cj=ci+1; cj<C.length; cj++){
         // Create variable: ci and cj meet at least once
@@ -331,7 +333,7 @@ export function buildCNF(config){
           }
         }
         
-        // If neither ci nor cj is a lover (and neither is phantom if S2 enabled), they must meet
+        // If neither ci nor cj is a lover AND neither is phantom (if S2 enabled), they must meet
         // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj] ∨ PH[ci] ∨ PH[cj]) ∨ (at least one pairMeets is true)
         if (PH) {
           clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], PH[ci], PH[cj], ...pairMeets]);

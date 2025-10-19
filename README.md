@@ -124,24 +124,26 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S6: Phantom Lover
-**Mystery**: One character is a phantom (alone at every timestep) AND is one of two lovers who never meet.
+**Mystery**: One character is a phantom (alone at every timestep) AND there are two lovers who never meet.
 
 **Rules**:
 - Combines S2 (Phantom) and S5 (Lovers) constraints
 - Exactly one character is the phantom:
   - At EVERY timestep, the phantom is alone in their room
   - NO other character shares a room with the phantom at any time
+  - The phantom is in their own category - neither a lover nor a non-lover
 - Exactly two characters are the lovers (L1 and L2):
   - The lovers NEVER share a room at any timestep
-  - The phantom MUST be one of the two lovers (either L1 or L2)
-- All non-phantom, non-lover characters must share a room with someone at least once
-- **Every pair of non-lovers must meet at least once**:
-  - For any two characters who are NOT both lovers, they must share a room at some point
-  - This includes the phantom's lover (who must meet all non-lovers)
+  - The lovers are distinct from the phantom
+  - **Neither lover can be the phantom** (phantom is always alone, so can't have a relationship)
+- **Every pair of non-phantom, non-lovers must meet at least once**:
+  - For any two characters who are NOT lovers AND NOT the phantom, they must share a room at some point
+  - This ensures all "regular" characters encounter each other
+  - The phantom is excluded from this requirement (they never meet anyone)
 
-**Goal**: Identify the phantom and their lover.
+**Goal**: Identify the phantom and the two lovers.
 
-**Difficulty Factors**: The phantom is easy to identify (always alone), but their lover is hidden among the other characters. The lover must avoid the phantom while still meeting everyone else. Other pairs who rarely meet create confusion.
+**Difficulty Factors**: The phantom is easy to identify (always alone). The two lovers must avoid each other while still meeting all other non-phantom characters. Other pairs who rarely meet create confusion about who the lovers are.
 
 ---
 
