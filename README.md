@@ -82,6 +82,7 @@ Players must deduce the secret scenario by combining:
 - The bombers were alone together in the plant room at the final time
 - **Critical**: The bombers are the ONLY pair who are ever alone together (exactly 2 people in a room) at ANY time
 - Other characters can be in groups of 1, 3, 4, 5, 6... but never exactly 2 (except the bombers)
+- **All non-bombers must share a room with at least one other person at some point** (they cannot be completely isolated)
 
 **Goal**: Identify the two bombers and which room they planted the bomb in.
 
@@ -96,6 +97,8 @@ Players must deduce the secret scenario by combining:
 - Two characters are the lovers
 - They are **never** in the same room at the same time
 - They avoid each other completely throughout all timesteps
+- **All non-lovers must share a room with at least one other person at some point** (they cannot be completely isolated)
+- **If S2 (Phantom) is also enabled**: The phantom MUST be one of the two lovers (since the phantom is alone at all times, they can never meet their lover)
 
 **Goal**: Identify the two lovers.
 

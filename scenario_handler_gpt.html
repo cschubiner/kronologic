@@ -114,10 +114,10 @@
       <label><input type="checkbox" id="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
+      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>; non-bombers must have company at least once)</label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet / same room same time)</label>
+      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; non-lovers must have company at least once; if S2 enabled, phantom must be a lover)</label>
     </div>
 
     <div class="row">
@@ -226,7 +226,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios supported: S1, S2, S4, S5.</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom), S4 (Bomb Duo + non-isolation), S5 (Lovers + non-isolation, phantom-lover constraint).</div>
 
 <script>
 /* ===========================
