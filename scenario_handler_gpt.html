@@ -122,6 +122,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s6" value="s6" /> S6: Phantom + Lovers (one phantom alone at every time, two separate lovers who never meet)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s7" value="s7" /> S7: Aggrosassin (serial poisoner who kills everyone they meet 1-on-1)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -242,7 +245,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S4 (Bomb Duo), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers - phantom is separate, two lovers never meet).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner).</div>
 
 <script>
 /* ===========================
@@ -757,6 +760,95 @@ function buildCNF(config){
     }
   }
 
+  // S7: Aggrosassin
+  let AGG=null;
+  if (config.scenarios.s7){
+    AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
+    clauses.push(...exactlyOne(AGG));
+
+    // For each (time, room) pair with exactly 2 people, track if aggrosassin is one of them
+    for (let t=0; t<T; t++){
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          for (let cj=ci+1; cj<C.length; cj++){
+            const exactlyTwo = vp.get(`exactlyTwo_s7_${t}_${ri}_${ci}_${cj}`);
+
+            // exactlyTwo ⇔ (exactly ci and cj in room ri at time t)
+            clauses.push([-exactlyTwo, X(ci,t,ri)]);
+            clauses.push([-exactlyTwo, X(cj,t,ri)]);
+
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
+            }
+
+            const someoneElse = [];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              someoneElse.push(X(ck,t,ri));
+            }
+            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
+
+            // Track if aggrosassin is involved in this pair
+            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
+            
+            // aggInPair ⇔ (exactlyTwo ∧ (AGG[ci] ∨ AGG[cj]))
+            clauses.push([-aggInPair, exactlyTwo]);
+            clauses.push([-aggInPair, AGG[ci], AGG[cj]]);
+            clauses.push([-exactlyTwo, -AGG[ci], aggInPair]);
+            clauses.push([-exactlyTwo, -AGG[cj], aggInPair]);
+          }
+        }
+      }
+    }
+
+    // For each timestep, track if aggrosassin kills someone (is alone with exactly 1 other)
+    const aggKillsAtTimestep = [];
+    for (let t=0; t<T; t++){
+      const killsThisTimestep = vp.get(`aggKills_t${t}`);
+      aggKillsAtTimestep.push(killsThisTimestep);
+      
+      // killsThisTimestep is true if aggrosassin is in a pair at this timestep
+      const pairsAtThisTime = [];
+      for (let ri=0; ri<R.length; ri++){
+        for (let ci=0; ci<C.length; ci++){
+          for (let cj=ci+1; cj<C.length; cj++){
+            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
+            pairsAtThisTime.push(aggInPair);
+          }
+        }
+      }
+      
+      // killsThisTimestep ⇔ (at least one aggInPair is true at this timestep)
+      clauses.push([-killsThisTimestep, ...pairsAtThisTime]);
+      for (const pair of pairsAtThisTime){
+        clauses.push([-pair, killsThisTimestep]);
+      }
+    }
+    
+    // Constraint: At least ceil(T/2) of the aggKillsAtTimestep variables must be true
+    const minKills = Math.ceil(T / 2);
+    
+    // For small T, we can use a direct encoding
+    if (T <= 10) {
+      const mustHaveKills = T - minKills + 1;
+      
+      function generateSubsets(arr, size) {
+        if (size === 0) return [[]];
+        if (arr.length === 0) return [];
+        const [first, ...rest] = arr;
+        const withoutFirst = generateSubsets(rest, size);
+        const withFirst = generateSubsets(rest, size - 1).map(subset => [first, ...subset]);
+        return [...withoutFirst, ...withFirst];
+      }
+      
+      const subsets = generateSubsets(aggKillsAtTimestep, mustHaveKills);
+      for (const subset of subsets) {
+        clauses.push(subset);
+      }
+    }
+  }
+
   // S4: Bomb duo — A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
   if (config.scenarios.s4){
@@ -831,7 +923,7 @@ function buildCNF(config){
     avgClauseLength: clauses.reduce((sum, c) => sum + c.length, 0) / clauses.length
   };
 
-  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2}, stats };
+  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2, AGG}, stats };
 }
 
 /* ===========================
@@ -869,6 +961,12 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s3) {
     scores.jewels = scoreJewels(res, cfg);
     score += scores.jewels;
+  }
+
+  // S7: Aggrosassin scoring
+  if (cfg.scenarios.s7 && res.priv.aggrosassin) {
+    scores.aggrosassin = scoreAggrosassin(res, cfg);
+    score += scores.aggrosassin;
   }
   
   return { total: score, breakdown: scores };
@@ -1047,6 +1145,31 @@ function scoreBomb(res, cfg) {
   return score;
 }
 
+function scoreAggrosassin(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: More victims and more pair meetings in general
+  const T = cfg.T;
+  const chars = cfg.chars;
+  
+  let score = 0;
+  
+  // +3 points per victim
+  const victimCount = res.priv.victims ? res.priv.victims.length : 0;
+  score += victimCount * 3;
+  
+  // +1 point per instance of exactly 2 people in a room
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2) {
+        score += 1;
+      }
+    }
+  }
+  
+  return score;
+}
+
 /* ===========================
    URL State Management
    =========================== */
@@ -1214,6 +1337,25 @@ function solveAndDecode(cfg){
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
     priv.bomb_duo = [a1,a2];
   }
+  if (privKeys.AGG){
+    let agg=null;
+    for (let ci=0; ci<C.length; ci++) if (val(`AGG_${C[ci]}`)) agg = C[ci];
+    
+    // Calculate victims (characters alone with aggrosassin)
+    const victims = new Set();
+    for (let t=0; t<T; t++){
+      for (const room of R){
+        const charsInRoom = C.filter(c => schedule[c][t] === room);
+        if (charsInRoom.length === 2 && charsInRoom.includes(agg)){
+          const victim = charsInRoom.find(c => c !== agg);
+          victims.add(victim);
+        }
+      }
+    }
+    
+    priv.aggrosassin = agg;
+    priv.victims = Array.from(victims);
+  }
 
   return {
     schedule,
@@ -1298,6 +1440,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s3: scenarioValue === 's3',
       s4: scenarioValue === 's4',
       s5: scenarioValue === 's5' || scenarioValue === 's6',
+      s7: scenarioValue === 's7',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -1361,6 +1504,7 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.lovers) pf.push(`<div>Lovers: <b>${res.priv.lovers[0]}</b> + <b>${res.priv.lovers[1]}</b></div>`);
     if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
+    if (res.priv.aggrosassin) pf.push(`<div>Aggrosassin: <b>${res.priv.aggrosassin}</b> killed <b>${res.priv.victims.length}</b> victim${res.priv.victims.length === 1 ? '' : 's'}: ${res.priv.victims.join(', ')}</div>`);
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
 
