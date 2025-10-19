@@ -751,6 +751,15 @@
             </div>
             <textarea class="notes-editor" id="notesEditor" placeholder="Enter your deduction notes here..."></textarea>
         </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px;">
+            <button onclick="strikeAllEverywhere()" style="width: 100%; padding: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; min-height: 48px;">
+                Strike All Characters for All Rooms for All Times
+            </button>
+            <p style="margin: 8px 0 0 0; font-size: 12px; color: #92400e;">
+                This will add all characters to every room at every timestep with strikethrough enabled. Useful for starting elimination deductions.
+            </p>
+        </div>
     </div>
 
     <!-- Character selector popup -->
@@ -1559,6 +1568,38 @@
             updateMiniMapVisuals(timestep);
             saveState();
             refreshExistingChips(timestep, roomName);
+        }
+
+        function strikeAllEverywhere() {
+            if (!confirm('This will add all characters to every room at every timestep with strikethrough. This action can be undone. Continue?')) {
+                return;
+            }
+
+            // Iterate through all timesteps and rooms
+            for (let t = 1; t <= state.timesteps; t++) {
+                state.rooms.forEach(room => {
+                    // Add all characters with strikethrough
+                    state.characters.forEach(char => {
+                        const existing = state.placements[t][room].find(p => p.char === char.name);
+                        if (existing) {
+                            existing.strikethrough = true;
+                        } else {
+                            state.placements[t][room].push({
+                                char: char.name,
+                                initial: char.initial,
+                                color: char.color,
+                                strikethrough: true
+                            });
+                        }
+                    });
+                });
+
+                // Update visuals for this timestep
+                updateMiniMapVisuals(t);
+            }
+
+            saveState();
+            alert('All characters have been struck through for all rooms and times.');
         }
 
         function renderTrackingTable() {
