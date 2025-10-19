@@ -1,5 +1,7 @@
 # Kronologic Mystery Game - Scenario Generator
 
+**[View on GitHub Pages](https://cschubiner.github.io/kronologic/)**
+
 A deduction game where players ask questions about character movements through rooms over time to solve mysteries. This tool generates valid scenarios with configurable difficulty using SAT solving.
 
 ## Quick Links

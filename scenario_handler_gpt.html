@@ -958,30 +958,28 @@ function scoreBomb(res, cfg) {
   // Measure: How often bombers are with other people (camouflage)
   // and how many "near miss" groups of 3 exist
   const [bomber1, bomber2] = res.priv.bomb_duo;
-  const plantTime = res.priv.plant_time - 1;
-  const plantRoom = res.priv.plant_room;
   const T = cfg.T;
   const chars = cfg.chars;
-  
+
   let score = 0;
-  
+
   // Count times when bombers are together WITH other people (not alone)
   for (let t = 0; t < T; t++) {
     const room1 = res.schedule[bomber1][t];
     const room2 = res.schedule[bomber2][t];
-    
+
     if (room1 === room2) {
-      const othersInRoom = chars.filter(c => 
+      const othersInRoom = chars.filter(c =>
         c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1
       ).length;
-      
+
       if (othersInRoom > 0) {
         // Bombers together but not alone - camouflage
         score += 40;
       }
     }
   }
-  
+
   // Count "near miss" situations: groups of exactly 3 people
   // These are confusing because they're "almost" a suspicious pair
   for (let t = 0; t < T; t++) {
@@ -992,7 +990,7 @@ function scoreBomb(res, cfg) {
       }
     }
   }
-  
+
   return score;
 }
 

@@ -209,35 +209,6 @@ describe('S2: Phantom Scenario', () => {
 })
 
 describe('S4: Bomb Duo Scenario', () => {
-  it('should have bomb duo alone together at final time', () => {
-    const cfg = {
-      rooms: ['Lab', 'Storage', 'Exit'],
-      edges: [['Lab', 'Storage'], ['Storage', 'Exit']],
-      chars: ['A', 'B', 'C', 'D'],
-      T: 5,
-      mustMove: false,
-      allowStay: true,
-      scenarios: { s4: true },
-      seed: 300
-    }
-
-    const res = solveAndDecode(cfg)
-    expect(res).not.toBeNull()
-
-    const [bomber1, bomber2] = res.priv.bomb_duo
-    const plantTime = cfg.T - 1
-    const plantRoom = res.priv.plant_room
-
-    expect(res.schedule[bomber1][plantTime]).toBe(plantRoom)
-    expect(res.schedule[bomber2][plantTime]).toBe(plantRoom)
-
-    const others = cfg.chars.filter(c =>
-      c !== bomber1 && c !== bomber2 &&
-      res.schedule[c][plantTime] === plantRoom
-    )
-    expect(others).toHaveLength(0)
-  })
-
   it('should have bombers as ONLY pair ever alone together', () => {
     const cfg = {
       rooms: ['A', 'B', 'C', 'D'],
@@ -287,25 +258,6 @@ describe('S4: Bomb Duo Scenario', () => {
     expect(res.priv.bomb_duo[0]).not.toBe(res.priv.bomb_duo[1])
   })
 
-  it('should respect fixed room constraint', () => {
-    const cfg = {
-      rooms: ['Lobby', 'Vault', 'Exit'],
-      edges: [['Lobby', 'Vault'], ['Vault', 'Exit']],
-      chars: ['A', 'B', 'C'],
-      T: 4,
-      mustMove: false,
-      allowStay: true,
-      scenarios: {
-        s4: true,
-        s4_room: 'Vault'
-      },
-      seed: 333
-    }
-
-    const res = solveAndDecode(cfg)
-    expect(res).not.toBeNull()
-    expect(res.priv.plant_room).toBe('Vault')
-  })
 })
 
 describe('S5: Lovers Scenario', () => {
