@@ -430,6 +430,137 @@ describe('S2: Phantom Scenario', () => {
       }
     }
   })
+
+  it('should verify phantom is never with anyone at any time', () => {
+    for (let seed = 220; seed < 225; seed++) {
+      const cfg = {
+        rooms: ['Room1', 'Room2', 'Room3', 'Room4'],
+        edges: [['Room1', 'Room2'], ['Room2', 'Room3'], ['Room3', 'Room4']],
+        chars: ['A', 'B', 'C', 'D', 'E'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const phantom = res.priv.phantom
+
+      // Check every single (time, room) pair
+      for (let t = 0; t < cfg.T; t++) {
+        const phantomRoom = res.schedule[phantom][t]
+        
+        // Count how many characters are in phantom's room
+        const charsInPhantomRoom = cfg.chars.filter(c => res.schedule[c][t] === phantomRoom)
+        
+        // Should be exactly 1 (just the phantom)
+        expect(charsInPhantomRoom).toHaveLength(1)
+        expect(charsInPhantomRoom[0]).toBe(phantom)
+      }
+    }
+  })
+
+  it('should work with minimum configuration', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['Phantom', 'Other'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s2: true },
+      seed: 230
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+    expect(res.priv.phantom).toBeTruthy()
+    
+    const phantom = res.priv.phantom
+    for (let t = 0; t < cfg.T; t++) {
+      const room = res.schedule[phantom][t]
+      const others = cfg.chars.filter(c => c !== phantom && res.schedule[c][t] === room)
+      expect(others).toHaveLength(0)
+    }
+  })
+
+  it('should ensure non-phantoms meet someone at least once', () => {
+    for (let seed = 240; seed < 245; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'N1', 'N2', 'N3', 'N4'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const phantom = res.priv.phantom
+      const nonPhantoms = cfg.chars.filter(c => c !== phantom)
+
+      for (const char of nonPhantoms) {
+        let metSomeone = false
+        for (let t = 0; t < cfg.T; t++) {
+          const room = res.schedule[char][t]
+          const others = cfg.chars.filter(c => c !== char && res.schedule[c][t] === room)
+          if (others.length > 0) {
+            metSomeone = true
+            break
+          }
+        }
+        expect(metSomeone).toBe(true)
+      }
+    }
+  })
+
+  it('should work with mustMove constraint', () => {
+    for (let seed = 250; seed < 253; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'A']],
+        chars: ['P', 'X', 'Y', 'Z'],
+        T: 4,
+        mustMove: true,
+        allowStay: false,
+        scenarios: { s2: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const phantom = res.priv.phantom
+      const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false)
+
+      // Verify movement
+      for (const char of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const currentRoom = res.schedule[char][t]
+          const nextRoom = res.schedule[char][t + 1]
+          const currentIdx = idx.get(currentRoom)
+          const nextIdx = idx.get(nextRoom)
+          
+          expect(nbr[currentIdx]).toContain(nextIdx)
+          expect(currentRoom).not.toBe(nextRoom)
+        }
+      }
+
+      // Phantom still alone at every timestep
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[phantom][t]
+        const others = cfg.chars.filter(c => c !== phantom && res.schedule[c][t] === room)
+        expect(others).toHaveLength(0)
+      }
+    }
+  })
 })
 
 describe('S4: Bomb Duo Scenario', () => {
