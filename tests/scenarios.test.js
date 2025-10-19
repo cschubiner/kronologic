@@ -1144,8 +1144,8 @@ describe('S5: Lovers Scenario', () => {
 
   it('should work with mustMove constraint', () => {
     const cfg = {
-      rooms: ['A', 'B', 'C'],
-      edges: [['A', 'B'], ['B', 'C']],
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
       chars: ['L1', 'L2', 'N1', 'N2'],
       T: 4,
       mustMove: true,

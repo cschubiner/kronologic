@@ -353,15 +353,10 @@ export function buildCNF(config){
           clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...meetLits]);
         }
 
-        // Require lovers to meet every non-lover when movement is flexible.
-        // Under hard must-move schedules the requirement can be unsatisfiable,
-        // so skip it in that mode to keep the scenario solvable.
-        if (!config.mustMove) {
-          clauses.push([-L1[ci], L2[cj], ...meetLits]);
-          clauses.push([-L2[ci], L1[cj], ...meetLits]);
-          clauses.push([-L1[cj], L2[ci], ...meetLits]);
-          clauses.push([-L2[cj], L1[ci], ...meetLits]);
-        }
+        clauses.push([-L1[ci], L2[cj], ...meetLits]);
+        clauses.push([-L2[ci], L1[cj], ...meetLits]);
+        clauses.push([-L1[cj], L2[ci], ...meetLits]);
+        clauses.push([-L2[cj], L1[ci], ...meetLits]);
       }
     }
     
