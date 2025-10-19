@@ -507,28 +507,6 @@ export function buildCNF(config){
       }
     }
     
-    // Non-bombers must share a room with someone at least once
-    for (let ci=0; ci<C.length; ci++){
-      const atLeastOnceWithOthers = [];
-      for (let t=0; t<T; t++){
-        for (let ri=0; ri<R.length; ri++){
-          for (let cj=0; cj<C.length; cj++){
-            if (ci===cj) continue;
-            // Create variable: both ci and cj in room ri at time t
-            const withOther = vp.get(`bomberNonAlone_${ci}_${t}_${ri}_${cj}`);
-            // withOther ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
-            clauses.push([-withOther, X(ci,t,ri)]);
-            clauses.push([-withOther, X(cj,t,ri)]);
-            clauses.push([-X(ci,t,ri), -X(cj,t,ri), withOther]);
-            atLeastOnceWithOthers.push(withOther);
-          }
-        }
-      }
-      // If NOT a bomber, must have at least one "with others" moment
-      // (A1[ci] ∨ A2[ci]) ∨ (at least one withOther is true)
-      clauses.push([A1[ci], A2[ci], ...atLeastOnceWithOthers]);
-    }
-    
     privKeys.A1 = A1;
     privKeys.A2 = A2;
   }
