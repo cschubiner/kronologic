@@ -335,9 +335,11 @@ export function buildCNF(config){
         
         // If neither ci nor cj is a lover AND neither is phantom (if S2 enabled), they must meet
         // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj] ∨ PH[ci] ∨ PH[cj]) ∨ (at least one pairMeets is true)
-        if (PH) {
+        if (config.scenarios.s2 && PH) {
+          // S6 scenario: exclude phantom from meeting requirement
           clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], PH[ci], PH[cj], ...pairMeets]);
         } else {
+          // S5 only: all non-lovers must meet
           clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...pairMeets]);
         }
       }
