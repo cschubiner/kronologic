@@ -44,12 +44,14 @@
   <section class="card">
     <h2>Map (Mermaid-like)</h2>
     <div class="hint tiny">Use undirected edges with <span class="mono">---</span>. Node IDs are room names (quote names with spaces).</div>
-    <textarea id="mermaidInput">graph LR
-  Lobby --- "Bay A"
-  Lobby --- "Bay B"
-  Lobby --- Office
-  Office --- Supply
-  Lobby --- Street</textarea>
+    <textarea id="mermaidInput">graph TD
+  Foyer --- Stairs
+  Foyer --- Gallery
+  Gallery --- Stairs
+  Gallery --- Masks
+  Masks --- DanceRoom
+  Masks --- MusicRoom
+  MusicRoom --- DanceRoom</textarea>
     <div class="row">
       <label for="chars">Characters:</label>
       <input id="chars" class="pill" value="Manager, Mechanic, VIP, Owner, Attendant, Soprano" />
