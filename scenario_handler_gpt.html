@@ -216,10 +216,11 @@
 /* ===========================
    Minimal SAT (DPLL + Unit)
    =========================== */
-function satSolve(clauses, numVars, randSeed=0) {
+function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
-  // Returns: assignment array with 1..numVars: true/false, or null if UNSAT
+  // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
   const rng = mulberry32(randSeed);
+  const startTime = Date.now();
   let assigns = new Array(numVars+1).fill(0); // 0=unassigned, 1=true, -1=false
   let occPos = Array.from({length:numVars+1}, ()=>[]);
   let occNeg = Array.from({length:numVars+1}, ()=>[]);
@@ -285,6 +286,11 @@ function satSolve(clauses, numVars, randSeed=0) {
   if (!unitProp(initQ)) return null;
 
   function dfs(){
+    // Check timeout
+    if (Date.now() - startTime > timeoutMs) {
+      throw new Error('SAT_TIMEOUT');
+    }
+    
     // check all satisfied?
     let allSat = true;
     for (const c of clauses){
@@ -973,23 +979,32 @@ qs("genBtn").addEventListener("click", async ()=>{
   try{
     // Multi-generation with scoring
     const solutions = [];
+    let skipped = 0;
     
     for (let i = 0; i < sampleCount; i++) {
       cfg.seed = i;
-      const res = solveAndDecode(cfg);
-      if (res) {
-        const scored = { ...res, score: scoreScenario(res, cfg) };
-        solutions.push(scored);
+      try {
+        const res = solveAndDecode(cfg);
+        if (res) {
+          const scored = { ...res, score: scoreScenario(res, cfg) };
+          solutions.push(scored);
+        } else {
+          skipped++;
+        }
+      } catch (e) {
+        // Skip timeouts or other errors
+        skipped++;
+        console.warn(`Sample ${i} failed:`, e.message);
       }
       
       if (i % 10 === 0) {
-        qs("status").textContent = `Generated ${i}/${sampleCount}...`;
+        qs("status").textContent = `Generated ${i}/${sampleCount} (${solutions.length} valid, ${skipped} skipped)...`;
         await new Promise(r => setTimeout(r, 0)); // Allow UI update
       }
     }
     
     if (solutions.length === 0) {
-      qs("status").innerHTML = `<span class="warn">No solutions found.</span>`;
+      qs("status").innerHTML = `<span class="warn">No solutions found (${skipped} samples timed out or failed).</span>`;
       return;
     }
     
@@ -1000,7 +1015,7 @@ qs("genBtn").addEventListener("click", async ()=>{
     const targetIdx = Math.floor((percentile / 100) * (solutions.length - 1));
     const res = solutions[targetIdx];
     
-    qs("status").innerHTML = `<span class="ok">Selected ${percentile}th percentile scenario</span> (score: ${res.score.total.toFixed(1)}, rank ${targetIdx+1}/${solutions.length})`;
+    qs("status").innerHTML = `<span class="ok">Selected ${percentile}th percentile scenario</span> (score: ${res.score.total.toFixed(1)}, rank ${targetIdx+1}/${solutions.length}, ${skipped} skipped)`;
     // Display selected solution
     qs("resultsHint").style.display = "none";
     qs("results").style.display = "block";
