@@ -316,7 +316,12 @@ function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
     return false;
   }
 
-  if (!dfs()) return null;
+  try {
+    if (!dfs()) return null;
+  } catch (e) {
+    if (e.message === 'SAT_TIMEOUT') return null;
+    throw e;
+  }
 
   // build boolean array
   const out = new Array(numVars+1);
