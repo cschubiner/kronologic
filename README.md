@@ -243,6 +243,22 @@ Higher percentiles select scenarios with more confusing patterns.
 - **Deterministic**: Same seed produces same scenario
 - **Pure JavaScript**: Runs entirely in browser, no server needed
 
+## Development
+
+### Running Tests
+
+This project uses [Bun](https://bun.sh) for running tests:
+
+```bash
+bun test
+```
+
+To run tests in watch mode:
+
+```bash
+bun test --watch
+```
+
 ## Note-Taking Interface
 
 The **note-sheet.html** file provides an interactive note-taking tool designed for players to track their deductions during gameplay.

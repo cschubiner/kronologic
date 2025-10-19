@@ -335,13 +335,21 @@ export function buildCNF(config){
         
         // If neither ci nor cj is a lover AND neither is phantom (if S2 enabled), they must meet
         // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj] ∨ PH[ci] ∨ PH[cj]) ∨ (at least one pairMeets is true)
+        const meetLits = [...pairMeets];
         if (config.scenarios.s2 && PH) {
+          meetLits.push(PH[ci], PH[cj]);
           // S6 scenario: exclude phantom from meeting requirement
-          clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], PH[ci], PH[cj], ...pairMeets]);
+          clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...meetLits]);
         } else {
           // S5 only: all non-lovers must meet
-          clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...pairMeets]);
+          clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...meetLits]);
         }
+
+        // Any pair involving at least one non-lover must meet
+        clauses.push([-L1[ci], L2[cj], ...meetLits]);
+        clauses.push([-L2[ci], L1[cj], ...meetLits]);
+        clauses.push([-L1[cj], L2[ci], ...meetLits]);
+        clauses.push([-L2[cj], L1[ci], ...meetLits]);
       }
     }
     
