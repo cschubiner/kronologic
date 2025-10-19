@@ -83,6 +83,18 @@
             cursor: not-allowed;
         }
 
+        .controls button.generate-graph {
+            background: #10b981;
+        }
+
+        .controls button.generate-graph:hover {
+            background: #059669;
+        }
+
+        .controls button.generate-graph:active {
+            background: #047857;
+        }
+
         /* Time-step maps grid */
         .maps-grid {
             display: grid;
@@ -589,6 +601,7 @@
             <input type="text" id="characterNames" value="A,B,C,D,S,J" placeholder="Comma-separated names">
 
             <button onclick="initializeSheet()">Initialize Sheet</button>
+            <button class="generate-graph" onclick="regenerateGraphLayout()" id="generateGraphBtn" disabled>Generate Graph</button>
             <button onclick="undo()" id="undoBtn" disabled>Undo</button>
             <button onclick="redo()" id="redoBtn" disabled>Redo</button>
         </div>
@@ -646,7 +659,8 @@
             cytoscapeInstances: [],
             history: [],
             historyIndex: -1,
-            currentSelector: null
+            currentSelector: null,
+            currentLayoutIndex: 0
         };
 
         const characterColors = [
@@ -656,6 +670,72 @@
 
         // Graph elements will be generated from Mermaid syntax
         let graphElements = [];
+
+        // Available layout algorithms
+        const layoutAlgorithms = [
+            {
+                name: 'cose',
+                options: {
+                    name: 'cose',
+                    fit: true,
+                    padding: 20,
+                    nodeRepulsion: 8000,
+                    idealEdgeLength: 80,
+                    animate: false
+                }
+            },
+            {
+                name: 'circle',
+                options: {
+                    name: 'circle',
+                    fit: true,
+                    padding: 20,
+                    animate: false
+                }
+            },
+            {
+                name: 'grid',
+                options: {
+                    name: 'grid',
+                    fit: true,
+                    padding: 20,
+                    animate: false
+                }
+            },
+            {
+                name: 'breadthfirst',
+                options: {
+                    name: 'breadthfirst',
+                    fit: true,
+                    padding: 20,
+                    directed: false,
+                    spacingFactor: 1.5,
+                    animate: false
+                }
+            },
+            {
+                name: 'concentric',
+                options: {
+                    name: 'concentric',
+                    fit: true,
+                    padding: 20,
+                    minNodeSpacing: 40,
+                    animate: false
+                }
+            },
+            {
+                name: 'cose-random',
+                options: {
+                    name: 'cose',
+                    fit: true,
+                    padding: 20,
+                    nodeRepulsion: 10000,
+                    idealEdgeLength: 60,
+                    randomize: true,
+                    animate: false
+                }
+            }
+        ];
 
         // Parse Mermaid graph syntax
         function parseMermaidGraph(mermaidText) {
@@ -765,10 +845,16 @@
             state.historyIndex = -1;
             updateUndoRedoButtons();
 
+            // Reset layout index
+            state.currentLayoutIndex = 0;
+
             // Render
             renderMaps();
             renderTrackingTable();
             saveState();
+
+            // Enable generate graph button
+            document.getElementById('generateGraphBtn').disabled = false;
         }
 
         function renderMaps() {
@@ -800,17 +886,11 @@
 
                 // Initialize Cytoscape
                 setTimeout(() => {
+                    const currentLayout = layoutAlgorithms[state.currentLayoutIndex];
                     const cy = cytoscape({
                         container: document.getElementById(`cy-${t}`),
                         elements: graphElements,
-                        layout: {
-                            name: 'cose',
-                            fit: true,
-                            padding: 20,
-                            nodeRepulsion: 8000,
-                            idealEdgeLength: 80,
-                            animate: false
-                        },
+                        layout: currentLayout.options,
                         style: [
                             {
                                 selector: 'node',
@@ -858,6 +938,22 @@
                     state.cytoscapeInstances.push(cy);
                 }, 50);
             }
+        }
+
+        function regenerateGraphLayout() {
+            // Cycle to next layout
+            state.currentLayoutIndex = (state.currentLayoutIndex + 1) % layoutAlgorithms.length;
+            const currentLayout = layoutAlgorithms[state.currentLayoutIndex];
+
+            // Apply the new layout to all Cytoscape instances
+            state.cytoscapeInstances.forEach((cy, index) => {
+                if (cy) {
+                    const layout = cy.layout(currentLayout.options);
+                    layout.run();
+                }
+            });
+
+            console.log(`Applied layout: ${currentLayout.name}`);
         }
 
         function updateNodeColors(cy, timestep) {
