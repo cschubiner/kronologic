@@ -292,16 +292,17 @@ export function buildCNF(config){
     clauses.push(...exactlyOne(L1));
     clauses.push(...exactlyOne(L2));
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -L1[ci], -L2[ci] ]); }
-    
-    // If both S2 and S5 are enabled, phantom must be one of the lovers
+
+    // If both S2 and S5 are enabled, phantom must NOT be a lover
     if (PH){
       for (let ci=0; ci<C.length; ci++){
-        // PH[ci] => (L1[ci] OR L2[ci])
-        // CNF: -PH[ci] OR L1[ci] OR L2[ci]
-        clauses.push([ -PH[ci], L1[ci], L2[ci] ]);
+        // PH[ci] => NOT L1[ci] AND NOT L2[ci]
+        // CNF: -PH[ci] OR -L1[ci]  AND  -PH[ci] OR -L2[ci]
+        clauses.push([ -PH[ci], -L1[ci] ]);
+        clauses.push([ -PH[ci], -L2[ci] ]);
       }
     }
-    
+
     // Lovers never meet
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){

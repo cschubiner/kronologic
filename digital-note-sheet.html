@@ -1261,17 +1261,25 @@
             // Show existing chips
             const placements = state.placements[timestep][roomName] || [];
             if (placements.length > 0) {
-                existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">Current:</div>';
+                existingChips.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-size: 11px; font-weight: 600;">Current:</div>
+                        <div style="display: flex; gap: 4px;">
+                            <button style="padding: 6px 10px; font-size: 11px; background: #ef4444; color: white; border: none; border-radius: 3px; cursor: pointer; min-height: 32px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
+                            <button style="padding: 6px 10px; font-size: 11px; background: #10b981; color: white; border: none; border-radius: 3px; cursor: pointer; min-height: 32px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
+                        </div>
+                    </div>
+                `;
                 placements.forEach(placement => {
                     const chipItem = document.createElement('div');
                     chipItem.className = 'chip-item';
                     chipItem.innerHTML = `
                         <span style="color: ${placement.color}; font-weight: 600; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.initial}</span>
                         <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.char}</span>
-                        <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}')">
+                        <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}', event)">
                             ${placement.strikethrough ? 'Unstrike' : 'Strike'}
                         </button>
-                        <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}')">Remove</button>
+                        <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}', event)">Remove</button>
                     `;
                     existingChips.appendChild(chipItem);
                 });
@@ -1346,7 +1354,8 @@
             refreshExistingChips(timestep, roomName);
         }
 
-        function toggleStrikethrough(timestep, roomName, charName) {
+        function toggleStrikethrough(timestep, roomName, charName, event) {
+            if (event) event.stopPropagation();
             const placement = state.placements[timestep][roomName].find(p => p.char === charName);
             if (placement) {
                 placement.strikethrough = !placement.strikethrough;
@@ -1358,7 +1367,8 @@
             }
         }
 
-        function removeCharacterChip(timestep, roomName, charName) {
+        function removeCharacterChip(timestep, roomName, charName, event) {
+            if (event) event.stopPropagation();
             state.placements[timestep][roomName] = state.placements[timestep][roomName].filter(p => p.char !== charName);
             updateMiniMapVisuals(timestep);
             saveState();
@@ -1377,25 +1387,55 @@
         function refreshExistingChips(timestep, roomName) {
             const existingChips = document.getElementById('existingChips');
             const placements = state.placements[timestep][roomName] || [];
-            
+
             if (placements.length > 0) {
-                existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">Current:</div>';
+                existingChips.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-size: 11px; font-weight: 600;">Current:</div>
+                        <div style="display: flex; gap: 4px;">
+                            <button style="padding: 6px 10px; font-size: 11px; background: #ef4444; color: white; border: none; border-radius: 3px; cursor: pointer; min-height: 32px;" onclick="strikeAllChips(${timestep}, '${roomName}', event)">Strike All</button>
+                            <button style="padding: 6px 10px; font-size: 11px; background: #10b981; color: white; border: none; border-radius: 3px; cursor: pointer; min-height: 32px;" onclick="unstrikeAllChips(${timestep}, '${roomName}', event)">Unstrike All</button>
+                        </div>
+                    </div>
+                `;
                 placements.forEach(placement => {
                     const chipItem = document.createElement('div');
                     chipItem.className = 'chip-item';
                     chipItem.innerHTML = `
                         <span style="color: ${placement.color}; font-weight: 600; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.initial}</span>
                         <span style="font-size: 11px; ${placement.strikethrough ? 'text-decoration: line-through; text-decoration-thickness: 2px;' : ''}">${placement.char}</span>
-                        <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}')">
+                        <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}', event)">
                             ${placement.strikethrough ? 'Unstrike' : 'Strike'}
                         </button>
-                        <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}')">Remove</button>
+                        <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}', event)">Remove</button>
                     `;
                     existingChips.appendChild(chipItem);
                 });
             } else {
                 existingChips.innerHTML = '';
             }
+        }
+
+        function strikeAllChips(timestep, roomName, event) {
+            if (event) event.stopPropagation();
+            const placements = state.placements[timestep][roomName] || [];
+            placements.forEach(placement => {
+                placement.strikethrough = true;
+            });
+            updateMiniMapVisuals(timestep);
+            saveState();
+            refreshExistingChips(timestep, roomName);
+        }
+
+        function unstrikeAllChips(timestep, roomName, event) {
+            if (event) event.stopPropagation();
+            const placements = state.placements[timestep][roomName] || [];
+            placements.forEach(placement => {
+                placement.strikethrough = false;
+            });
+            updateMiniMapVisuals(timestep);
+            saveState();
+            refreshExistingChips(timestep, roomName);
         }
 
         function renderTrackingTable() {

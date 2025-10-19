@@ -117,7 +117,7 @@
       <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>; non-bombers must have company at least once)</label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; non-lovers must have company at least once; if S2 enabled, phantom must be a lover)</label>
+      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; non-lovers must have company at least once; if S2 enabled, phantom must NOT be a lover)</label>
     </div>
 
     <div class="row">
@@ -235,7 +235,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom), S4 (Bomb Duo + non-isolation), S5 (Lovers + non-isolation, phantom-lover constraint).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom), S4 (Bomb Duo + non-isolation), S5 (Lovers + non-isolation), S2+S5 (phantom NOT a lover).</div>
 
 <script>
 /* ===========================
@@ -541,16 +541,17 @@ function buildCNF(config){
     clauses.push(...exactlyOne(L2));
     // distinct lovers: not the same char in both
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -L1[ci], -L2[ci] ]); }
-    
-    // If both S2 and S5 are enabled, phantom must be one of the lovers
+
+    // If both S2 and S5 are enabled, phantom must NOT be a lover
     if (PH){
       for (let ci=0; ci<C.length; ci++){
-        // PH[ci] => (L1[ci] OR L2[ci])
-        // CNF: -PH[ci] OR L1[ci] OR L2[ci]
-        clauses.push([ -PH[ci], L1[ci], L2[ci] ]);
+        // PH[ci] => NOT L1[ci] AND NOT L2[ci]
+        // CNF: -PH[ci] OR -L1[ci]  AND  -PH[ci] OR -L2[ci]
+        clauses.push([ -PH[ci], -L1[ci] ]);
+        clauses.push([ -PH[ci], -L2[ci] ]);
       }
     }
-    
+
     // Lovers never meet
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
