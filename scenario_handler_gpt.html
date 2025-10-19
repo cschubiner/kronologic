@@ -33,6 +33,15 @@
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
   .hint { color:#9fb1c1; font-size:12px; }
   .footer { padding:10px 16px; border-top:1px solid #18222f; color:#7ea2c7; }
+  .question-interface { margin-top:16px; }
+  .question-type { display:flex; gap:12px; margin-bottom:12px; }
+  .question-type button { flex:1; }
+  .question-form { display:none; }
+  .question-form.active { display:block; }
+  .answer-box { margin-top:12px; padding:12px; border-radius:8px; background:#0e141b; border:1px solid #253244; }
+  .answer-shared { color:#42d392; font-weight:600; margin-bottom:8px; }
+  .answer-private { color:#9fb1c1; font-size:12px; }
+  select.pill { padding:6px 10px; }
 </style>
 </head>
 <body>
@@ -130,6 +139,43 @@
           <h2>Raw JSON</h2>
           <pre class="mono tiny" id="rawJson"></pre>
           <button class="ghost" id="downloadBtn">Download JSON</button>
+        </div>
+        <div class="card">
+          <h2>Question Interface</h2>
+          <div class="question-interface">
+            <div class="question-type">
+              <button class="ghost" id="askLocTimeBtn">Location + Time</button>
+              <button class="ghost" id="askLocCharBtn">Location + Character</button>
+            </div>
+            
+            <div id="locTimeForm" class="question-form">
+              <div class="row">
+                <label>Location:</label>
+                <select id="locTimeLocation" class="pill"></select>
+                <label>Time:</label>
+                <select id="locTimeTime" class="pill"></select>
+                <button class="primary" id="askLocTimeSubmit">Ask</button>
+              </div>
+              <div id="locTimeAnswer" class="answer-box" style="display:none;">
+                <div class="answer-shared" id="locTimeShared"></div>
+                <div class="answer-private" id="locTimePrivate"></div>
+              </div>
+            </div>
+            
+            <div id="locCharForm" class="question-form">
+              <div class="row">
+                <label>Location:</label>
+                <select id="locCharLocation" class="pill"></select>
+                <label>Character:</label>
+                <select id="locCharChar" class="pill"></select>
+                <button class="primary" id="askLocCharSubmit">Ask</button>
+              </div>
+              <div id="locCharAnswer" class="answer-box" style="display:none;">
+                <div class="answer-shared" id="locCharShared"></div>
+                <div class="answer-private" id="locCharPrivate"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -698,11 +744,89 @@ qs("genBtn").addEventListener("click", ()=>{
       a.click();
       URL.revokeObjectURL(a.href);
     };
+
+    // Setup question interface
+    setupQuestionInterface(res, cfg);
   }catch(e){
     console.error(e);
     qs("status").innerHTML = `<span class="warn">Error: ${e.message}</span>`;
   }
 });
+
+function setupQuestionInterface(res, cfg){
+  const rooms = cfg.rooms;
+  const chars = cfg.chars;
+  const T = cfg.T;
+
+  // Populate dropdowns
+  const locTimeLocation = qs("locTimeLocation");
+  const locCharLocation = qs("locCharLocation");
+  const locCharChar = qs("locCharChar");
+  const locTimeTime = qs("locTimeTime");
+
+  locTimeLocation.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join("");
+  locCharLocation.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join("");
+  locCharChar.innerHTML = chars.map(c => `<option value="${c}">${c}</option>`).join("");
+  locTimeTime.innerHTML = Array.from({length:T}, (_,i) => `<option value="${i+1}">t=${i+1}</option>`).join("");
+
+  // Toggle between question types
+  qs("askLocTimeBtn").onclick = ()=>{
+    qs("locTimeForm").classList.add("active");
+    qs("locCharForm").classList.remove("active");
+    qs("locTimeAnswer").style.display = "none";
+  };
+  qs("askLocCharBtn").onclick = ()=>{
+    qs("locCharForm").classList.add("active");
+    qs("locTimeForm").classList.remove("active");
+    qs("locCharAnswer").style.display = "none";
+  };
+
+  // Location + Time question
+  qs("askLocTimeSubmit").onclick = ()=>{
+    const location = locTimeLocation.value;
+    const time = Number(locTimeTime.value);
+    
+    // Count how many characters were in this location at this time
+    const charsAtLocation = [];
+    for (const char of chars){
+      if (res.schedule[char][time-1] === location){
+        charsAtLocation.push(char);
+      }
+    }
+    
+    const count = charsAtLocation.length;
+    const identities = charsAtLocation.join(", ") || "none";
+    
+    qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} were in ${location} at t=${time}`;
+    qs("locTimePrivate").innerHTML = `⚪ Private: The character${count===1?' was':'s were'}: <b>${identities}</b>`;
+    qs("locTimeAnswer").style.display = "block";
+  };
+
+  // Location + Character question
+  qs("askLocCharSubmit").onclick = ()=>{
+    const location = locCharLocation.value;
+    const character = locCharChar.value;
+    
+    // Count how many times this character visited this location
+    const visitCount = res.visits[character][location] || 0;
+    
+    // Find which times they visited
+    const times = [];
+    for (let t=0; t<T; t++){
+      if (res.schedule[character][t] === location){
+        times.push(t+1);
+      }
+    }
+    const timesList = times.length > 0 ? times.map(t => `t=${t}`).join(", ") : "never";
+    
+    qs("locCharShared").innerHTML = `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
+    qs("locCharPrivate").innerHTML = `⚪ Private: Visited at: <b>${timesList}</b>`;
+    qs("locCharAnswer").style.display = "block";
+  };
+
+  // Default to Location + Time
+  qs("askLocTimeBtn").click();
+}
 </script>
 </body>
 </html>
