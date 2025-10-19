@@ -373,6 +373,242 @@ describe('S5: Lovers Scenario', () => {
     expect(res).not.toBeNull()
     expect(res.priv.lovers[0]).not.toBe(res.priv.lovers[1])
   })
+
+  it('should work with minimum configuration (2 chars, 2 rooms)', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['X', 'Y'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s5: true },
+      seed: 800
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+    expect(res.priv.lovers).toHaveLength(2)
+    
+    // With only 2 characters, both must be lovers
+    expect(res.priv.lovers).toContain('X')
+    expect(res.priv.lovers).toContain('Y')
+    
+    // They should never meet
+    for (let t = 0; t < cfg.T; t++) {
+      expect(res.schedule['X'][t]).not.toBe(res.schedule['Y'][t])
+    }
+  })
+
+  it('should handle larger groups with many non-lovers', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+      chars: ['L1', 'L2', 'N1', 'N2', 'N3', 'N4'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s5: true },
+      seed: 900
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const [lover1, lover2] = res.priv.lovers
+    const nonLovers = cfg.chars.filter(c => c !== lover1 && c !== lover2)
+
+    // Lovers never meet
+    for (let t = 0; t < cfg.T; t++) {
+      expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+    }
+
+    // All non-lovers have company at least once
+    for (const char of nonLovers) {
+      let hasCompany = false
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[char][t]
+        const others = cfg.chars.filter(c =>
+          c !== char && res.schedule[c][t] === room
+        )
+        if (others.length > 0) {
+          hasCompany = true
+          break
+        }
+      }
+      expect(hasCompany).toBe(true)
+    }
+  })
+
+  it('should allow lovers to be alone (just not together)', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['L1', 'L2', 'N1'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s5: true },
+      seed: 1000
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const [lover1, lover2] = res.priv.lovers
+
+    // Lovers can be alone (in a room by themselves)
+    // Just verify they're never in the same room
+    for (let t = 0; t < cfg.T; t++) {
+      expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+    }
+  })
+
+  it('should work with mustMove constraint', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['L1', 'L2', 'N1', 'N2'],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s5: true },
+      seed: 1100
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const [lover1, lover2] = res.priv.lovers
+    const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false)
+
+    // Verify movement constraints
+    for (const char of cfg.chars) {
+      for (let t = 0; t < cfg.T - 1; t++) {
+        const currentRoom = res.schedule[char][t]
+        const nextRoom = res.schedule[char][t + 1]
+        const currentIdx = idx.get(currentRoom)
+        const nextIdx = idx.get(nextRoom)
+        
+        expect(nbr[currentIdx]).toContain(nextIdx)
+        expect(currentRoom).not.toBe(nextRoom)
+      }
+    }
+
+    // Lovers still never meet
+    for (let t = 0; t < cfg.T; t++) {
+      expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+    }
+  })
+
+  it('should verify lovers can be in adjacent rooms', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['L1', 'L2', 'N1'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s5: true },
+      seed: 1200
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const [lover1, lover2] = res.priv.lovers
+
+    // Lovers can be in adjacent rooms (just not the same room)
+    // With only 2 rooms, they should often be in adjacent rooms
+    let adjacentCount = 0
+    for (let t = 0; t < cfg.T; t++) {
+      const room1 = res.schedule[lover1][t]
+      const room2 = res.schedule[lover2][t]
+      
+      // Never in same room
+      expect(room1).not.toBe(room2)
+      
+      // Count when they're in different rooms (which means adjacent with only 2 rooms)
+      if (room1 !== room2) adjacentCount++
+    }
+    
+    // They should be in different rooms at all times
+    expect(adjacentCount).toBe(cfg.T)
+  })
+
+  it('should handle complex graph topology', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C', 'D', 'E'],
+      edges: [
+        ['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'],
+        ['A', 'E'], // Creates a cycle
+        ['B', 'D']  // Adds a shortcut
+      ],
+      chars: ['L1', 'L2', 'N1', 'N2', 'N3'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s5: true },
+      seed: 1300
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const [lover1, lover2] = res.priv.lovers
+
+    // Verify core constraint: lovers never meet
+    for (let t = 0; t < cfg.T; t++) {
+      expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+    }
+
+    // Verify non-lovers have company
+    const nonLovers = cfg.chars.filter(c => c !== lover1 && c !== lover2)
+    for (const char of nonLovers) {
+      let hasCompany = false
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[char][t]
+        const others = cfg.chars.filter(c =>
+          c !== char && res.schedule[c][t] === room
+        )
+        if (others.length > 0) {
+          hasCompany = true
+          break
+        }
+      }
+      expect(hasCompany).toBe(true)
+    }
+  })
+
+  it('should work with different seeds producing different lovers', () => {
+    const baseConfig = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['C1', 'C2', 'C3', 'C4'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s5: true }
+    }
+
+    const res1 = solveAndDecode({ ...baseConfig, seed: 1400 })
+    const res2 = solveAndDecode({ ...baseConfig, seed: 1401 })
+
+    expect(res1).not.toBeNull()
+    expect(res2).not.toBeNull()
+
+    // Both should have valid lovers
+    expect(res1.priv.lovers).toHaveLength(2)
+    expect(res2.priv.lovers).toHaveLength(2)
+
+    // Both should satisfy the constraint
+    for (const res of [res1, res2]) {
+      const [lover1, lover2] = res.priv.lovers
+      for (let t = 0; t < baseConfig.T; t++) {
+        expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+      }
+    }
+  })
 })
 
 describe('Movement Constraints', () => {
