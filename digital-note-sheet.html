@@ -192,6 +192,31 @@
             font-size: 13px;
         }
 
+        .room-count {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .room-count label {
+            font-weight: 600;
+            font-size: 13px;
+            color: #1f2937;
+        }
+
+        .room-count input {
+            width: 80px;
+            padding: 8px;
+            text-align: center;
+            border: 2px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            min-height: 40px;
+            touch-action: manipulation;
+        }
+
         .character-grid {
             display: grid;
             gap: 6px;
@@ -713,6 +738,7 @@
     <!-- Character selector popup -->
     <div id="characterSelector" class="character-selector hidden">
         <div class="header" id="selectorHeader">Add Character</div>
+        <div class="room-count" id="roomCount"></div>
         <div class="character-grid" id="characterGrid"></div>
         <div class="existing-chips" id="existingChips"></div>
     </div>
@@ -744,7 +770,8 @@
             history: [],
             historyIndex: -1,
             currentSelector: null,
-            currentLayoutIndex: 0
+            currentLayoutIndex: 0,
+            counts: {}
         };
 
         const characterColors = [
@@ -775,6 +802,7 @@
                         layoutIndex: state.currentLayoutIndex
                     },
                     placements: state.placements,
+                    counts: state.counts,
                     notes: document.getElementById('notesEditor').value,
                     tracking: getTrackingTableData(),
                     history: state.history,
@@ -823,6 +851,8 @@
 
                 // Restore placements
                 state.placements = sessionData.placements;
+                // Restore counts
+                state.counts = sessionData.counts || {};
 
                 // Restore notes
                 document.getElementById('notesEditor').value = sessionData.notes || '';
@@ -1069,6 +1099,15 @@
                 });
             }
 
+            // Reset counts
+            state.counts = {};
+            for (let t = 1; t <= timestepCount; t++) {
+                state.counts[t] = {};
+                state.rooms.forEach(room => {
+                    state.counts[t][room] = null;
+                });
+            }
+
             // Clear history
             state.history = [];
             state.historyIndex = -1;
@@ -1190,8 +1229,14 @@
                 const roomName = node.data('name');
                 const placements = state.placements[timestep][roomName];
 
-                // Build label with room name and character initials
+                // Build label with room name, optional headcount, and character initials
                 let label = roomName;
+
+                // Append headcount if provided for this room and timestep
+                const roomCount = state.counts && state.counts[timestep] ? state.counts[timestep][roomName] : null;
+                if (typeof roomCount === 'number' && roomCount >= 0) {
+                    label += ` (${roomCount})`;
+                }
 
                 if (placements && placements.length > 0) {
                     const activeChars = placements.filter(p => !p.strikethrough);
@@ -1243,6 +1288,38 @@
             state.currentSelector = { timestep, roomName };
 
             header.textContent = `${roomName} at Time ${timestep}`;
+
+            // Render room count control
+            const maxCount = state.characters.length;
+            const existingCount = (state.counts && state.counts[timestep]) ? state.counts[timestep][roomName] : null;
+            const roomCountDiv = document.getElementById('roomCount');
+            if (roomCountDiv) {
+                const initialVal = (existingCount === null || existingCount === undefined) ? '' : existingCount;
+                roomCountDiv.innerHTML = `
+                    <label for="roomCountInput">Characters present:</label>
+                    <input type="number" id="roomCountInput" min="0" max="${maxCount}" placeholder="0" value="${initialVal}">
+                `;
+                const rcInput = document.getElementById('roomCountInput');
+                rcInput.addEventListener('input', (e) => {
+                    let val = e.target.value;
+                    if (val === '') {
+                        if (!state.counts[timestep]) state.counts[timestep] = {};
+                        state.counts[timestep][roomName] = null;
+                        updateMiniMapVisuals(timestep);
+                        saveState();
+                        return;
+                    }
+                    let num = parseInt(val, 10);
+                    if (isNaN(num) || num < 0) num = 0;
+                    const cap = state.characters.length;
+                    if (num > cap) num = cap;
+                    e.target.value = String(num);
+                    if (!state.counts[timestep]) state.counts[timestep] = {};
+                    state.counts[timestep][roomName] = num;
+                    updateMiniMapVisuals(timestep);
+                    saveState();
+                });
+            }
 
             // Render character options
             grid.innerHTML = '';
@@ -1473,6 +1550,7 @@
         function saveState() {
             const stateSnapshot = JSON.stringify({
                 placements: state.placements,
+                counts: state.counts,
                 notes: document.getElementById('notesEditor').value
             });
 
@@ -1512,6 +1590,7 @@
         function restoreState(stateStr) {
             const snapshot = JSON.parse(stateStr);
             state.placements = snapshot.placements;
+            state.counts = snapshot.counts || {};
             document.getElementById('notesEditor').value = snapshot.notes;
 
             // Update all mini-maps
