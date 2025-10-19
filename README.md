@@ -57,7 +57,7 @@ Players must deduce the secret scenario by combining:
   - NO other characters are present (exactly 2 people total)
 - At ALL other (time, room) pairs where the assassin is present:
   - Either the assassin is completely alone (1 person), OR
-  - The assassin is with 2+ other people (3+ people total)
+  - At least 2 other people are present with the assassin (3+ people total)
   - The assassin is NEVER alone with exactly one other person except at the poison moment
 - You can optionally fix the poison room and/or poison time
 
