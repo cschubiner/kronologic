@@ -137,12 +137,48 @@ Enable one or more scenarios:
 
 ### How Difficulty Scoring Works
 
-The generator creates many valid scenarios and scores them based on "red herrings":
+The generator creates many valid scenarios and scores them based on "red herrings" - patterns that look suspicious but aren't the actual solution. Higher scores = harder puzzles.
 
-- **S2 (Phantom)**: Characters who are alone frequently but not always
-- **S5 (Lovers)**: Pairs who rarely meet but do meet sometimes
-- **S1 (Poison)**: Characters alone at other times/places
-- **S4 (Bomb)**: Other pairs who are alone together (shouldn't exist, but scoring considers near-misses)
+#### S1: Poison Scoring
+**What makes it harder**: Other character pairs being alone together at various times
+
+- **+60 points** for each pair of characters (not assassin-victim) who are alone together at any time/room
+- The more "suspicious pairs" exist, the harder it is to identify the actual poisoning
+
+**Example**: If characters B and C are alone in the Library at t=2, and D and E are alone in the Kitchen at t=4, that's +120 difficulty (2 red herring pairs).
+
+#### S2: Phantom Scoring
+**What makes it harder**: Characters who are alone frequently (but not always)
+
+- **+100 points** per character who is alone T-1 or T-2 times (weighted by proportion)
+- **+50 points** per character who is alone ≥50% of the time (weighted by proportion)
+- Characters who are "almost phantoms" make it much harder to identify the true phantom
+
+**Example**: With T=6 timesteps, if character B is alone 5 times (but not all 6), that's a strong red herring worth ~83 points.
+
+#### S4: Bomb Duo Scoring
+**What makes it harder**: Other character pairs being alone together (which shouldn't exist per the rules)
+
+- **+60 points** for each pair of characters (not the bombers) who are alone together at any time/room
+- Since the bomb duo should be the ONLY pair ever alone, any other pairs are major red herrings
+
+**Example**: If the constraint is slightly relaxed or near-violations exist in the search space, these get scored.
+
+#### S5: Lovers Scoring
+**What makes it harder**: Character pairs who rarely meet
+
+- **+100 points** for pairs who never meet (0 meetings)
+- **+80 points** for pairs who meet exactly once
+- **+40 points** for pairs who meet 2 times
+- Pairs that avoid each other create confusion about who the actual lovers are
+
+**Example**: With T=6, if characters A and B never meet, C and D meet once, and E and F meet twice, that's +220 difficulty from red herrings.
+
+#### Combined Scoring
+When multiple scenarios are enabled, scores are added together. The percentile selection then picks from the sorted list:
+- **0th percentile**: Minimum score (easiest)
+- **50th percentile**: Median score
+- **100th percentile**: Maximum score (hardest)
 
 Higher percentiles select scenarios with more confusing patterns.
 
