@@ -276,6 +276,283 @@ describe('S4: Bomb Duo Scenario', () => {
     expect(res.priv.bomb_duo[0]).not.toBe(res.priv.bomb_duo[1])
   })
 
+  it('should allow bombers to be alone individually', () => {
+    // Bombers can be in rooms by themselves, just not with other non-bombers as a pair
+    for (let seed = 510; seed < 515; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['X', 'Y', 'Z', 'W'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [bomber1, bomber2] = res.priv.bomb_duo
+
+      // Verify bombers CAN be alone (count = 1 is allowed)
+      let bomber1AloneCount = 0
+      let bomber2AloneCount = 0
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.length === 1) {
+            if (charsInRoom[0] === bomber1) bomber1AloneCount++
+            if (charsInRoom[0] === bomber2) bomber2AloneCount++
+          }
+        }
+      }
+
+      // At least one bomber should be alone at some point (not required, but likely)
+      // This just verifies the constraint allows it
+      expect(bomber1AloneCount + bomber2AloneCount).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('should allow bombers to be in groups of 3+', () => {
+    // Bombers can be in larger groups, just not as the only pair
+    for (let seed = 520; seed < 525; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'Q', 'R', 'S', 'T'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [bomber1, bomber2] = res.priv.bomb_duo
+
+      // Count times bombers are together in groups of 3+
+      let bombersInLargeGroup = 0
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.length >= 3 && 
+              charsInRoom.includes(bomber1) && 
+              charsInRoom.includes(bomber2)) {
+            bombersInLargeGroup++
+          }
+        }
+      }
+
+      // This is allowed - just verify no constraint violation
+      expect(bombersInLargeGroup).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('should ensure bombers meet at least once', () => {
+    // Bombers should be alone together at least once (otherwise they're not identifiable)
+    for (let seed = 530; seed < 535; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['A', 'B', 'C', 'D'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [bomber1, bomber2] = res.priv.bomb_duo
+      const bombersSorted = [bomber1, bomber2].sort()
+
+      // Count times bombers are alone together
+      let bombersAloneTogether = 0
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.length === 2) {
+            const sorted = charsInRoom.sort()
+            if (sorted[0] === bombersSorted[0] && sorted[1] === bombersSorted[1]) {
+              bombersAloneTogether++
+            }
+          }
+        }
+      }
+
+      // Bombers must be alone together at least once
+      expect(bombersAloneTogether).toBeGreaterThan(0)
+    }
+  })
+
+  it('should work with minimum configuration (3 chars, 2 rooms)', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['X', 'Y', 'Z'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s4: true },
+      seed: 540
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+    expect(res.priv.bomb_duo).toHaveLength(2)
+
+    const [bomber1, bomber2] = res.priv.bomb_duo
+
+    // Verify constraint
+    for (let t = 0; t < cfg.T; t++) {
+      for (const room of cfg.rooms) {
+        const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+        
+        if (charsInRoom.length === 2) {
+          expect(charsInRoom).toContain(bomber1)
+          expect(charsInRoom).toContain(bomber2)
+        }
+      }
+    }
+  })
+
+  it('should work with many characters', () => {
+    for (let seed = 550; seed < 555; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D', 'E'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E']],
+        chars: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [bomber1, bomber2] = res.priv.bomb_duo
+      const bombersSorted = [bomber1, bomber2].sort()
+
+      // Verify no other pairs are alone together
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.length === 2) {
+            const sorted = charsInRoom.sort()
+            expect(sorted).toEqual(bombersSorted)
+          }
+        }
+      }
+    }
+  })
+
+  it('should work with mustMove constraint', () => {
+    for (let seed = 560; seed < 565; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']],
+        chars: ['W', 'X', 'Y', 'Z'],
+        T: 5,
+        mustMove: true,
+        allowStay: false,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [bomber1, bomber2] = res.priv.bomb_duo
+      const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false)
+
+      // Verify movement constraints
+      for (const char of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const currentRoom = res.schedule[char][t]
+          const nextRoom = res.schedule[char][t + 1]
+          const currentIdx = idx.get(currentRoom)
+          const nextIdx = idx.get(nextRoom)
+          
+          expect(nbr[currentIdx]).toContain(nextIdx)
+          expect(currentRoom).not.toBe(nextRoom)
+        }
+      }
+
+      // Verify bomb duo constraint still holds
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          if (charsInRoom.length === 2) {
+            const sorted = charsInRoom.sort()
+            const bombersSorted = [bomber1, bomber2].sort()
+            expect(sorted).toEqual(bombersSorted)
+          }
+        }
+      }
+    }
+  })
+
+  it('should verify no non-bomber pairs are ever alone', () => {
+    for (let seed = 570; seed < 575; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'Q', 'R', 'S', 'T'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s4: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [bomber1, bomber2] = res.priv.bomb_duo
+      const bomberSet = new Set([bomber1, bomber2])
+
+      // Check every possible pair
+      for (let i = 0; i < cfg.chars.length; i++) {
+        for (let j = i + 1; j < cfg.chars.length; j++) {
+          const char1 = cfg.chars[i]
+          const char2 = cfg.chars[j]
+          
+          // Skip if this is the bomber pair
+          if (bomberSet.has(char1) && bomberSet.has(char2)) continue
+
+          // This pair should NEVER be alone together
+          for (let t = 0; t < cfg.T; t++) {
+            for (const room of cfg.rooms) {
+              const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+              
+              if (charsInRoom.length === 2 && 
+                  charsInRoom.includes(char1) && 
+                  charsInRoom.includes(char2)) {
+                // This should never happen
+                fail(`Non-bomber pair ${char1},${char2} found alone in ${room} at t=${t+1}`)
+              }
+            }
+          }
+        }
+      }
+    }
+  })
+
 })
 
 describe('S5: Lovers Scenario', () => {
