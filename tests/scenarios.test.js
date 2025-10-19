@@ -802,6 +802,30 @@ describe('S5: Lovers Scenario', () => {
     }
   })
 
+  it('should have exactly two distinct lovers', () => {
+    for (let seed = 650; seed < 655; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['L1', 'L2', 'N1', 'N2'],
+        T: 4,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+      expect(res.priv.lovers).toHaveLength(2)
+      
+      const [lover1, lover2] = res.priv.lovers
+      expect(lover1).not.toBe(lover2)
+      expect(lover1).toBeTruthy()
+      expect(lover2).toBeTruthy()
+    }
+  })
+
   it('should have lovers never in same room', () => {
     // Test with multiple seeds
     for (let seed = 600; seed < 610; seed++) {
@@ -1052,6 +1076,83 @@ describe('S5: Lovers Scenario', () => {
     }
   })
 
+  it('should ensure every pair of non-lovers meets at least once', () => {
+    for (let seed = 710; seed < 715; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['L1', 'L2', 'N1', 'N2', 'N3'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [lover1, lover2] = res.priv.lovers
+      const loverSet = new Set([lover1, lover2])
+
+      // Check all pairs of characters
+      for (let i = 0; i < cfg.chars.length; i++) {
+        for (let j = i + 1; j < cfg.chars.length; j++) {
+          const char1 = cfg.chars[i]
+          const char2 = cfg.chars[j]
+
+          // If both are lovers, they should never meet
+          if (loverSet.has(char1) && loverSet.has(char2)) {
+            for (let t = 0; t < cfg.T; t++) {
+              expect(res.schedule[char1][t]).not.toBe(res.schedule[char2][t])
+            }
+          } else {
+            // At least one is not a lover - they must meet at least once
+            let met = false
+            for (let t = 0; t < cfg.T; t++) {
+              if (res.schedule[char1][t] === res.schedule[char2][t]) {
+                met = true
+                break
+              }
+            }
+            expect(met).toBe(true)
+          }
+        }
+      }
+    }
+  })
+
+  it('should verify lovers never share any room at any time', () => {
+    for (let seed = 720; seed < 725; seed++) {
+      const cfg = {
+        rooms: ['Room1', 'Room2', 'Room3'],
+        edges: [['Room1', 'Room2'], ['Room2', 'Room3']],
+        chars: ['A', 'B', 'C', 'D'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [lover1, lover2] = res.priv.lovers
+
+      // Check every (time, room) pair
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          
+          // Lovers should never both be in this room
+          const bothPresent = charsInRoom.includes(lover1) && charsInRoom.includes(lover2)
+          expect(bothPresent).toBe(false)
+        }
+      }
+    }
+  })
+
   it('should work with different seeds producing different lovers', () => {
     const baseConfig = {
       rooms: ['A', 'B', 'C'],
@@ -1083,8 +1184,266 @@ describe('S5: Lovers Scenario', () => {
   })
 })
 
-describe('S6: Phantom Lover', () => {
+describe('S6: Phantom Lover Scenario (S2 + S5)', () => {
   it('should have phantom as one of the lovers', () => {
+    for (let seed = 1500; seed < 1505; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'L', 'N1', 'N2', 'N3'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true, s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+      expect(res.priv.phantom).toBeTruthy()
+      expect(res.priv.lovers).toHaveLength(2)
+
+      const phantom = res.priv.phantom
+      const [lover1, lover2] = res.priv.lovers
+
+      // Phantom must be one of the lovers
+      expect([lover1, lover2]).toContain(phantom)
+    }
+  })
+
+  it('should have phantom alone at every timestep', () => {
+    for (let seed = 1510; seed < 1515; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C'],
+        edges: [['A', 'B'], ['B', 'C']],
+        chars: ['P', 'L', 'N1', 'N2'],
+        T: 4,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true, s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const phantom = res.priv.phantom
+
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[phantom][t]
+        const others = cfg.chars.filter(c => c !== phantom && res.schedule[c][t] === room)
+        expect(others).toHaveLength(0)
+      }
+    }
+  })
+
+  it('should have lovers never meet', () => {
+    for (let seed = 1520; seed < 1525; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'L', 'N1', 'N2', 'N3'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true, s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [lover1, lover2] = res.priv.lovers
+
+      for (let t = 0; t < cfg.T; t++) {
+        expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+      }
+    }
+  })
+
+  it('should ensure non-phantom lover meets all non-lovers', () => {
+    for (let seed = 1530; seed < 1535; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'L', 'N1', 'N2', 'N3'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true, s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const phantom = res.priv.phantom
+      const [lover1, lover2] = res.priv.lovers
+      
+      // Find the non-phantom lover
+      const nonPhantomLover = lover1 === phantom ? lover2 : lover1
+      
+      // Non-phantom lover must meet all non-lovers
+      const nonLovers = cfg.chars.filter(c => c !== lover1 && c !== lover2)
+      
+      for (const nonLover of nonLovers) {
+        let met = false
+        for (let t = 0; t < cfg.T; t++) {
+          if (res.schedule[nonPhantomLover][t] === res.schedule[nonLover][t]) {
+            met = true
+            break
+          }
+        }
+        expect(met).toBe(true)
+      }
+    }
+  })
+
+  it('should ensure all non-lover pairs meet', () => {
+    for (let seed = 1540; seed < 1545; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'L', 'N1', 'N2', 'N3'],
+        T: 6,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true, s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+
+      const [lover1, lover2] = res.priv.lovers
+      const loverSet = new Set([lover1, lover2])
+
+      // Check all pairs
+      for (let i = 0; i < cfg.chars.length; i++) {
+        for (let j = i + 1; j < cfg.chars.length; j++) {
+          const char1 = cfg.chars[i]
+          const char2 = cfg.chars[j]
+
+          // If both are lovers, they never meet
+          if (loverSet.has(char1) && loverSet.has(char2)) {
+            for (let t = 0; t < cfg.T; t++) {
+              expect(res.schedule[char1][t]).not.toBe(res.schedule[char2][t])
+            }
+          } else {
+            // At least one is not a lover - they must meet
+            let met = false
+            for (let t = 0; t < cfg.T; t++) {
+              if (res.schedule[char1][t] === res.schedule[char2][t]) {
+                met = true
+                break
+              }
+            }
+            expect(met).toBe(true)
+          }
+        }
+      }
+    }
+  })
+
+  it('should work with minimum configuration', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['Phantom', 'Lover', 'Other'],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s2: true, s5: true },
+      seed: 1550
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+    
+    const phantom = res.priv.phantom
+    const [lover1, lover2] = res.priv.lovers
+    
+    // Phantom is one of the lovers
+    expect([lover1, lover2]).toContain(phantom)
+    
+    // Phantom alone at all times
+    for (let t = 0; t < cfg.T; t++) {
+      const room = res.schedule[phantom][t]
+      const others = cfg.chars.filter(c => c !== phantom && res.schedule[c][t] === room)
+      expect(others).toHaveLength(0)
+    }
+    
+    // Lovers never meet
+    for (let t = 0; t < cfg.T; t++) {
+      expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+    }
+  })
+})
+
+describe('Combined Scenarios (Legacy S2 + S5 with phantom NOT lover)', () => {
+  it('should have phantom as one of the lovers', () => {
+    // Test with multiple seeds
+    for (let seed = 999; seed < 1009; seed++) {
+      const cfg = {
+        rooms: ['A', 'B', 'C', 'D'],
+        edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
+        chars: ['P', 'L1', 'L2', 'N1', 'N2'],
+        T: 5,
+        mustMove: false,
+        allowStay: true,
+        scenarios: { s2: true, s5: true },
+        seed
+      }
+
+      const res = solveAndDecode(cfg)
+      expect(res).not.toBeNull()
+      expect(res.priv.phantom).toBeTruthy()
+      expect(res.priv.lovers).toBeTruthy()
+
+      const phantom = res.priv.phantom
+      const [lover1, lover2] = res.priv.lovers
+
+      // Phantom MUST be one of the lovers in S6
+      const phantomIsLover = phantom === lover1 || phantom === lover2
+      expect(phantomIsLover).toBe(true)
+
+      // Verify phantom is alone at every timestep
+      for (let t = 0; t < cfg.T; t++) {
+        const phantomRoom = res.schedule[phantom][t]
+        const othersInRoom = cfg.chars.filter(c =>
+          c !== phantom && res.schedule[c][t] === phantomRoom
+        )
+        expect(othersInRoom).toHaveLength(0)
+      }
+
+      // Verify lovers never meet
+      for (let t = 0; t < cfg.T; t++) {
+        const room1 = res.schedule[lover1][t]
+        const room2 = res.schedule[lover2][t]
+        expect(room1).not.toBe(room2)
+      }
+
+      // Verify non-lovers all meet each other at least once
+      const nonLovers = cfg.chars.filter(c => c !== lover1 && c !== lover2)
+      for (let i = 0; i < nonLovers.length; i++) {
+        for (let j = i + 1; j < nonLovers.length; j++) {
+          const char1 = nonLovers[i]
+          const char2 = nonLovers[j]
+
+          let met = false
+          for (let t = 0; t < cfg.T; t++) {
+            if (res.schedule[char1][t] === res.schedule[char2][t]) {
+              met = true
+              break
+            }
+          }
+          expect(met).toBe(true)
+        }
+      }
+    }
+  })
+
+  it('should handle S2 + S5 together with phantom NOT a lover', () => {
     // Test with multiple seeds
     for (let seed = 999; seed < 1009; seed++) {
       const cfg = {
