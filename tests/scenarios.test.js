@@ -695,12 +695,12 @@ describe('Combined Scenarios', () => {
     expect(lover1).not.toBe(lover2)
   })
 
-  it('should work with minimum S2+S5 configuration (3 chars)', () => {
+  it('should work with S2+S5 configuration (4 chars)', () => {
     const cfg = {
-      rooms: ['A', 'B', 'C'],
-      edges: [['A', 'B'], ['B', 'C']],
-      chars: ['P', 'L1', 'L2'],
-      T: 4,
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['A', 'D']],
+      chars: ['P', 'L1', 'L2', 'N'],
+      T: 5,
       mustMove: false,
       allowStay: true,
       scenarios: { s2: true, s5: true },
@@ -713,9 +713,10 @@ describe('Combined Scenarios', () => {
     const phantom = res.priv.phantom
     const [lover1, lover2] = res.priv.lovers
 
-    // With 3 chars: 1 phantom, 2 lovers, all distinct
-    expect([phantom, lover1, lover2].length).toBe(3)
+    // Phantom, lover1, lover2 all distinct
     expect(new Set([phantom, lover1, lover2]).size).toBe(3)
+    expect(phantom).not.toBe(lover1)
+    expect(phantom).not.toBe(lover2)
 
     // Phantom alone everywhere
     for (let t = 0; t < cfg.T; t++) {
@@ -729,6 +730,24 @@ describe('Combined Scenarios', () => {
     // Lovers never meet
     for (let t = 0; t < cfg.T; t++) {
       expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t])
+    }
+
+    // Non-phantom non-lovers have company at least once
+    for (const char of cfg.chars) {
+      if (char === phantom || char === lover1 || char === lover2) continue
+
+      let hasCompany = false
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[char][t]
+        const others = cfg.chars.filter(c =>
+          c !== char && res.schedule[c][t] === room
+        )
+        if (others.length > 0) {
+          hasCompany = true
+          break
+        }
+      }
+      expect(hasCompany).toBe(true)
     }
   })
 })

@@ -1205,8 +1205,8 @@
         function updateNodeColors(cy, timestep) {
             cy.nodes().forEach(node => {
                 const roomName = node.data('name');
-                const placements = state.placements[timestep][roomName];
-                const roomCount = state.roomCounts[timestep][roomName];
+                const placements = state.placements[timestep] ? state.placements[timestep][roomName] : undefined;
+                const roomCount = state.roomCounts[timestep] ? state.roomCounts[timestep][roomName] : undefined;
 
                 // Build label with room name and character initials
                 let label = roomName;
@@ -1269,7 +1269,7 @@
             header.textContent = `${roomName} at Time ${timestep}`;
 
             // Set current room count
-            const currentCount = state.roomCounts[timestep][roomName];
+            const currentCount = state.roomCounts[timestep] && state.roomCounts[timestep][roomName];
             roomCountInput.value = currentCount !== null && currentCount !== undefined ? currentCount : '';
 
             // Render character options
@@ -1406,7 +1406,7 @@
 
         function refreshExistingChips(timestep, roomName) {
             const existingChips = document.getElementById('existingChips');
-            const placements = state.placements[timestep][roomName] || [];
+            const placements = (state.placements[timestep] && state.placements[timestep][roomName]) || [];
 
             if (placements.length > 0) {
                 existingChips.innerHTML = '<div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">Current:</div>';
@@ -1434,6 +1434,10 @@
 
             const { timestep, roomName } = state.currentSelector;
             
+            // Ensure the placements structure exists
+            if (!state.placements[timestep]) state.placements[timestep] = {};
+            if (!state.placements[timestep][roomName]) state.placements[timestep][roomName] = [];
+            
             // Add all characters to this room with strikethrough
             state.characters.forEach(char => {
                 const existing = state.placements[timestep][roomName].find(p => p.char === char.name);
@@ -1459,7 +1463,7 @@
             if (!state.currentSelector) return;
 
             const { timestep, roomName } = state.currentSelector;
-            const placements = state.placements[timestep][roomName] || [];
+            const placements = (state.placements[timestep] && state.placements[timestep][roomName]) || [];
             
             // Unstrike all existing placements
             placements.forEach(placement => {
@@ -1477,6 +1481,9 @@
 
             const { timestep, roomName } = state.currentSelector;
             const value = event.target.value;
+            
+            // Ensure the roomCounts structure exists
+            if (!state.roomCounts[timestep]) state.roomCounts[timestep] = {};
             
             // Store the count (null if empty)
             state.roomCounts[timestep][roomName] = value === '' ? null : parseInt(value);
