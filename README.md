@@ -44,6 +44,8 @@ Players must deduce the secret scenario by combining:
 
 ## Scenarios
 
+**Note**: You can only select ONE scenario per puzzle generation. Each scenario creates a unique mystery to solve.
+
 ### S1: Poison (Assassin)
 **Mystery**: One character poisoned someone at a specific time and location.
 
@@ -95,11 +97,26 @@ Players must deduce the secret scenario by combining:
 - They are **never** in the same room at the same time
 - They avoid each other completely throughout all timesteps
 - **Every pair of non-lovers must meet at least once** (all non-lovers must encounter each other)
-- **If S2 (Phantom) is also enabled**: The phantom MUST be one of the two lovers (since the phantom is alone at all times, they can never meet their lover)
 
 **Goal**: Identify the two lovers.
 
 **Difficulty Factors**: Other pairs who rarely meet create confusion.
+
+---
+
+### S6: Phantom Lover
+**Mystery**: One character is a phantom (alone at every timestep) AND is one of two lovers who never meet.
+
+**Rules**:
+- Combines S2 (Phantom) and S5 (Lovers) constraints
+- One character is the phantom - alone at every single timestep
+- The phantom is also one of two lovers who never meet
+- All other characters (non-phantom, non-lovers) must share a room with someone at least once
+- **Every pair of non-lovers must meet at least once** (all non-lovers must encounter each other)
+
+**Goal**: Identify the phantom and their lover.
+
+**Difficulty Factors**: The phantom constraint makes one lover obvious (they're always alone), but identifying their lover among the remaining characters is challenging. Other pairs who rarely meet create confusion.
 
 ---
 

@@ -96,9 +96,9 @@
       <button class="ghost" id="validateBtn">Validate Map</button>
     </div>
 
-    <h2>Scenarios</h2>
+    <h2>Scenarios (Select One)</h2>
     <div class="row">
-      <label><input type="checkbox" id="s1" /> S1: Poison (assassin alone with victim, first char is assassin)</label>
+      <label><input type="radio" name="scenario" id="s1" value="s1" /> S1: Poison (assassin alone with victim, first char is assassin)</label>
     </div>
     <div class="row tiny">
       <label>Poison room (optional exact):</label>
@@ -108,16 +108,19 @@
       <span class="muted tiny">(Assassin is always first character in list)</span>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s2" /> S2: Phantom (one character is alone at every time)</label>
+      <label><input type="radio" name="scenario" id="s2" value="s2" /> S2: Phantom (one character is alone at every time)</label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
+      <label><input type="radio" name="scenario" id="s3" value="s3" disabled /> S3: Jewels / hand-offs <span class="muted">(coming soon)</span></label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
+      <label><input type="radio" name="scenario" id="s4" value="s4" /> S4: Bomb duo (two culprits are the <i>only pair ever alone together</i>)</label>
     </div>
     <div class="row">
-      <label><input type="checkbox" id="s5" /> S5: Lovers (two lovers never meet; every pair of non-lovers must meet at least once; if S2 enabled, phantom must NOT be a lover)</label>
+      <label><input type="radio" name="scenario" id="s5" value="s5" /> S5: Lovers (two lovers never meet; every pair of non-lovers must meet at least once)</label>
+    </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s6" value="s6" /> S6: Phantom Lover (phantom is alone at every time AND is one of two lovers who never meet)</label>
     </div>
 
     <div class="row">
@@ -235,7 +238,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S4 (Bomb Duo), S5 (Lovers + all non-lovers meet), S2+S5 (phantom NOT a lover).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S4 (Bomb Duo), S5 (Lovers + all non-lovers meet), S6 (Phantom Lover - phantom is one of the lovers).</div>
 
 <script>
 /* ===========================
@@ -812,7 +815,7 @@ function scoreScenario(res, cfg) {
     score += scores.phantom;
   }
   
-  // S5: Lovers scoring
+  // S5/S6: Lovers scoring
   if (cfg.scenarios.s5 && res.priv.lovers) {
     scores.lovers = scoreLovers(res, cfg);
     score += scores.lovers;
@@ -1207,14 +1210,23 @@ qs("genBtn").addEventListener("click", async ()=>{
   if (rooms.length<2 || edges.length<1){ qs("status").innerHTML = `<span class="warn">Map too small.</span>`; return; }
   if (chars.length<2){ qs("status").innerHTML = `<span class="warn">Add at least 2 characters.</span>`; return; }
 
+  // Get selected scenario (radio button)
+  const selectedScenario = document.querySelector('input[name="scenario"]:checked');
+  const scenarioValue = selectedScenario ? selectedScenario.value : null;
+  
+  if (!scenarioValue) {
+    qs("status").innerHTML = `<span class="warn">Please select a scenario.</span>`;
+    return;
+  }
+
   const cfg = {
     rooms, edges, chars, T, mustMove, allowStay,
     scenarios: {
-      s1: qs("s1").checked,
-      s2: qs("s2").checked,
+      s1: scenarioValue === 's1',
+      s2: scenarioValue === 's2' || scenarioValue === 's6',
       s3: false, // placeholder
-      s4: qs("s4").checked,
-      s5: qs("s5").checked,
+      s4: scenarioValue === 's4',
+      s5: scenarioValue === 's5' || scenarioValue === 's6',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
