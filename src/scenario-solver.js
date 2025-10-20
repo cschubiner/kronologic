@@ -3,7 +3,7 @@
    =========================== */
 function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
 
-export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
+export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
   const rng = mulberry32(randSeed);
@@ -168,6 +168,27 @@ export function atMostOne(vars){ // pairwise
 
 export function exactlyOne(vars){
   return [...atLeastOne(vars), ...atMostOne(vars)];
+}
+
+export function atLeastK(vars, k){
+  if (k <= 0) return [[]];
+  const n = vars.length;
+  if (k > n) return [];
+  const targetSize = n - k + 1;
+  const combos = [];
+  function backtrack(start, chosen){
+    if (chosen.length === targetSize){
+      combos.push(chosen.slice());
+      return;
+    }
+    for (let i=start; i<n; i++){
+      chosen.push(vars[i]);
+      backtrack(i+1, chosen);
+      chosen.pop();
+    }
+  }
+  backtrack(0, []);
+  return combos;
 }
 
 export function buildTotalizer(vars, vp, clauses, prefix){
