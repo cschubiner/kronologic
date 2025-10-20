@@ -839,7 +839,9 @@ export function solveAndDecode(cfg){
   const { vp, clauses, privKeys } = buildCNF(cfg);
   const numVars = vp.count();
   const seed = Number(cfg.seed||0) || 0;
+  const solveStartTime = Date.now();
   const sol = satSolve(clauses, numVars, seed);
+  const solveTime = Date.now() - solveStartTime;
   if (!sol) return null;
 
   const val = name => sol[ vp.get(name) ]===true;
@@ -950,5 +952,12 @@ export function solveAndDecode(cfg){
     }
   }
 
-  return { schedule, byTime, visits, priv, meta: { vars:numVars } };
+  const stats = {
+    totalVars: numVars,
+    totalClauses: clauses.length,
+    avgClauseLength: clauses.length > 0 ? clauses.reduce((sum, c) => sum + c.length, 0) / clauses.length : 0,
+    solveTimeMs: solveTime
+  };
+
+  return { schedule, byTime, visits, priv, meta: { vars:numVars }, stats };
 }
