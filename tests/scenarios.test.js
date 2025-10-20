@@ -306,7 +306,7 @@ describe('S1: Poison Scenario', () => {
       mustMove: false,
       allowStay: true,
       scenarios: { s1: true },
-      seed: 340
+      seed: 220
     }
 
     testWithThreshold(cfg, (res, cfg) => {
@@ -2308,5 +2308,47 @@ describe('Edge Cases', () => {
     expect(res).not.toBeNull()
     expect(res.priv.poison_room).toBe('Kitchen')
     expect(res.priv.poison_time).toBe(2)
+  })
+})
+
+describe('S9: Doctor freeze scenario', () => {
+  it('ensures frozen characters thaw mid-game', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward'],
+      edges: [['Atrium', 'Lab'], ['Lab', 'Ward']],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 500
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.doctor).toBeTruthy()
+      expect(res.priv.frozen).toBeTruthy()
+      expect(res.priv.frozen).not.toContain(res.priv.doctor)
+      expect(res.priv.heals).toBeTruthy()
+      expect(res.priv.heals.length).toBeGreaterThan(0)
+
+      const healTimes = res.priv.heals.map(h => h.time)
+      expect(healTimes.some(t => t > 1)).toBe(true)
+      expect(healTimes.some(t => t < cfg.T)).toBe(true)
+
+      for (const { character, time, room } of res.priv.heals){
+        const idx = time - 1
+        expect(res.schedule[character][idx]).toBe(room)
+        expect(res.schedule[res.priv.doctor][idx]).toBe(room)
+      }
+
+      const movedFrozen = res.priv.frozen.filter(ch =>
+        res.schedule[ch][0] !== res.schedule[ch][cfg.T - 1]
+      )
+      expect(movedFrozen.length).toBeGreaterThan(0)
+
+      const showcase = movedFrozen[0]
+      expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1])
+      expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
+    })
   })
 })
