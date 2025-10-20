@@ -25,7 +25,7 @@ jobs:
         run: bun install
 
       - name: Run tests in parallel
-        run: bun test --bail=false
+        run: bun test --no-bail
 
       - name: Upload test results
         if: always()
