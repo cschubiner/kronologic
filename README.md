@@ -331,6 +331,21 @@ Higher percentiles select scenarios with more confusing patterns.
 
 ## Development
 
+### Local Development Server
+
+The scenario generator uses ES6 modules, which require a web server (they don't work with `file://` protocol due to CORS restrictions). To run locally:
+
+```bash
+# Start the development server
+bun run dev
+```
+
+Then open your browser to:
+- **Scenario Generator**: http://localhost:3000/scenario_handler_gpt.html
+- **Note Sheet**: http://localhost:3000/digital-note-sheet.html
+
+**Note**: The generator works perfectly on GitHub Pages without any build step. The dev server is only needed for local development.
+
 ### Running Tests
 
 This project uses [Bun](https://bun.sh) for running tests:

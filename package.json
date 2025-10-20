@@ -4,7 +4,9 @@
   "description": "A deduction game where players ask questions about character movements through rooms over time to solve mysteries. This tool generates valid scenarios with configurable difficulty using SAT solving.",
   "main": "index.js",
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "dev": "bunx serve -p 3000",
+    "serve": "python3 -m http.server 8000"
   },
   "keywords": [],
   "author": "",
