@@ -1,6 +1,8 @@
 /* ===========================
    Minimal SAT (DPLL + Unit)
    =========================== */
+function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
+
 export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
@@ -49,26 +51,36 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   }
 
   function chooseVar(){
-    // Prefer a unit clause first; otherwise take first literal from shortest clause.
-    let bestClause = null;
-    for (const c of clauses){
-      if (c.length===1){
-        const lit = c[0];
-        if (lit===0) continue;
-        const v = Math.abs(lit);
-        if (assigns[v]===0) return v;
-      } else if (c.length>1){
-        if (!bestClause || c.length < bestClause.length) bestClause = c;
+    // Heuristic: pick variable from a random non-satisfied clause
+    const unsatClauses = [];
+    for (let i = 0; i < clauses.length; i++) {
+      const c = clauses[i];
+      if (c.length === 1 && c[0] === 0) continue; // satisfied
+      if (c.length > 0) {
+        unsatClauses.push(i);
       }
     }
-    if (bestClause){
-      for (const lit of bestClause){
+    
+    if (unsatClauses.length > 0) {
+      // Pick a random unsat clause
+      const clauseIdx = unsatClauses[Math.floor(rng() * unsatClauses.length)];
+      const clause = clauses[clauseIdx];
+      
+      // Pick a random unassigned literal from that clause
+      const unassigned = [];
+      for (const lit of clause) {
         const v = Math.abs(lit);
-        if (assigns[v]===0) return v;
+        if (assigns[v] === 0) unassigned.push(v);
+      }
+      
+      if (unassigned.length > 0) {
+        return unassigned[Math.floor(rng() * unassigned.length)];
       }
     }
-    for (let v=1; v<=numVars; v++){
-      if (assigns[v]===0) return v;
+    
+    // Fallback: pick first unassigned variable
+    for (let v = 1; v <= numVars; v++) {
+      if (assigns[v] === 0) return v;
     }
     return 0;
   }
@@ -125,9 +137,6 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   return out;
 }
 
-function mulberry32(a){return function(){var
-t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
-
 /* ===========================
    CNF Builder Helpers
    =========================== */
@@ -145,11 +154,11 @@ export function varPool(){
   };
 }
 
-function atLeastOne(cl){ // OR over literals (already in int form)
+export function atLeastOne(cl){ // OR over literals (already in int form)
   return [cl];
 }
 
-function atMostOne(vars){ // pairwise
+export function atMostOne(vars){ // pairwise
   const out = [];
   for (let i=0;i<vars.length;i++) for (let j=i+1;j<vars.length;j++){
     out.push([-vars[i], -vars[j]]);
@@ -157,35 +166,11 @@ function atMostOne(vars){ // pairwise
   return out;
 }
 
-function exactlyOne(vars){
+export function exactlyOne(vars){
   return [...atLeastOne(vars), ...atMostOne(vars)];
 }
 
-function atLeastK(vars, k){
-  if (k <= 0) return [];
-  if (k > vars.length) return [];
-
-  const need = vars.length - k + 1;
-  const clauses = [];
-  const stack = [];
-
-  function backtrack(start){
-    if (stack.length === need){
-      clauses.push(stack.map(idx => vars[idx]));
-      return;
-    }
-    for (let i=start; i<vars.length; i++){
-      stack.push(i);
-      backtrack(i+1);
-      stack.pop();
-    }
-  }
-
-  backtrack(0);
-  return clauses;
-}
-
-function buildTotalizer(vars, vp, clauses, prefix){
+export function buildTotalizer(vars, vp, clauses, prefix){
   let nodeCounter = 0;
 
   function helper(list, tag){
@@ -319,7 +304,9 @@ export function buildCNF(config){
   const clauses = [];
 
   const R = config.rooms, C = config.chars, T = config.T;
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, config.allowStay && !config.mustMove);
+  const baseStay = config.allowStay && !config.mustMove;
+  const freezeStay = !!(config.scenarios && config.scenarios.s8);
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
 
   // Helper to get variable IDs
   const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
@@ -701,6 +688,94 @@ export function buildCNF(config){
     privKeys.AGG = AGG;
   }
 
+  // S8: Freeze
+  let FRZ = null;
+  if (config.scenarios && config.scenarios.s8){
+    if (T < 2) throw new Error('S8 requires at least two timesteps');
+    if (C.length < 2) throw new Error('S8 requires at least two characters');
+
+    FRZ = C.map((_,ci)=> vp.get(`FRZ_${C[ci]}`));
+    clauses.push(...exactlyOne(FRZ));
+
+    const freezeDetailByVictim = Array.from({length:C.length}, ()=>
+      Array.from({length:T}, ()=>Array.from({length:R.length}, ()=>[]))
+    );
+    const freezeKillsBeforeFinal = Array.from({length:C.length}, ()=>[]);
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const detail = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+            freezeDetailByVictim[vj][t][ri].push(detail);
+            if (t < T-1){
+              freezeKillsBeforeFinal[ci].push(detail);
+            }
+
+            clauses.push([-detail, FRZ[ci]]);
+            clauses.push([-detail, X(ci,t,ri)]);
+            clauses.push([-detail, X(vj,t,ri)]);
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === vj) continue;
+              clauses.push([-detail, -X(ck,t,ri)]);
+            }
+
+            const reverse = [ -FRZ[ci], -X(ci,t,ri), -X(vj,t,ri) ];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === vj) continue;
+              reverse.push( X(ck,t,ri) );
+            }
+            reverse.push(detail);
+            clauses.push(reverse);
+
+            for (let u=t; u<T; u++){
+              clauses.push([-detail, X(vj,u,ri)]);
+            }
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      if (freezeKillsBeforeFinal[ci].length === 0){
+        throw new Error('S8 requires a kill opportunity before the final timestep');
+      }
+      clauses.push([-FRZ[ci], ...freezeKillsBeforeFinal[ci]]);
+    }
+
+    if (config.mustMove){
+      const freezeSupports = Array.from({length:C.length}, ()=>
+        Array.from({length:T}, ()=>Array.from({length:R.length}, ()=>[]))
+      );
+
+      for (let vi=0; vi<C.length; vi++){
+        for (let ri=0; ri<R.length; ri++){
+          const seen = new Set();
+          for (let t=0; t<T; t++){
+            for (const detail of freezeDetailByVictim[vi][t][ri]){
+              seen.add(detail);
+            }
+            freezeSupports[vi][t][ri] = Array.from(seen);
+          }
+        }
+      }
+
+      for (let vi=0; vi<C.length; vi++){
+        for (let t=0; t<T-1; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const clause = [ -X(vi,t,ri), -X(vi,t+1,ri) ];
+            const support = freezeSupports[vi][t][ri];
+            if (support.length){ clause.push(...support); }
+            clauses.push(clause);
+          }
+        }
+      }
+    }
+
+    privKeys.FRZ = FRZ;
+  }
+
   // S4: Bomb duo
   // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
@@ -779,7 +854,9 @@ export function solveAndDecode(cfg){
   const { vp, clauses, privKeys } = buildCNF(cfg);
   const numVars = vp.count();
   const seed = Number(cfg.seed||0) || 0;
+  const solveStartTime = Date.now();
   const sol = satSolve(clauses, numVars, seed);
+  const solveTime = Date.now() - solveStartTime;
   if (!sol) return null;
 
   const val = name => sol[ vp.get(name) ]===true;
@@ -845,7 +922,7 @@ export function solveAndDecode(cfg){
   if (privKeys.AGG){
     let agg=null;
     for (let ci=0; ci<C.length; ci++) if (val(`AGG_${C[ci]}`)) agg = C[ci];
-    
+
     // Calculate victims (characters alone with aggrosassin)
     const victims = new Set();
     for (let t=0; t<T; t++){
@@ -857,10 +934,45 @@ export function solveAndDecode(cfg){
         }
       }
     }
-    
+
     priv.aggrosassin = agg;
     priv.victims = Array.from(victims);
   }
+  if (privKeys.FRZ){
+    let freezeChar = null;
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`FRZ_${C[ci]}`)){ freezeChar = C[ci]; break; }
+    }
+    if (freezeChar){
+      const victims = new Set();
+      const seenVictims = new Set();
+      const killRecords = [];
+      for (let t=0; t<T; t++){
+        const room = schedule[freezeChar][t];
+        const charsInRoom = C.filter(c => schedule[c][t] === room);
+        if (charsInRoom.length === 2){
+          const victim = charsInRoom.find(c => c !== freezeChar);
+          if (victim){
+            victims.add(victim);
+            if (!seenVictims.has(victim)){
+              seenVictims.add(victim);
+              killRecords.push({ victim, time: t+1, room });
+            }
+          }
+        }
+      }
+      priv.freeze = freezeChar;
+      priv.freeze_victims = Array.from(victims);
+      priv.freeze_kills = killRecords;
+    }
+  }
 
-  return { schedule, byTime, visits, priv, meta: { vars:numVars } };
+  const stats = {
+    totalVars: numVars,
+    totalClauses: clauses.length,
+    avgClauseLength: clauses.length > 0 ? clauses.reduce((sum, c) => sum + c.length, 0) / clauses.length : 0,
+    solveTimeMs: solveTime
+  };
+
+  return { schedule, byTime, visits, priv, meta: { vars:numVars }, stats };
 }

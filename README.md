@@ -196,6 +196,27 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S8: The Freeze
+**Mystery**: Mr. Freeze is on the loose. Anyone they catch alone is frozen in place for the rest of the timeline.
+
+**Rules**:
+- Exactly one character is the Freeze
+- Whenever the Freeze shares a room with exactly **one** other person, that person is frozen
+- Frozen characters remain in that room for all remaining timesteps (even if `mustMove=true`)
+- The Freeze must freeze at least one victim before the final timestep (players need a visible clue)
+- Frozen victims can be visited later, but they never move again
+
+**Goal**: Identify Mr. Freeze and list every frozen victim (with their freeze moments).
+
+**Difficulty Factors**:
+- More frozen victims make the answer clearer (easier mystery)
+- 1-on-1 meetings between non-Freeze characters act as red herrings and increase difficulty
+- Late freeze events give fewer turns to notice immobilised victims, raising difficulty
+
+**Scoring**: Difficulty starts at 40, decreases by 10 for each frozen victim, and increases by 5 for every 1-on-1 meeting that does **not** include the Freeze.
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -226,6 +247,7 @@ Enable one or more scenarios:
 - **S5 (Lovers)**: No configuration needed
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
+- **S8 (The Freeze)**: No configuration needed
 
 ### Difficulty Control
 
@@ -308,6 +330,21 @@ Higher percentiles select scenarios with more confusing patterns.
 - **Pure JavaScript**: Runs entirely in browser, no server needed
 
 ## Development
+
+### Local Development Server
+
+The scenario generator uses ES6 modules, which require a web server (they don't work with `file://` protocol due to CORS restrictions). To run locally:
+
+```bash
+# Start the development server
+bun run dev
+```
+
+Then open your browser to:
+- **Scenario Generator**: http://localhost:3000/scenario_handler_gpt.html
+- **Note Sheet**: http://localhost:3000/digital-note-sheet.html
+
+**Note**: The generator works perfectly on GitHub Pages without any build step. The dev server is only needed for local development.
 
 ### Running Tests
 

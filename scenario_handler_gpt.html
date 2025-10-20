@@ -125,12 +125,15 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s7" value="s7" /> S7: Aggrosassin (serial poisoner who kills everyone they meet 1-on-1)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (identify Mr. Freeze and the frozen victims)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
       <input id="percentile" type="number" min="0" max="100" step="0.1" class="pill" value="50" />
       <label>Samples:</label>
-      <input id="samples" type="number" min="10" max="5000" class="pill" value="100" />
+      <input id="samples" type="number" min="10" max="5000" class="pill" value="10" />
     </div>
     <div class="row">
       <button class="primary" id="genBtn">Generate</button>
@@ -245,768 +248,21 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place).</div>
 
-<script>
+<script type="module">
 /* ===========================
-   Minimal SAT (DPLL + Unit)
+   Import from scenario-solver.js
    =========================== */
-function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
-  // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
-  // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
-  const rng = mulberry32(randSeed);
-  const startTime = Date.now();
-  let assigns = new Array(numVars+1).fill(0); // 0=unassigned, 1=true, -1=false
-  let occPos = Array.from({length:numVars+1}, ()=>[]);
-  let occNeg = Array.from({length:numVars+1}, ()=>[]);
-  for (let i=0;i<clauses.length;i++){
-    const c = clauses[i];
-    for (const lit of c){
-      const v = Math.abs(lit);
-      if (lit>0) occPos[v].push(i); else occNeg[v].push(i);
-    }
-  }
-
-  function unitProp(queue){
-    while (queue.length){
-      const lit = queue.pop();
-      const v = Math.abs(lit);
-      const val = lit>0 ? 1 : -1;
-      if (assigns[v] !== 0){
-        if (assigns[v] !== val) return false; // conflict
-        continue;
-      }
-      assigns[v] = val;
-      // Satisfy clauses containing lit
-      const satList = val>0 ? occPos[v] : occNeg[v];
-      for (const ci of satList){ clauses[ci] = [0]; } // mark satisfied
-      // For clauses containing ~lit, remove ~lit
-      const remList = val>0 ? occNeg[v] : occPos[v];
-      for (const ci of remList){
-        if (clauses[ci].length===1 && clauses[ci][0]===0) continue;
-        // remove -lit
-        let arr = clauses[ci];
-        let idx = arr.indexOf(-lit);
-        if (idx>=0){ arr.splice(idx,1); }
-        if (arr.length===0) return false; // empty => conflict
-        if (arr.length===1){
-          const u = arr[0];
-          if (u!==0) queue.push(u);
-        }
-      }
-    }
-    return true;
-  }
-
-  function chooseVar(){
-    // Heuristic: pick variable from a random non-satisfied clause
-    for (let tries=0; tries<1000; tries++){
-      const ci = Math.floor(rng()*clauses.length);
-      const c = clauses[ci];
-      if (c.length===1 && c[0]===0) continue; // satisfied
-      if (c.length>0){
-        // pick literal with smallest abs assignment or random
-        let lit = c[Math.floor(rng()*c.length)];
-        return Math.abs(lit);
-      }
-    }
-    // fallback
-    for (let v=1; v<=numVars; v++) if (assigns[v]===0) return v;
-    return 0;
-  }
-
-  // initial unit clauses
-  let initQ = [];
-  for (const c of clauses){ if (c.length===1 && c[0]!==0) initQ.push(c[0]); }
-  if (!unitProp(initQ)) return null;
-
-  function dfs(){
-    // Check timeout
-    if (Date.now() - startTime > timeoutMs) {
-      throw new Error('SAT_TIMEOUT');
-    }
-    
-    // check all satisfied?
-    let allSat = true;
-    for (const c of clauses){
-      if (c.length===0) return false;
-      if (!(c.length===1 && c[0]===0)) { allSat=false; break; }
-    }
-    if (allSat) return true;
-
-    const v = chooseVar();
-    if (v===0) return true; // nothing left
-    // branch true, then false
-    for (const tryVal of [true,false]){
-      // clone state (clauses + assigns) cheaply via snapshots
-      const snapshotClauses = clauses.map(c=>c.slice());
-      const snapshotAssigns = assigns.slice();
-      if (unitProp([tryVal ? v : -v])){
-        if (dfs()) return true;
-      }
-      // restore
-      clauses = snapshotClauses;
-      assigns = snapshotAssigns;
-    }
-    return false;
-  }
-
-  try {
-    if (!dfs()) return null;
-  } catch (e) {
-    if (e.message === 'SAT_TIMEOUT') return null;
-    throw e;
-  }
-
-  // build boolean array
-  const out = new Array(numVars+1);
-  for (let v=1; v<=numVars; v++){
-    out[v] = assigns[v]===1;
-    if (assigns[v]===0) out[v]=false; // default
-  }
-  return out;
-}
-function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
+import {
+  parseMermaid,
+  neighbors,
+  buildCNF,
+  solveAndDecode
+} from './src/scenario-solver.js';
 
 /* ===========================
-   CNF Builder Helpers
-   =========================== */
-function varPool(){
-  let next = 1;
-  const id = new Map();
-  const rev = new Map();
-  return {
-    get(name){
-      if (!id.has(name)){ id.set(name, next); rev.set(next, name); next++; }
-      return id.get(name);
-    },
-    count(){ return next-1; },
-    rev
-  };
-}
-function atLeastOne(cl){ // OR over literals (already in int form)
-  return [cl];
-}
-function atMostOne(vars){ // pairwise
-  const out = [];
-  for (let i=0;i<vars.length;i++) for (let j=i+1;j<vars.length;j++){
-    out.push([-vars[i], -vars[j]]);
-  }
-  return out;
-}
-function exactlyOne(vars){
-  return [...atLeastOne(vars), ...atMostOne(vars)];
-}
-
-function buildTotalizer(vars, vp, clauses, prefix){
-  let nodeCounter = 0;
-
-  function helper(list, tag){
-    if (!list.length) return [];
-    if (list.length === 1) return [list[0]];
-
-    const mid = Math.floor(list.length / 2);
-    const left = helper(list.slice(0, mid), `${tag}L`);
-    const right = helper(list.slice(mid), `${tag}R`);
-
-    const id = `${tag}_${nodeCounter++}`;
-    const outLen = left.length + right.length;
-    const out = new Array(outLen);
-
-    for (let i=0; i<outLen; i++){
-      out[i] = vp.get(`${prefix}_${id}_${i+1}`);
-    }
-
-    for (let i=1; i<out.length; i++){
-      clauses.push([-out[i], out[i-1]]);
-    }
-    for (let i=0; i<left.length; i++){
-      clauses.push([-left[i], out[i]]);
-    }
-    for (let j=0; j<right.length; j++){
-      clauses.push([-right[j], out[j]]);
-    }
-    for (let i=0; i<left.length; i++){
-      for (let j=0; j<right.length; j++){
-        const idx = i + j + 1;
-        if (idx < out.length){
-          clauses.push([-left[i], -right[j], out[idx]]);
-        }
-      }
-    }
-
-    for (let i=0; i<out.length; i++){
-      const support = [];
-      if (i < left.length) support.push(left[i]);
-      if (i < right.length) support.push(right[i]);
-
-      for (let a=0; a<left.length; a++){
-        for (let b=0; b<right.length; b++){
-          if (a + b + 1 !== i) continue;
-          const comb = vp.get(`${prefix}_${id}_comb_${i}_${a}_${b}`);
-          clauses.push([-comb, left[a]]);
-          clauses.push([-comb, right[b]]);
-          clauses.push([comb, -left[a], -right[b]]);
-          support.push(comb);
-        }
-      }
-
-      if (support.length === 0){
-        clauses.push([-out[i]]);
-      } else {
-        clauses.push([-out[i], ...support]);
-      }
-    }
-    return out;
-  }
-
-  return helper(vars, prefix);
-}
-function impl(aLit, bLit){ // a ⇒ b  ->  (-a ∨ b)
-  return [[-aLit, bLit]];
-}
-
-/* ===========================
-   Mermaid-ish Parser
-   =========================== */
-function parseMermaid(txt){
-  // Parse Mermaid-like graph: handle quoted and unquoted room names
-  const rooms = new Set();
-  const edges = [];
-  // Match: optional quote, capture content, optional quote, ---, repeat
-  const re = /"([^"]+)"|(\S+)/g;
-  const lines = txt.split(/\r?\n/);
-  for (let line of lines){
-    line = line.trim();
-    if (!line || line.startsWith("graph")) continue;
-    if (!line.includes("---")) continue;
-    
-    // Extract all quoted or unquoted tokens
-    const tokens = [];
-    let match;
-    while ((match = re.exec(line)) !== null) {
-      tokens.push(match[1] || match[2]); // quoted or unquoted
-    }
-    
-    // Find --- separator position in original line
-    const parts = line.split("---");
-    if (parts.length === 2) {
-      // Re-parse each side
-      const leftTokens = [];
-      const rightTokens = [];
-      re.lastIndex = 0;
-      while ((match = re.exec(parts[0])) !== null) {
-        leftTokens.push(match[1] || match[2]);
-      }
-      re.lastIndex = 0;
-      while ((match = re.exec(parts[1])) !== null) {
-        rightTokens.push(match[1] || match[2]);
-      }
-      
-      if (leftTokens.length > 0 && rightTokens.length > 0) {
-        const a = leftTokens[leftTokens.length - 1]; // last token on left
-        const b = rightTokens[0]; // first token on right
-        rooms.add(a); rooms.add(b);
-        edges.push([a, b]);
-      }
-    }
-  }
-  return { rooms: Array.from(rooms), edges };
-}
-function neighbors(rooms, edges, includeSelf){
-  const idx = new Map(); rooms.forEach((r,i)=>idx.set(r,i));
-  const nbr = Array.from({length: rooms.length}, ()=> new Set());
-  for (const [a,b] of edges){
-    if (!idx.has(a) || !idx.has(b)) continue;
-    const i = idx.get(a), j = idx.get(b);
-    nbr[i].add(j); nbr[j].add(i);
-  }
-  if (includeSelf){ for (let i=0;i<rooms.length;i++) nbr[i].add(i); }
-  return { idx, nbr: nbr.map(s=>Array.from(s)) };
-}
-
-/* ===========================
-   Problem Encoding
-   =========================== */
-function buildCNF(config){
-  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?,time?}, s5}, seed}
-  const vp = varPool();
-  const clauses = [];
-
-  const R = config.rooms, C = config.chars, T = config.T;
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, config.allowStay && !config.mustMove);
-
-  // Helper to get variable IDs
-  const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
-
-  // Exactly one room per (c,t)
-  for (let ci=0; ci<C.length; ci++){
-    for (let t=0; t<T; t++){
-      const vars = [];
-      for (let ri=0; ri<R.length; ri++) vars.push(X(ci,t,ri));
-      clauses.push(...exactlyOne(vars));
-    }
-  }
-
-  // Movement constraints
-  for (let ci=0; ci<C.length; ci++){
-    for (let t=0; t<T-1; t++){
-      for (let ri=0; ri<R.length; ri++){
-        const allowed = nbr[ri];
-        if (!config.allowStay && config.mustMove){
-          // ensure next is in neighbors and not same room (we built nbr without self)
-        }
-        const rhs = allowed.map(r2 => X(ci, t+1, r2));
-        // (¬X[c,t,ri] ∨ (OR next))
-        clauses.push([ -X(ci,t,ri), ...rhs ]);
-      }
-    }
-  }
-
-  // =========== Scenarios ===========
-  const priv = {}; // which we'll fill later from assignment
-
-  // S2: Phantom alone at every time
-  let PH = null;
-  if (config.scenarios.s2){
-    PH = C.map((_,ci)=> vp.get(`PH_${C[ci]}`));
-    clauses.push(...exactlyOne(PH));
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        for (let ci=0; ci<C.length; ci++){
-          for (let cj=0; cj<C.length; cj++){
-            if (ci===cj) continue;
-            // (Ph(ci) ∧ X(ci,t,ri)) ⇒ ¬X(cj,t,ri)
-            clauses.push([ -PH[ci], -X(ci,t,ri), -X(cj,t,ri) ]);
-          }
-        }
-      }
-    }
-    // Non-phantom characters must have at least one timestep where they're not alone
-    for (let ci=0; ci<C.length; ci++){
-      const atLeastOnceNotAlone = [];
-      for (let t=0; t<T; t++){
-        for (let ri=0; ri<R.length; ri++){
-          for (let cj=0; cj<C.length; cj++){
-            if (ci===cj) continue;
-            // Variable: both ci and cj are in room ri at time t
-            const bothThere = vp.get(`notAlone_${ci}_${t}_${ri}_${cj}`);
-            // bothThere ⇒ X(ci,t,ri) and bothThere ⇒ X(cj,t,ri)
-            clauses.push([-bothThere, X(ci,t,ri)]);
-            clauses.push([-bothThere, X(cj,t,ri)]);
-            // X(ci,t,ri) ∧ X(cj,t,ri) ⇒ bothThere
-            clauses.push([-X(ci,t,ri), -X(cj,t,ri), bothThere]);
-            atLeastOnceNotAlone.push(bothThere);
-          }
-        }
-      }
-      // If ci is NOT the phantom, then at least one "not alone" moment must be true
-      // ¬PH[ci] ⇒ (at least one bothThere is true)
-      // CNF: PH[ci] ∨ (OR of all bothThere vars)
-      clauses.push([PH[ci], ...atLeastOnceNotAlone]);
-    }
-  }
-
-  // S5: Lovers never meet (two distinct characters never share a room/time)
-  let L1=null, L2=null;
-  if (config.scenarios.s5){
-    L1 = C.map((_,ci)=> vp.get(`L1_${C[ci]}`));
-    L2 = C.map((_,ci)=> vp.get(`L2_${C[ci]}`));
-    clauses.push(...exactlyOne(L1));
-    clauses.push(...exactlyOne(L2));
-    // distinct lovers: not the same char in both
-    for (let ci=0; ci<C.length; ci++){ clauses.push([ -L1[ci], -L2[ci] ]); }
-
-    // If both S2 and S5 are enabled, phantom must NOT be a lover
-    if (PH){
-      for (let ci=0; ci<C.length; ci++){
-        // PH[ci] => NOT L1[ci] AND NOT L2[ci]
-        // CNF: -PH[ci] OR -L1[ci]  AND  -PH[ci] OR -L2[ci]
-        clauses.push([ -PH[ci], -L1[ci] ]);
-        clauses.push([ -PH[ci], -L2[ci] ]);
-      }
-    }
-
-    // Lovers never meet
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        for (let c1=0; c1<C.length; c1++){
-          for (let c2=0; c2<C.length; c2++){
-            if (c1===c2) continue;
-            // (L1[c1] ∧ L2[c2]) ⇒ ¬(X[c1,t,ri] ∧ X[c2,t,ri])
-            // CNF: ¬L1[c1] ∨ ¬L2[c2] ∨ ¬X[c1,t,ri] ∨ ¬X[c2,t,ri]
-            clauses.push([ -L1[c1], -L2[c2], -X(c1,t,ri), -X(c2,t,ri) ]);
-          }
-        }
-      }
-    }
-    
-    // Every pair of non-lovers must meet at least once
-    for (let ci=0; ci<C.length; ci++){
-      for (let cj=ci+1; cj<C.length; cj++){
-        // Create variable: ci and cj meet at least once
-        const pairMeets = [];
-        for (let t=0; t<T; t++){
-          for (let ri=0; ri<R.length; ri++){
-            const bothThere = vp.get(`loverPairMeet_${ci}_${cj}_${t}_${ri}`);
-            // bothThere ⇔ (X(ci,t,ri) ∧ X(cj,t,ri))
-            clauses.push([-bothThere, X(ci,t,ri)]);
-            clauses.push([-bothThere, X(cj,t,ri)]);
-            clauses.push([-X(ci,t,ri), -X(cj,t,ri), bothThere]);
-            pairMeets.push(bothThere);
-          }
-        }
-        
-        // If neither ci nor cj is a lover (or they're not THE lover pair), they must meet
-        // The pair (ci, cj) are lovers iff: (L1[ci] ∧ L2[cj]) ∨ (L1[cj] ∧ L2[ci])
-        // So they're NOT the lover pair iff: ¬((L1[ci] ∧ L2[cj]) ∨ (L1[cj] ∧ L2[ci]))
-        // Which is: (¬L1[ci] ∨ ¬L2[cj]) ∧ (¬L1[cj] ∨ ¬L2[ci])
-        // If they're not the lover pair, they must meet: at least one pairMeets is true
-        
-        // Create helper variables for "this pair is the lovers"
-        const isLoverPair1 = vp.get(`isLoverPair1_${ci}_${cj}`);
-        const isLoverPair2 = vp.get(`isLoverPair2_${ci}_${cj}`);
-        
-        // isLoverPair1 ⇔ (L1[ci] ∧ L2[cj])
-        clauses.push([-isLoverPair1, L1[ci]]);
-        clauses.push([-isLoverPair1, L2[cj]]);
-        clauses.push([-L1[ci], -L2[cj], isLoverPair1]);
-        
-        // isLoverPair2 ⇔ (L1[cj] ∧ L2[ci])
-        clauses.push([-isLoverPair2, L1[cj]]);
-        clauses.push([-isLoverPair2, L2[ci]]);
-        clauses.push([-L1[cj], -L2[ci], isLoverPair2]);
-        
-        // If NOT (isLoverPair1 ∨ isLoverPair2), then they must meet
-        // ¬(isLoverPair1 ∨ isLoverPair2) ⇒ (at least one pairMeets)
-        // (isLoverPair1 ∨ isLoverPair2) ∨ (at least one pairMeets)
-        clauses.push([isLoverPair1, isLoverPair2, ...pairMeets]);
-      }
-    }
-  }
-
-  // S1: Poison — assassin (first character) alone with exactly one victim
-  let V=null, PT=null, PR=null;
-  if (config.scenarios.s1){
-    // Assassin is always first character (index 0)
-    const assassinIdx = 0;
-    
-    // Variables for victim, poison time, and poison room
-    V  = C.map((_,ci)=> vp.get(`V_${C[ci]}`));
-    PT = Array.from({length:T}, (_,t)=> vp.get(`PT_${t}`));
-    PR = R.map((_,ri)=> vp.get(`PR_${R[ri]}`));
-    
-    clauses.push(...exactlyOne(V));
-    clauses.push(...exactlyOne(PT));
-    clauses.push(...exactlyOne(PR));
-    
-    // Victim cannot be the assassin
-    clauses.push([ -V[assassinIdx] ]);
-    
-    // Optional fixed room/time pins
-    if (config.scenarios.s1_room){
-      const ri = Ridx.get(config.scenarios.s1_room);
-      if (ri!=null) clauses.push([ PR[ri] ]); // force true
-    }
-    if (config.scenarios.s1_time){
-      const t = Number(config.scenarios.s1_time)-1;
-      if (!Number.isNaN(t) && t>=0 && t<T) clauses.push([ PT[t] ]);
-    }
-    
-    // At poison time/room: assassin and victim are there, no one else
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        for (let vi=0; vi<C.length; vi++){
-          if (vi === assassinIdx) continue;
-          
-          // If PT[t] & PR[ri] & V[vi], then:
-          // - Assassin is in room: X(assassin, t, ri)
-          clauses.push([ -PT[t], -PR[ri], -V[vi], X(assassinIdx, t, ri) ]);
-          // - Victim is in room: X(vi, t, ri)
-          clauses.push([ -PT[t], -PR[ri], -V[vi], X(vi, t, ri) ]);
-          
-          // - No one else is in room
-          for (let ci=0; ci<C.length; ci++){
-            if (ci === assassinIdx || ci === vi) continue;
-            clauses.push([ -PT[t], -PR[ri], -V[vi], -X(ci, t, ri) ]);
-          }
-        }
-      }
-    }
-    
-    // Assassin is ONLY alone with one other person at the poison time/room
-    // For all other (t, ri) pairs, assassin must be either:
-    // - Completely alone (no one else in room), OR
-    // - With 2+ other people
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        // Create variable: this is the poison time/room
-        const isPoisonMoment = vp.get(`isPoisonMoment_${t}_${ri}`);
-        
-        // isPoisonMoment is true iff there exists a victim such that PT[t] & PR[ri] & V[victim]
-        const poisonClauses = [];
-        for (let vi=0; vi<C.length; vi++){
-          if (vi === assassinIdx) continue;
-          const thisPoison = vp.get(`thisPoison_${t}_${ri}_${vi}`);
-          // thisPoison <=> (PT[t] & PR[ri] & V[vi])
-          clauses.push([-thisPoison, PT[t]]);
-          clauses.push([-thisPoison, PR[ri]]);
-          clauses.push([-thisPoison, V[vi]]);
-          clauses.push([-PT[t], -PR[ri], -V[vi], thisPoison]);
-          poisonClauses.push(thisPoison);
-        }
-        // isPoisonMoment <=> (OR of all thisPoison vars)
-        clauses.push([-isPoisonMoment, ...poisonClauses]);
-        for (const tp of poisonClauses){
-          clauses.push([-tp, isPoisonMoment]);
-        }
-        
-        // If assassin is in this room at this time AND it's NOT the poison moment,
-        // then assassin must be either alone or with 2+ people (not exactly 1 other)
-        
-        // Count how many others are in room with assassin
-        for (let ci=0; ci<C.length; ci++){
-          if (ci === assassinIdx) continue;
-          for (let cj=ci+1; cj<C.length; cj++){
-            if (cj === assassinIdx) continue;
-            
-            // If assassin is here, NOT poison moment, and exactly ci and cj are the only others:
-            // This should be impossible
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
-            
-            // exactlyTwo => X(assassin), X(ci), X(cj), and no others
-            clauses.push([-exactlyTwo, X(assassinIdx, t, ri)]);
-            clauses.push([-exactlyTwo, X(ci, t, ri)]);
-            clauses.push([-exactlyTwo, X(cj, t, ri)]);
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === assassinIdx || ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck, t, ri)]);
-            }
-            
-            // If all those conditions hold, then exactlyTwo
-            const others = [];
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === assassinIdx || ck === ci || ck === cj) continue;
-              others.push(X(ck, t, ri));
-            }
-            clauses.push([exactlyTwo, -X(assassinIdx, t, ri), -X(ci, t, ri), -X(cj, t, ri), ...others]);
-            
-            // exactlyTwo AND NOT isPoisonMoment => FALSE (contradiction)
-            clauses.push([-exactlyTwo, isPoisonMoment]);
-          }
-        }
-        
-        // Also handle case where assassin is with exactly 1 other person (not a pair from above)
-        for (let ci=0; ci<C.length; ci++){
-          if (ci === assassinIdx) continue;
-          
-          const exactlyOne = vp.get(`exactlyOne_${t}_${ri}_${ci}`);
-          
-          // exactlyOne => X(assassin), X(ci), and no others
-          clauses.push([-exactlyOne, X(assassinIdx, t, ri)]);
-          clauses.push([-exactlyOne, X(ci, t, ri)]);
-          for (let ck=0; ck<C.length; ck++){
-            if (ck === assassinIdx || ck === ci) continue;
-            clauses.push([-exactlyOne, -X(ck, t, ri)]);
-          }
-          
-          // If those conditions hold, then exactlyOne
-          const others = [];
-          for (let ck=0; ck<C.length; ck++){
-            if (ck === assassinIdx || ck === ci) continue;
-            others.push(X(ck, t, ri));
-          }
-          clauses.push([exactlyOne, -X(assassinIdx, t, ri), -X(ci, t, ri), ...others]);
-          
-          // exactlyOne AND NOT isPoisonMoment => FALSE
-          clauses.push([-exactlyOne, isPoisonMoment]);
-        }
-      }
-    }
-  }
-
-  // S7: Aggrosassin
-  let AGG=null;
-  if (config.scenarios.s7){
-    AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
-    clauses.push(...exactlyOne(AGG));
-
-    // For each (time, room) pair with exactly 2 people, track if aggrosassin is one of them
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        for (let ci=0; ci<C.length; ci++){
-          for (let cj=ci+1; cj<C.length; cj++){
-            const exactlyTwo = vp.get(`exactlyTwo_s7_${t}_${ri}_${ci}_${cj}`);
-
-            // exactlyTwo ⇔ (exactly ci and cj in room ri at time t)
-            clauses.push([-exactlyTwo, X(ci,t,ri)]);
-            clauses.push([-exactlyTwo, X(cj,t,ri)]);
-
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
-            }
-
-            const someoneElse = [];
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === cj) continue;
-              someoneElse.push(X(ck,t,ri));
-            }
-            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
-
-            // Track if aggrosassin is involved in this pair
-            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
-            
-            // aggInPair ⇔ (exactlyTwo ∧ (AGG[ci] ∨ AGG[cj]))
-            clauses.push([-aggInPair, exactlyTwo]);
-            clauses.push([-aggInPair, AGG[ci], AGG[cj]]);
-            clauses.push([-exactlyTwo, -AGG[ci], aggInPair]);
-            clauses.push([-exactlyTwo, -AGG[cj], aggInPair]);
-          }
-        }
-      }
-    }
-
-    // For each timestep, track if aggrosassin kills someone (is alone with exactly 1 other)
-    const aggKillsAtTimestep = [];
-    for (let t=0; t<T; t++){
-      const killsThisTimestep = vp.get(`aggKills_t${t}`);
-      aggKillsAtTimestep.push(killsThisTimestep);
-      
-      // killsThisTimestep is true if aggrosassin is in a pair at this timestep
-      const pairsAtThisTime = [];
-      for (let ri=0; ri<R.length; ri++){
-        for (let ci=0; ci<C.length; ci++){
-          for (let cj=ci+1; cj<C.length; cj++){
-            const aggInPair = vp.get(`aggInPair_${t}_${ri}_${ci}_${cj}`);
-            pairsAtThisTime.push(aggInPair);
-          }
-        }
-      }
-      
-      // killsThisTimestep ⇔ (at least one aggInPair is true at this timestep)
-      clauses.push([-killsThisTimestep, ...pairsAtThisTime]);
-      for (const pair of pairsAtThisTime){
-        clauses.push([-pair, killsThisTimestep]);
-      }
-    }
-    
-    // Constraint: At least ceil(T/2) of the aggKillsAtTimestep variables must be true
-    const minKills = Math.ceil(T / 2);
-    
-    // For small T, we can use a direct encoding
-    if (T <= 10) {
-      const mustHaveKills = T - minKills + 1;
-      
-      function generateSubsets(arr, size) {
-        if (size === 0) return [[]];
-        if (arr.length === 0) return [];
-        const [first, ...rest] = arr;
-        const withoutFirst = generateSubsets(rest, size);
-        const withFirst = generateSubsets(rest, size - 1).map(subset => [first, ...subset]);
-        return [...withoutFirst, ...withFirst];
-      }
-      
-      const subsets = generateSubsets(aggKillsAtTimestep, mustHaveKills);
-      for (const subset of subsets) {
-        clauses.push(subset);
-      }
-    }
-  }
-
-  // S4: Bomb duo — A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
-  let A1=null, A2=null;
-  if (config.scenarios.s4){
-    A1 = C.map((_,ci)=> vp.get(`A1_${C[ci]}`));
-    A2 = C.map((_,ci)=> vp.get(`A2_${C[ci]}`));
-    clauses.push(...exactlyOne(A1));
-    clauses.push(...exactlyOne(A2));
-    // distinct
-    for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
-
-    // Enforce: ONLY A1 and A2 can ever be alone together (exactly 2 people in a room)
-    // For all times and rooms, if exactly 2 people are present, they must be A1 and A2
-    const bomberAloneChoices = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>[]));
-
-    for (let t=0; t<T; t++){
-      for (let ri=0; ri<R.length; ri++){
-        // For each pair of characters
-        for (let ci=0; ci<C.length; ci++){
-          for (let cj=ci+1; cj<C.length; cj++){
-            // If ci and cj are both in room ri at time t, and no one else is there,
-            // then ci and cj must be A1 and A2 (in either order)
-            
-            // Create helper variable: exactly ci and cj in room ri at time t
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
-
-            bomberAloneChoices[ci][cj].push(exactlyTwo);
-            bomberAloneChoices[cj][ci].push(exactlyTwo);
-            
-            // exactlyTwo => X(ci,t,ri) AND X(cj,t,ri)
-            clauses.push([-exactlyTwo, X(ci,t,ri)]);
-            clauses.push([-exactlyTwo, X(cj,t,ri)]);
-            
-            // exactlyTwo => no other character in room
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
-            }
-            
-            // If X(ci,t,ri) AND X(cj,t,ri) AND (no others), then exactlyTwo
-            // We need: (X(ci,t,ri) ∧ X(cj,t,ri) ∧ ∀k≠ci,cj: ¬X(ck,t,ri)) => exactlyTwo
-            // Equivalently: exactlyTwo ∨ ¬X(ci,t,ri) ∨ ¬X(cj,t,ri) ∨ (∃k: X(ck,t,ri))
-            const someoneElse = [];
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === cj) continue;
-              someoneElse.push(X(ck,t,ri));
-            }
-            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
-            
-            // exactlyTwo => (ci,cj) must be (A1,A2) in some order
-            // exactlyTwo => (A1[ci] ∧ A2[cj]) ∨ (A1[cj] ∧ A2[ci])
-            // CNF: exactlyTwo => pair1 ∨ pair2
-            const pair1 = vp.get(`pair1_${ci}_${cj}`);
-            const pair2 = vp.get(`pair2_${ci}_${cj}`);
-            
-            // pair1 <=> (A1[ci] ∧ A2[cj])
-            clauses.push([-pair1, A1[ci]]);
-            clauses.push([-pair1, A2[cj]]);
-            clauses.push([-A1[ci], -A2[cj], pair1]);
-            
-            // pair2 <=> (A1[cj] ∧ A2[ci])
-            clauses.push([-pair2, A1[cj]]);
-            clauses.push([-pair2, A2[ci]]);
-            clauses.push([-A1[cj], -A2[ci], pair2]);
-            
-            // exactlyTwo => (pair1 ∨ pair2)
-            clauses.push([-exactlyTwo, pair1, pair2]);
-          }
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let cj=ci+1; cj<C.length; cj++){
-        const choices = bomberAloneChoices[ci][cj];
-        if (!choices.length) continue;
-        clauses.push([-A1[ci], -A2[cj], ...choices]);
-        clauses.push([-A1[cj], -A2[ci], ...choices]);
-      }
-    }
-  }
-
-  // Collect statistics
-  const stats = {
-    totalVars: vp.count(),
-    totalClauses: clauses.length,
-    avgClauseLength: clauses.reduce((sum, c) => sum + c.length, 0) / clauses.length
-  };
-
-  return { vp, clauses, privKeys: {PH, L1, L2, V, PT, PR, A1, A2, AGG}, stats };
-}
-
-/* ===========================
-   Scoring Functions
+   Scoring Functions (HTML-specific)
    =========================== */
 function scoreScenario(res, cfg) {
   let score = 0;
@@ -1047,7 +303,13 @@ function scoreScenario(res, cfg) {
     scores.aggrosassin = scoreAggrosassin(res, cfg);
     score += scores.aggrosassin;
   }
-  
+
+  // S8: Freeze scoring
+  if (cfg.scenarios.s8 && res.priv.freeze) {
+    scores.freeze = scoreFreeze(res, cfg);
+    score += scores.freeze;
+  }
+
   return { total: score, breakdown: scores };
 }
 
@@ -1245,12 +507,44 @@ function scoreAggrosassin(res, cfg) {
       }
     }
   }
-  
+
+  return score;
+}
+
+function scoreFreeze(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: Fewer freeze victims, timing of freezes, and red herring 1:1 meetings
+  const freeze = res.priv.freeze;
+  if (!freeze) return 0;
+
+  const kills = res.priv.freeze_kills || [];
+  const T = cfg.T;
+  const chars = cfg.chars;
+
+  let score = Math.max(0, 40 - kills.length * 2);
+
+  // Late freezes are harder to detect (fewer timesteps to observe immobility)
+  for (const kill of kills) {
+    const lateness = kill.time / T; // 0.0 to 1.0
+    score += lateness * 15; // Up to +15 for very late freezes
+  }
+
+  let redHerrings = 0;
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2 && !charsInRoom.includes(freeze)) {
+        redHerrings++;
+      }
+    }
+  }
+
+  score += redHerrings * 5;
   return score;
 }
 
 /* ===========================
-   URL State Management
+   URL State Management (HTML-specific)
    =========================== */
 function encodeScenarioToURL(res, cfg) {
   // Create a compact representation of the scenario
@@ -1340,113 +634,6 @@ function getScenarioFromURL() {
 }
 
 /* ===========================
-   Decode & Clues
-   =========================== */
-function solveAndDecode(cfg){
-  const { vp, clauses, privKeys, stats } = buildCNF(cfg);
-  const numVars = vp.count();
-  const seed = Number(cfg.seed||0) || 0;
-  const solveStartTime = Date.now();
-  const sol = satSolve(clauses, numVars, seed);
-  const solveTime = Date.now() - solveStartTime;
-  if (!sol) return null;
-
-  // Helper to read var by name
-  const val = name => sol[ vp.get(name) ]===true;
-
-  const R = cfg.rooms, C = cfg.chars, T = cfg.T;
-  // schedule
-  const schedule = {};
-  for (let ci=0; ci<C.length; ci++){
-    const row = [];
-    for (let t=0; t<T; t++){
-      let found = "(none)";
-      for (let ri=0; ri<R.length; ri++){
-        if (val(`X_${C[ci]}_${t}_${R[ri]}`)){ found = R[ri]; break; }
-      }
-      row.push(found);
-    }
-    schedule[C[ci]] = row;
-  }
-
-  // by-time counts
-  const byTime = {};
-  for (let t=0; t<T; t++){
-    const counts = {}; R.forEach(r=>counts[r]=0);
-    for (let ci=0; ci<C.length; ci++){
-      const r = schedule[C[ci]][t];
-      if (counts[r]!=null) counts[r]++;
-    }
-    byTime[t+1] = counts;
-  }
-
-  // visits
-  const visits = {};
-  for (let ci=0; ci<C.length; ci++){
-    const v = {}; R.forEach(r=>v[r]=0);
-    for (let t=0; t<T; t++){ v[ schedule[C[ci]][t] ]++; }
-    visits[C[ci]] = v;
-  }
-
-  // private facts
-  const priv = {};
-  if (privKeys.PH){
-    for (let ci=0; ci<C.length; ci++){
-      if (val(`PH_${C[ci]}`)) { priv.phantom = C[ci]; break; }
-    }
-  }
-  if (privKeys.L1 && privKeys.L2){
-    let l1=null, l2=null;
-    for (let ci=0; ci<C.length; ci++){
-      if (val(`L1_${C[ci]}`)) l1 = C[ci];
-      if (val(`L2_${C[ci]}`)) l2 = C[ci];
-    }
-    if (l1 && l2) priv.lovers = [l1,l2];
-  }
-  if (privKeys.V && privKeys.PT && privKeys.PR){
-    let victim=null, pTime=null, pRoom=null;
-    const assassin = C[0]; // First character is always assassin
-    for (let ci=0; ci<C.length; ci++) if (val(`V_${C[ci]}`)) victim = C[ci];
-    for (let t=0; t<T; t++) if (val(`PT_${t}`)) pTime = t+1;
-    for (let ri=0; ri<R.length; ri++) if (val(`PR_${R[ri]}`)) pRoom = R[ri];
-    priv.assassin = assassin; priv.victim = victim; priv.poison_time = pTime; priv.poison_room = pRoom;
-  }
-  if (privKeys.A1 && privKeys.A2){
-    let a1=null, a2=null;
-    for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
-    priv.bomb_duo = [a1,a2];
-  }
-  if (privKeys.AGG){
-    let agg=null;
-    for (let ci=0; ci<C.length; ci++) if (val(`AGG_${C[ci]}`)) agg = C[ci];
-    
-    // Calculate victims (characters alone with aggrosassin)
-    const victims = new Set();
-    for (let t=0; t<T; t++){
-      for (const room of R){
-        const charsInRoom = C.filter(c => schedule[c][t] === room);
-        if (charsInRoom.length === 2 && charsInRoom.includes(agg)){
-          const victim = charsInRoom.find(c => c !== agg);
-          victims.add(victim);
-        }
-      }
-    }
-    
-    priv.aggrosassin = agg;
-    priv.victims = Array.from(victims);
-  }
-
-  return {
-    schedule,
-    byTime,
-    visits,
-    priv,
-    meta: { vars: numVars },
-    stats: { ...stats, solveTimeMs: solveTime }
-  };
-}
-
-/* ===========================
    UI glue
    =========================== */
 function qs(id){ return document.getElementById(id); }
@@ -1520,6 +707,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s4: scenarioValue === 's4',
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s7: scenarioValue === 's7',
+      s8: scenarioValue === 's8',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -1584,6 +772,19 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
     if (res.priv.aggrosassin) pf.push(`<div>Aggrosassin: <b>${res.priv.aggrosassin}</b> killed <b>${res.priv.victims.length}</b> victim${res.priv.victims.length === 1 ? '' : 's'}: ${res.priv.victims.join(', ')}</div>`);
+    if (res.priv.freeze) {
+      const victims = res.priv.freeze_victims || [];
+      const kills = res.priv.freeze_kills || [];
+      let detail = '';
+      if (victims.length) {
+        const killSummary = kills.map(k => `${k.victim} @ t=${k.time}, ${k.room}`).join('; ');
+        detail = ` froze <b>${victims.length}</b> victim${victims.length === 1 ? '' : 's'}: ${victims.join(', ')}`;
+        if (killSummary) {
+          detail += ` (first freezes: ${killSummary})`;
+        }
+      }
+      pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+    }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
 
