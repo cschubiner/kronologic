@@ -1,6 +1,8 @@
 /* ===========================
    Minimal SAT (DPLL + Unit)
    =========================== */
+function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
+
 export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
@@ -125,9 +127,6 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   return out;
 }
 
-function mulberry32(a){return function(){var
-t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
-
 /* ===========================
    CNF Builder Helpers
    =========================== */
@@ -145,11 +144,11 @@ export function varPool(){
   };
 }
 
-function atLeastOne(cl){ // OR over literals (already in int form)
+export function atLeastOne(cl){ // OR over literals (already in int form)
   return [cl];
 }
 
-function atMostOne(vars){ // pairwise
+export function atMostOne(vars){ // pairwise
   const out = [];
   for (let i=0;i<vars.length;i++) for (let j=i+1;j<vars.length;j++){
     out.push([-vars[i], -vars[j]]);
@@ -157,11 +156,11 @@ function atMostOne(vars){ // pairwise
   return out;
 }
 
-function exactlyOne(vars){
+export function exactlyOne(vars){
   return [...atLeastOne(vars), ...atMostOne(vars)];
 }
 
-function buildTotalizer(vars, vp, clauses, prefix){
+export function buildTotalizer(vars, vp, clauses, prefix){
   let nodeCounter = 0;
 
   function helper(list, tag){
