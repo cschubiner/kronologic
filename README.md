@@ -247,6 +247,7 @@ Enable one or more scenarios:
 - **S5 (Lovers)**: No configuration needed
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
+- **S8 (The Freeze)**: No configuration needed
 
 ### Difficulty Control
 
