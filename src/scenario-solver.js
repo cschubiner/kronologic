@@ -51,26 +51,36 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=5000) {
   }
 
   function chooseVar(){
-    // Prefer a unit clause first; otherwise take first literal from shortest clause.
-    let bestClause = null;
-    for (const c of clauses){
-      if (c.length===1){
-        const lit = c[0];
-        if (lit===0) continue;
-        const v = Math.abs(lit);
-        if (assigns[v]===0) return v;
-      } else if (c.length>1){
-        if (!bestClause || c.length < bestClause.length) bestClause = c;
+    // Heuristic: pick variable from a random non-satisfied clause
+    const unsatClauses = [];
+    for (let i = 0; i < clauses.length; i++) {
+      const c = clauses[i];
+      if (c.length === 1 && c[0] === 0) continue; // satisfied
+      if (c.length > 0) {
+        unsatClauses.push(i);
       }
     }
-    if (bestClause){
-      for (const lit of bestClause){
+    
+    if (unsatClauses.length > 0) {
+      // Pick a random unsat clause
+      const clauseIdx = unsatClauses[Math.floor(rng() * unsatClauses.length)];
+      const clause = clauses[clauseIdx];
+      
+      // Pick a random unassigned literal from that clause
+      const unassigned = [];
+      for (const lit of clause) {
         const v = Math.abs(lit);
-        if (assigns[v]===0) return v;
+        if (assigns[v] === 0) unassigned.push(v);
+      }
+      
+      if (unassigned.length > 0) {
+        return unassigned[Math.floor(rng() * unassigned.length)];
       }
     }
-    for (let v=1; v<=numVars; v++){
-      if (assigns[v]===0) return v;
+    
+    // Fallback: pick first unassigned variable
+    for (let v = 1; v <= numVars; v++) {
+      if (assigns[v] === 0) return v;
     }
     return 0;
   }
