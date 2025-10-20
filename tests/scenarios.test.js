@@ -1922,6 +1922,109 @@ describe('S7: Aggrosassin Scenario', () => {
   })
 })
 
+describe('S8: Freeze Scenario', () => {
+  it('should identify the freeze and record kill events', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Gallery', 'Vault'],
+      edges: [['Atrium', 'Gallery'], ['Gallery', 'Vault']],
+      chars: ['Fiona', 'Gus', 'Hank', 'Ivy'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 8000
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+      expect(cfg.chars).toContain(freeze)
+
+      const killEvents = res.priv.freeze_kill_events
+      expect(killEvents.length).toBe(res.priv.freeze_kill_count)
+      expect(killEvents.length).toBeGreaterThan(0)
+
+      for (const event of killEvents) {
+        const t = event.time - 1
+        const room = event.room
+        const victim = event.victim
+
+        expect(res.schedule[freeze][t]).toBe(room)
+        expect(res.schedule[victim][t]).toBe(room)
+
+        const others = cfg.chars.filter(c =>
+          c !== freeze && c !== victim && res.schedule[c][t] === room
+        )
+        expect(others).toHaveLength(0)
+      }
+    })
+  })
+
+  it('should freeze victims in place even when mustMove is true', () => {
+    const cfg = {
+      rooms: ['North', 'East', 'South', 'West'],
+      edges: [
+        ['North', 'East'],
+        ['East', 'South'],
+        ['South', 'West'],
+        ['West', 'North']
+      ],
+      chars: ['Freeze', 'Alice', 'Bob', 'Cara'],
+      T: 6,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true },
+      seed: 8100
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const events = res.priv.freeze_kill_events
+      expect(events.length).toBeGreaterThan(0)
+
+      for (const event of events) {
+        const victim = event.victim
+        const room = event.room
+        for (let t = event.time - 1; t < cfg.T; t++) {
+          expect(res.schedule[victim][t]).toBe(room)
+        }
+      }
+    })
+  })
+
+  it('should ensure an early kill and track non-freeze encounters', () => {
+    const cfg = {
+      rooms: ['Library', 'Atrium', 'Courtyard'],
+      edges: [['Library', 'Atrium'], ['Atrium', 'Courtyard']],
+      chars: ['Zero', 'One', 'Two', 'Three', 'Four'],
+      T: 7,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 8200
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      const hasEarlyKill = res.priv.freeze_kill_events.some(event => event.time < cfg.T)
+      expect(hasEarlyKill).toBe(true)
+
+      let computedNonFreeze = 0
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const occupants = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (occupants.length === 2 && !occupants.includes(freeze)) {
+            computedNonFreeze++
+          }
+        }
+      }
+
+      expect(res.priv.non_freeze_one_on_one).toBe(computedNonFreeze)
+    })
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds
