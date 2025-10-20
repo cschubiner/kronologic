@@ -319,7 +319,8 @@ export function buildCNF(config){
   const clauses = [];
 
   const R = config.rooms, C = config.chars, T = config.T;
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, config.allowStay && !config.mustMove);
+  const allowSelf = (config.allowStay && !config.mustMove) || (config.scenarios && config.scenarios.s8);
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, allowSelf);
 
   // Helper to get variable IDs
   const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
@@ -701,6 +702,104 @@ export function buildCNF(config){
     privKeys.AGG = AGG;
   }
 
+  // S8: The Freeze
+  let FRZ=null;
+  if (config.scenarios.s8){
+    if (T < 2) throw new Error('S8 requires at least two timesteps');
+    if (C.length < 2) throw new Error('S8 requires at least two characters');
+
+    FRZ = C.map((_,ci)=> vp.get(`FRZ_${C[ci]}`));
+    clauses.push(...exactlyOne(FRZ));
+
+    const freezeKillVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const frozenPermits = Array.from({length:C.length}, ()=>Array.from({length:Math.max(0, T-1)}, ()=>[]));
+    const earlyKillByFreeze = Array.from({length:C.length}, ()=>[]);
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        for (let t=0; t<T; t++){
+          const kv = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}`);
+          freezeKillVars[ci][vj][t] = kv;
+          clauses.push([-kv, FRZ[ci]]);
+          if (t < T-1){
+            earlyKillByFreeze[ci].push(kv);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        for (let t=0; t<T; t++){
+          const kv = freezeKillVars[ci][vj][t];
+          if (!kv) continue;
+          const detailVars = [];
+          for (let ri=0; ri<R.length; ri++){
+            const detail = vp.get(`FRZKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+            detailVars.push(detail);
+            clauses.push([-detail, FRZ[ci]]);
+            clauses.push([-detail, kv]);
+            clauses.push([-detail, X(ci,t,ri)]);
+            clauses.push([-detail, X(vj,t,ri)]);
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === vj) continue;
+              clauses.push([-detail, -X(ck,t,ri)]);
+            }
+
+            const reverse = [ -FRZ[ci], -X(ci,t,ri), -X(vj,t,ri) ];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === vj) continue;
+              reverse.push( X(ck,t,ri) );
+            }
+            reverse.push(detail);
+            clauses.push(reverse);
+
+            // Victim remains in the room for all future timesteps
+            for (let tp=t+1; tp<T; tp++){
+              clauses.push([-detail, X(vj,tp,ri)]);
+            }
+            for (let tp=t; tp<T-1; tp++){
+              frozenPermits[vj][tp].push(detail);
+            }
+          }
+          if (detailVars.length){
+            clauses.push([-kv, ...detailVars]);
+          } else {
+            clauses.push([-kv]);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      const earlyKills = earlyKillByFreeze[ci];
+      if (earlyKills.length){
+        clauses.push([-FRZ[ci], ...earlyKills]);
+      } else {
+        clauses.push([-FRZ[ci]]);
+      }
+    }
+
+    if (!(config.allowStay && !config.mustMove)){
+      for (let ci=0; ci<C.length; ci++){
+        for (let t=0; t<T-1; t++){
+          const permits = frozenPermits[ci][t];
+          for (let ri=0; ri<R.length; ri++){
+            const clause = [-X(ci,t,ri), -X(ci,t+1,ri)];
+            if (permits.length){
+              clause.push(...permits);
+            }
+            clauses.push(clause);
+          }
+        }
+      }
+    }
+
+    privKeys.FRZ = FRZ;
+  }
+
   // S4: Bomb duo
   // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
@@ -860,6 +959,27 @@ export function solveAndDecode(cfg){
     
     priv.aggrosassin = agg;
     priv.victims = Array.from(victims);
+  }
+  if (privKeys.FRZ){
+    let freeze=null;
+    for (let ci=0; ci<C.length; ci++) if (val(`FRZ_${C[ci]}`)) freeze = C[ci];
+    if (freeze){
+      const victims = new Set();
+      const killMoments = [];
+      for (let t=0; t<T; t++){
+        for (const room of R){
+          const charsInRoom = C.filter(c => schedule[c][t] === room);
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)){
+            const victim = charsInRoom.find(c => c !== freeze);
+            victims.add(victim);
+            killMoments.push({ victim, time: t+1, room });
+          }
+        }
+      }
+      priv.freeze = freeze;
+      priv.freezeVictims = Array.from(victims);
+      priv.freezeMoments = killMoments;
+    }
   }
 
   return { schedule, byTime, visits, priv, meta: { vars:numVars } };

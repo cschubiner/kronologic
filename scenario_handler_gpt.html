@@ -125,6 +125,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s7" value="s7" /> S7: Aggrosassin (serial poisoner who kills everyone they meet 1-on-1)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (victims stay put after a 1-on-1 with Mr. Freeze)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -245,7 +248,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims lock in place).</div>
 
 <script>
 /* ===========================
@@ -534,7 +537,8 @@ function buildCNF(config){
   const clauses = [];
 
   const R = config.rooms, C = config.chars, T = config.T;
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, config.allowStay && !config.mustMove);
+  const allowSelf = (config.allowStay && !config.mustMove) || (config.scenarios && config.scenarios.s8);
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, allowSelf);
 
   // Helper to get variable IDs
   const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
@@ -914,6 +918,103 @@ function buildCNF(config){
     }
   }
 
+  // S8: The Freeze
+  let FRZ=null;
+  if (config.scenarios.s8){
+    if (T < 2) throw new Error('S8 requires at least two timesteps');
+    if (C.length < 2) throw new Error('S8 requires at least two characters');
+
+    FRZ = C.map((_,ci)=> vp.get(`FRZ_${C[ci]}`));
+    clauses.push(...exactlyOne(FRZ));
+
+    const freezeKillVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const frozenPermits = Array.from({length:C.length}, ()=>Array.from({length:Math.max(0, T-1)}, ()=>[]));
+    const earlyKillByFreeze = Array.from({length:C.length}, ()=>[]);
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        for (let t=0; t<T; t++){
+          const kv = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}`);
+          freezeKillVars[ci][vj][t] = kv;
+          clauses.push([-kv, FRZ[ci]]);
+          if (t < T-1){
+            earlyKillByFreeze[ci].push(kv);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        for (let t=0; t<T; t++){
+          const kv = freezeKillVars[ci][vj][t];
+          if (!kv) continue;
+          const detailVars = [];
+          for (let ri=0; ri<R.length; ri++){
+            const detail = vp.get(`FRZKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+            detailVars.push(detail);
+            clauses.push([-detail, FRZ[ci]]);
+            clauses.push([-detail, kv]);
+            clauses.push([-detail, X(ci,t,ri)]);
+            clauses.push([-detail, X(vj,t,ri)]);
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === vj) continue;
+              clauses.push([-detail, -X(ck,t,ri)]);
+            }
+
+            const reverse = [ -FRZ[ci], -X(ci,t,ri), -X(vj,t,ri) ];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === vj) continue;
+              reverse.push( X(ck,t,ri) );
+            }
+            reverse.push(detail);
+            clauses.push(reverse);
+
+            for (let tp=t+1; tp<T; tp++){
+              clauses.push([-detail, X(vj,tp,ri)]);
+            }
+            for (let tp=t; tp<T-1; tp++){
+              frozenPermits[vj][tp].push(detail);
+            }
+          }
+          if (detailVars.length){
+            clauses.push([-kv, ...detailVars]);
+          } else {
+            clauses.push([-kv]);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      const earlyKills = earlyKillByFreeze[ci];
+      if (earlyKills.length){
+        clauses.push([-FRZ[ci], ...earlyKills]);
+      } else {
+        clauses.push([-FRZ[ci]]);
+      }
+    }
+
+    if (!(config.allowStay && !config.mustMove)){
+      for (let ci=0; ci<C.length; ci++){
+        for (let t=0; t<T-1; t++){
+          const permits = frozenPermits[ci][t];
+          for (let ri=0; ri<R.length; ri++){
+            const clause = [-X(ci,t,ri), -X(ci,t+1,ri)];
+            if (permits.length){
+              clause.push(...permits);
+            }
+            clauses.push(clause);
+          }
+        }
+      }
+    }
+
+    privKeys.FRZ = FRZ;
+  }
+
   // S4: Bomb duo — A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
   if (config.scenarios.s4){
@@ -1046,6 +1147,12 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s7 && res.priv.aggrosassin) {
     scores.aggrosassin = scoreAggrosassin(res, cfg);
     score += scores.aggrosassin;
+  }
+
+  // S8: Freeze scoring
+  if (cfg.scenarios.s8 && res.priv.freeze) {
+    scores.freeze = scoreFreeze(res, cfg);
+    score += scores.freeze;
   }
   
   return { total: score, breakdown: scores };
@@ -1249,6 +1356,26 @@ function scoreAggrosassin(res, cfg) {
   return score;
 }
 
+function scoreFreeze(res, cfg) {
+  const freeze = res.priv.freeze;
+  const victims = res.priv.freezeVictims || [];
+  const T = cfg.T;
+  const chars = cfg.chars;
+
+  let nonFreezePairs = 0;
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2 && !charsInRoom.includes(freeze)) {
+        nonFreezePairs++;
+      }
+    }
+  }
+
+  const raw = nonFreezePairs * 8 - victims.length * 6;
+  return Math.max(0, raw);
+}
+
 /* ===========================
    URL State Management
    =========================== */
@@ -1435,6 +1562,27 @@ function solveAndDecode(cfg){
     priv.aggrosassin = agg;
     priv.victims = Array.from(victims);
   }
+  if (privKeys.FRZ){
+    let freeze=null;
+    for (let ci=0; ci<C.length; ci++) if (val(`FRZ_${C[ci]}`)) freeze = C[ci];
+    if (freeze){
+      const victims = new Set();
+      const moments = [];
+      for (let t=0; t<T; t++){
+        for (const room of R){
+          const charsInRoom = C.filter(c => schedule[c][t] === room);
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)){
+            const victim = charsInRoom.find(c => c !== freeze);
+            victims.add(victim);
+            moments.push({ victim, time: t+1, room });
+          }
+        }
+      }
+      priv.freeze = freeze;
+      priv.freezeVictims = Array.from(victims);
+      priv.freezeMoments = moments;
+    }
+  }
 
   return {
     schedule,
@@ -1520,6 +1668,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s4: scenarioValue === 's4',
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s7: scenarioValue === 's7',
+      s8: scenarioValue === 's8',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -1584,6 +1733,10 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
     if (res.priv.aggrosassin) pf.push(`<div>Aggrosassin: <b>${res.priv.aggrosassin}</b> killed <b>${res.priv.victims.length}</b> victim${res.priv.victims.length === 1 ? '' : 's'}: ${res.priv.victims.join(', ')}</div>`);
+    if (res.priv.freeze) {
+      const victims = res.priv.freezeVictims || [];
+      pf.push(`<div>Freeze: <b>${res.priv.freeze}</b> froze <b>${victims.length}</b> victim${victims.length === 1 ? '' : 's'}${victims.length ? `: ${victims.join(', ')}` : ''}</div>`);
+    }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
 

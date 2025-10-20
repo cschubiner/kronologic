@@ -1922,6 +1922,270 @@ describe('S7: Aggrosassin Scenario', () => {
   })
 })
 
+describe('S8: Freeze Scenario', () => {
+  it('should identify the freeze and log victims with an early kill', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Gallery', 'Vault'],
+      edges: [['Atrium', 'Gallery'], ['Gallery', 'Vault']],
+      chars: ['Anna', 'Bruce', 'Chloe', 'Dmitri'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 800
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.freeze).toBeTruthy()
+      expect(res.priv.freezeVictims).toBeTruthy()
+      expect(res.priv.freezeVictims.length).toBeGreaterThan(0)
+
+      const freeze = res.priv.freeze
+      const kills = []
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            const victim = charsInRoom.find(c => c !== freeze)
+            kills.push({ victim, time: t, room })
+          }
+        }
+      }
+
+      expect(kills.length).toBeGreaterThan(0)
+      const earliestKill = Math.min(...kills.map(k => k.time))
+      expect(earliestKill).toBeLessThan(cfg.T - 1)
+    })
+  })
+
+  it('should freeze victims in place even when mustMove is true', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']],
+      chars: ['Freeze', 'Gina', 'Hector', 'Iris'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true },
+      seed: 810
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      const frozenVictims = new Map()
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            const victim = charsInRoom.find(c => c !== freeze)
+            if (!frozenVictims.has(victim)) {
+              frozenVictims.set(victim, { room, time: t })
+            }
+          }
+        }
+      }
+
+      expect(frozenVictims.size).toBeGreaterThan(0)
+
+      for (const [victim, { room, time }] of frozenVictims.entries()) {
+        for (let future = time + 1; future < cfg.T; future++) {
+          expect(res.schedule[victim][future]).toBe(room)
+        }
+      }
+    })
+  })
+
+  it('should surface freeze victims and moments in priv data', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Basement', 'Conservatory'],
+      edges: [['Atrium', 'Basement'], ['Basement', 'Conservatory']],
+      chars: ['Freeze', 'Jill', 'Karl', 'Lena'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 820
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      const expectedVictims = new Set()
+      const expectedMoments = []
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            const victim = charsInRoom.find(c => c !== freeze)
+            expectedVictims.add(victim)
+            expectedMoments.push({ victim, time: t + 1, room })
+          }
+        }
+      }
+
+      expect(new Set(res.priv.freezeVictims || [])).toEqual(expectedVictims)
+      expect(res.priv.freezeMoments || []).toEqual(expectedMoments)
+    })
+  })
+
+  it('should keep victims locked in the room where they were frozen', () => {
+    const cfg = {
+      rooms: ['Foyer', 'Gallery', 'Hall'],
+      edges: [['Foyer', 'Gallery'], ['Gallery', 'Hall']],
+      chars: ['Freeze', 'Seth', 'Tara', 'Uma'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 835
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      const frozenRooms = new Map()
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            const victim = charsInRoom.find(c => c !== freeze)
+            if (!frozenRooms.has(victim)) {
+              frozenRooms.set(victim, { room, time: t })
+            }
+          }
+        }
+      }
+
+      expect(frozenRooms.size).toBeGreaterThan(0)
+
+      for (const [victim, { room, time }] of frozenRooms.entries()) {
+        for (let future = time + 1; future < cfg.T; future++) {
+          expect(res.schedule[victim][future]).toBe(room)
+        }
+      }
+    })
+  })
+
+  it('should still allow non-freeze characters to meet one-on-one', () => {
+    const cfg = {
+      rooms: ['North', 'East', 'West'],
+      edges: [['North', 'East'], ['East', 'West']],
+      chars: ['Freeze', 'Mia', 'Nate', 'Omar'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 830
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      let nonFreezePairs = 0
+      let earliestKill = cfg.T
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2) {
+            if (charsInRoom.includes(freeze)) {
+              earliestKill = Math.min(earliestKill, t)
+            } else {
+              nonFreezePairs++
+            }
+          }
+        }
+      }
+
+      expect(nonFreezePairs).toBeGreaterThan(0)
+      expect(earliestKill).toBeLessThan(cfg.T - 1)
+    })
+  })
+
+  it('should reject solutions where kills only happen at the final timestep', () => {
+    const cfg = {
+      rooms: ['R1', 'R2', 'R3'],
+      edges: [['R1', 'R2'], ['R2', 'R3']],
+      chars: ['Freeze', 'Pia', 'Quinn', 'Rory'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 840
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      let earliestKill = cfg.T
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            earliestKill = Math.min(earliestKill, t)
+          }
+        }
+      }
+
+      expect(earliestKill).toBeLessThan(cfg.T - 1)
+    })
+  })
+
+  it('should not freeze characters when the room has 3 or more occupants', () => {
+    const cfg = {
+      rooms: ['Lounge', 'Kitchen', 'Study'],
+      edges: [['Lounge', 'Kitchen'], ['Kitchen', 'Study']],
+      chars: ['Freeze', 'Vera', 'Wade', 'Xena', 'Yuri'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 0
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      const frozenMoments = res.priv.freezeMoments || []
+
+      let threePlusHit = false
+      const groupWitnesses = []
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.includes(freeze)) {
+            if (charsInRoom.length >= 3) {
+              threePlusHit = true
+              const others = charsInRoom.filter(c => c !== freeze)
+              groupWitnesses.push({ room, time: t, others })
+            }
+          }
+        }
+      }
+
+      expect(threePlusHit).toBe(true)
+
+      for (const { room, time, others } of groupWitnesses) {
+        for (const other of others) {
+          const killAtSameTime = frozenMoments.some(m => m.time === time + 1 && m.victim === other)
+          expect(killAtSameTime).toBe(false)
+        }
+      }
+    })
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds
