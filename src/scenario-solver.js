@@ -19,31 +19,44 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
     }
   }
 
-  function unitProp(queue){
+  function assignLiteral(lit, trail){
+    const v = Math.abs(lit);
+    const val = lit>0 ? 1 : -1;
+    const current = assigns[v];
+    if (current !== 0){
+      return current === val;
+    }
+    assigns[v] = val;
+    trail.push(v);
+    return true;
+  }
+
+  function unitProp(queue, trail){
     while (queue.length){
       const lit = queue.pop();
+      if (!assignLiteral(lit, trail)) return false;
       const v = Math.abs(lit);
       const val = lit>0 ? 1 : -1;
-      if (assigns[v] !== 0){
-        if (assigns[v] !== val) return false; // conflict
-        continue;
-      }
-      assigns[v] = val;
-      // Satisfy clauses containing lit
-      const satList = val>0 ? occPos[v] : occNeg[v];
-      for (const ci of satList){ clauses[ci] = [0]; } // mark satisfied
-      // For clauses containing ~lit, remove ~lit
       const remList = val>0 ? occNeg[v] : occPos[v];
       for (const ci of remList){
-        if (clauses[ci].length===1 && clauses[ci][0]===0) continue;
-        // remove -lit
-        let arr = clauses[ci];
-        let idx = arr.indexOf(-lit);
-        if (idx>=0){ arr.splice(idx,1); }
-        if (arr.length===0) return false; // empty => conflict
-        if (arr.length===1){
-          const u = arr[0];
-          if (u!==0) queue.push(u);
+        const clause = clauses[ci];
+        let satisfied = false;
+        let unassigned = 0;
+        let lastUnassigned = 0;
+        for (const lit2 of clause){
+          const v2 = Math.abs(lit2);
+          const assign = assigns[v2];
+          if (assign === 1 && lit2 > 0){ satisfied = true; break; }
+          if (assign === -1 && lit2 < 0){ satisfied = true; break; }
+          if (assign === 0){
+            unassigned++;
+            lastUnassigned = lit2;
+          }
+        }
+        if (satisfied) continue;
+        if (unassigned === 0) return false;
+        if (unassigned === 1){
+          queue.push(lastUnassigned);
         }
       }
     }
@@ -51,22 +64,39 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
   }
 
   function chooseLiteral(){
-    let bestClause = null;
-    for (const c of clauses){
-      if (c.length===1){
-        const lit = c[0];
-        if (lit===0) continue;
+    const literalScores = new Map();
+    let found = false;
+    for (const clause of clauses){
+      let satisfied = false;
+      const unassignedLits = [];
+      for (const lit of clause){
         const v = Math.abs(lit);
-        if (assigns[v]===0) return lit;
-      } else if (c.length>1){
-        if (!bestClause || c.length < bestClause.length) bestClause = c;
+        const assign = assigns[v];
+        if ((assign === 1 && lit > 0) || (assign === -1 && lit < 0)){
+          satisfied = true;
+          break;
+        }
+        if (assign === 0){
+          unassignedLits.push(lit);
+        }
+      }
+      if (satisfied || unassignedLits.length === 0) continue;
+      found = true;
+      const weight = Math.pow(2, -unassignedLits.length);
+      for (const lit of unassignedLits){
+        literalScores.set(lit, (literalScores.get(lit) || 0) + weight);
       }
     }
-    if (bestClause){
-      for (const lit of bestClause){
-        const v = Math.abs(lit);
-        if (assigns[v]===0) return lit;
+    if (found){
+      let bestLit = 0;
+      let bestScore = -Infinity;
+      for (const [lit, score] of literalScores.entries()){
+        if (score > bestScore){
+          bestScore = score;
+          bestLit = lit;
+        }
       }
+      if (bestLit !== 0) return bestLit;
     }
     for (let v=1; v<=numVars; v++){
       if (assigns[v]===0) return v;
@@ -77,7 +107,8 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
   // initial unit clauses
   let initQ = [];
   for (const c of clauses){ if (c.length===1 && c[0]!==0) initQ.push(c[0]); }
-  if (!unitProp(initQ)) return null;
+  const trail = [];
+  if (!unitProp(initQ, trail)) return null;
 
   function dfs(){
     // Check timeout
@@ -87,9 +118,22 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
 
     // check all satisfied?
     let allSat = true;
-    for (const c of clauses){
-      if (c.length===0) return false;
-      if (!(c.length===1 && c[0]===0)) { allSat=false; break; }
+    for (const clause of clauses){
+      let satisfied = false;
+      let unassigned = false;
+      for (const lit of clause){
+        const v = Math.abs(lit);
+        const assign = assigns[v];
+        if (assign === 0){ unassigned = true; continue; }
+        if ((assign === 1 && lit > 0) || (assign === -1 && lit < 0)){
+          satisfied = true;
+          break;
+        }
+      }
+      if (!satisfied){
+        if (!unassigned) return false;
+        allSat = false;
+      }
     }
     if (allSat) return true;
 
@@ -97,17 +141,17 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
     if (lit===0) return true; // nothing left
     // branch with suggested literal first, then opposite
     for (const tryLit of [lit, -lit]){
+      const trailSize = trail.length;
       const v = Math.abs(tryLit);
       if (assigns[v] !== 0 && assigns[v] !== (tryLit>0?1:-1)) continue;
-      // clone state (clauses + assigns) cheaply via snapshots
-      const snapshotClauses = clauses.map(c=>c.slice());
-      const snapshotAssigns = assigns.slice();
-      if (unitProp([tryLit])){
+      const stack = [tryLit];
+      if (unitProp(stack, trail)){
         if (dfs()) return true;
       }
-      // restore
-      clauses = snapshotClauses;
-      assigns = snapshotAssigns;
+      while (trail.length > trailSize){
+        const reverted = trail.pop();
+        assigns[reverted] = 0;
+      }
     }
     return false;
   }
