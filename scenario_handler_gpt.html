@@ -513,15 +513,21 @@ function scoreAggrosassin(res, cfg) {
 
 function scoreFreeze(res, cfg) {
   // Higher score = harder puzzle
-  // Measure: Fewer freeze victims and more red herring 1:1 meetings
+  // Measure: Fewer freeze victims, timing of freezes, and red herring 1:1 meetings
   const freeze = res.priv.freeze;
   if (!freeze) return 0;
 
-  const killCount = (res.priv.freeze_kills || []).length;
+  const kills = res.priv.freeze_kills || [];
   const T = cfg.T;
   const chars = cfg.chars;
 
-  let score = Math.max(0, 40 - killCount * 10);
+  let score = Math.max(0, 40 - kills.length * 2);
+
+  // Late freezes are harder to detect (fewer timesteps to observe immobility)
+  for (const kill of kills) {
+    const lateness = kill.time / T; // 0.0 to 1.0
+    score += lateness * 15; // Up to +15 for very late freezes
+  }
 
   let redHerrings = 0;
   for (let t = 0; t < T; t++) {
