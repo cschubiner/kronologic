@@ -1922,6 +1922,84 @@ describe('S7: Aggrosassin Scenario', () => {
   })
 })
 
+describe('S8: Freeze Scenario', () => {
+  it('should identify the freeze and log victims with an early kill', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Gallery', 'Vault'],
+      edges: [['Atrium', 'Gallery'], ['Gallery', 'Vault']],
+      chars: ['Anna', 'Bruce', 'Chloe', 'Dmitri'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 800
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.freeze).toBeTruthy()
+      expect(res.priv.freezeVictims).toBeTruthy()
+      expect(res.priv.freezeVictims.length).toBeGreaterThan(0)
+
+      const freeze = res.priv.freeze
+      const kills = []
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            const victim = charsInRoom.find(c => c !== freeze)
+            kills.push({ victim, time: t, room })
+          }
+        }
+      }
+
+      expect(kills.length).toBeGreaterThan(0)
+      const earliestKill = Math.min(...kills.map(k => k.time))
+      expect(earliestKill).toBeLessThan(cfg.T - 1)
+    })
+  })
+
+  it('should freeze victims in place even when mustMove is true', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C', 'D'],
+      edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']],
+      chars: ['Freeze', 'Gina', 'Hector', 'Iris'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true },
+      seed: 810
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+
+      const frozenVictims = new Map()
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 && charsInRoom.includes(freeze)) {
+            const victim = charsInRoom.find(c => c !== freeze)
+            if (!frozenVictims.has(victim)) {
+              frozenVictims.set(victim, { room, time: t })
+            }
+          }
+        }
+      }
+
+      expect(frozenVictims.size).toBeGreaterThan(0)
+
+      for (const [victim, { room, time }] of frozenVictims.entries()) {
+        for (let future = time + 1; future < cfg.T; future++) {
+          expect(res.schedule[victim][future]).toBe(room)
+        }
+      }
+    })
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds

@@ -196,6 +196,27 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S8: The Freeze
+**Mystery**: Mr. Freeze stalks the halls. Anyone caught alone with them is frozen in place for the rest of the night.
+
+**Rules**:
+- Exactly one character is the Freeze
+- Whenever the Freeze shares a room with **exactly one** other character:
+  - That character becomes frozen immediately
+  - From the next timestep onward, the victim must remain in that same room, even if `mustMove` is enabled
+- The Freeze must freeze at least one victim **before the final timestep**
+  - Example: With T=6, at least one freeze happens by timestep 5
+- The Freeze may keep moving freely after each freeze (and may revisit victims)
+- Other characters can still have ordinary 1-on-1 meetings with each other
+
+**Goal**: Discover who the Freeze is and list every frozen victim.
+
+**Difficulty Factors**:
+- More non-Freeze 1-on-1 meetings create noisy red herrings (harder)
+- More frozen victims leave obvious statues around the map (easier)
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -226,6 +247,7 @@ Enable one or more scenarios:
 - **S5 (Lovers)**: No configuration needed
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
+- **S8 (Freeze)**: No configuration needed
 
 ### Difficulty Control
 
@@ -291,6 +313,13 @@ The generator creates many valid scenarios and scores them based on "red herring
   - Every "alone together" moment adds to the confusion
 
 **Example**: If the aggrosassin kills 3 victims (30 points) and there are 12 total instances of pairs being alone throughout the timeline (12 points), that's 42 difficulty total.
+
+#### S8: The Freeze Scoring
+**What makes it harder**: Innocent 1-on-1 meetings; what makes it easier: lots of icy statues
+
+- **+8 points** for each 1-on-1 meeting that does **not** involve the Freeze
+- **-6 points** for every frozen victim (more victims, easier deduction)
+- Total difficulty is clamped at a minimum of 0
 
 #### Combined Scoring
 When multiple scenarios are enabled, scores are added together. The percentile selection then picks from the sorted list:
