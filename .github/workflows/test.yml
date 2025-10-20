@@ -24,8 +24,8 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run tests in parallel
-        run: bun test --bail=false
+      - name: Run tests
+        run: bun test
 
       - name: Upload test results
         if: always()
