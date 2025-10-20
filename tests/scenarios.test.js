@@ -1893,6 +1893,101 @@ describe('S7: Aggrosassin Scenario', () => {
   })
 })
 
+describe('S8: Freeze Scenario', () => {
+  it('should identify a single freeze who freezes before the final timestep', () => {
+    const cfg = {
+      rooms: ['A', 'B', 'C'],
+      edges: [['A', 'B'], ['B', 'C']],
+      chars: ['W', 'X', 'Y', 'Z'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 8000
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.freeze).toBeTruthy()
+      expect(cfg.chars).toContain(res.priv.freeze)
+
+      const kills = res.priv.freeze_kills || []
+      expect(kills.length).toBeGreaterThan(0)
+
+      for (const kill of kills) {
+        expect(kill.time).toBeLessThan(cfg.T)
+      }
+
+      const victims = res.priv.freeze_victims || []
+      expect(new Set(victims).size).toBe(victims.length)
+    })
+  })
+
+  it('should keep frozen victims locked in their freeze room', () => {
+    const cfg = {
+      rooms: ['Hall', 'Lab', 'Vault'],
+      edges: [['Hall', 'Lab'], ['Lab', 'Vault']],
+      chars: ['Freeze', 'Alpha', 'Bravo', 'Charlie'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true },
+      seed: 8100
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const kills = res.priv.freeze_kills || []
+      expect(kills.length).toBeGreaterThan(0)
+
+      for (const kill of kills) {
+        const victim = kill.victim
+        const freezeRoom = res.schedule[victim][kill.time - 1]
+        for (let t = kill.time - 1; t < cfg.T; t++) {
+          expect(res.schedule[victim][t]).toBe(freezeRoom)
+        }
+      }
+    })
+  })
+
+  it('should not freeze characters after non-freeze 1-on-1 meetings', () => {
+    const cfg = {
+      rooms: ['Hall', 'Lab', 'Vault'],
+      edges: [['Hall', 'Lab'], ['Lab', 'Vault']],
+      chars: ['Freeze', 'Delta', 'Echo', 'Foxtrot'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true },
+      seed: 8200
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const freeze = res.priv.freeze
+      expect(freeze).toBeTruthy()
+      const victims = new Set(res.priv.freeze_victims || [])
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const occupants = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (occupants.length === 2 && !occupants.includes(freeze)) {
+            for (const char of occupants) {
+              if (victims.has(char) || t >= cfg.T - 1) continue
+
+              let movedLater = false
+              for (let future = t; future < cfg.T - 1; future++) {
+                if (res.schedule[char][future] !== res.schedule[char][future + 1]) {
+                  movedLater = true
+                  break
+                }
+              }
+              expect(movedLater).toBe(true)
+            }
+          }
+        }
+      }
+    })
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds

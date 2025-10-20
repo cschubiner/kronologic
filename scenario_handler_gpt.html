@@ -125,6 +125,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s7" value="s7" /> S7: Aggrosassin (serial poisoner who kills everyone they meet 1-on-1)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (identify Mr. Freeze and the frozen victims)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -1033,7 +1036,13 @@ function scoreScenario(res, cfg) {
     scores.aggrosassin = scoreAggrosassin(res, cfg);
     score += scores.aggrosassin;
   }
-  
+
+  // S8: Freeze scoring
+  if (cfg.scenarios.s8 && res.priv.freeze) {
+    scores.freeze = scoreFreeze(res, cfg);
+    score += scores.freeze;
+  }
+
   return { total: score, breakdown: scores };
 }
 
@@ -1231,7 +1240,33 @@ function scoreAggrosassin(res, cfg) {
       }
     }
   }
-  
+
+  return score;
+}
+
+function scoreFreeze(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: Fewer freeze victims and more red herring 1:1 meetings
+  const freeze = res.priv.freeze;
+  if (!freeze) return 0;
+
+  const killCount = (res.priv.freeze_kills || []).length;
+  const T = cfg.T;
+  const chars = cfg.chars;
+
+  let score = Math.max(0, 40 - killCount * 10);
+
+  let redHerrings = 0;
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2 && !charsInRoom.includes(freeze)) {
+        redHerrings++;
+      }
+    }
+  }
+
+  score += redHerrings * 5;
   return score;
 }
 
@@ -1506,6 +1541,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s4: scenarioValue === 's4',
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s7: scenarioValue === 's7',
+      s8: scenarioValue === 's8',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -1570,6 +1606,19 @@ qs("genBtn").addEventListener("click", async ()=>{
     if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
     if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
     if (res.priv.aggrosassin) pf.push(`<div>Aggrosassin: <b>${res.priv.aggrosassin}</b> killed <b>${res.priv.victims.length}</b> victim${res.priv.victims.length === 1 ? '' : 's'}: ${res.priv.victims.join(', ')}</div>`);
+    if (res.priv.freeze) {
+      const victims = res.priv.freeze_victims || [];
+      const kills = res.priv.freeze_kills || [];
+      let detail = '';
+      if (victims.length) {
+        const killSummary = kills.map(k => `${k.victim} @ t=${k.time}, ${k.room}`).join('; ');
+        detail = ` froze <b>${victims.length}</b> victim${victims.length === 1 ? '' : 's'}: ${victims.join(', ')}`;
+        if (killSummary) {
+          detail += ` (first freezes: ${killSummary})`;
+        }
+      }
+      pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+    }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
 
