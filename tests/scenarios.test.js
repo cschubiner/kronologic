@@ -1922,6 +1922,60 @@ describe('S7: Aggrosassin Scenario', () => {
   })
 })
 
+describe('S8: Freeze Scenario', () => {
+  it('should freeze victims in place and reveal Mr. Freeze', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Vault'],
+      edges: [
+        ['Atrium', 'Lab'],
+        ['Lab', 'Vault']
+      ],
+      chars: ['Alice', 'Bob', 'Charlie', 'Dana'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true },
+      seed: 404
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.freeze).toBeTruthy()
+
+      const victims = res.priv.freeze_victims || []
+      expect(victims.length).toBeGreaterThan(0)
+
+      let earliestFreeze = cfg.T
+
+      for (const victim of victims) {
+        let freezeTime = null
+
+        for (let t = 0; t < cfg.T; t++) {
+          const victimRoom = res.schedule[victim][t]
+          const freezeRoom = res.schedule[res.priv.freeze][t]
+          if (victimRoom !== freezeRoom) continue
+
+          const others = cfg.chars.filter(c =>
+            c !== victim && c !== res.priv.freeze && res.schedule[c][t] === victimRoom
+          )
+          if (others.length === 0) {
+            freezeTime = t
+            const frozenRoom = victimRoom
+            for (let tp = t; tp < cfg.T; tp++) {
+              expect(res.schedule[victim][tp]).toBe(frozenRoom)
+            }
+            break
+          }
+        }
+
+        expect(freezeTime).not.toBeNull()
+        earliestFreeze = Math.min(earliestFreeze, freezeTime)
+      }
+
+      expect(earliestFreeze).toBeLessThan(cfg.T - 1)
+    })
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds
