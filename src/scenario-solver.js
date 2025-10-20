@@ -599,9 +599,6 @@ export function buildCNF(config){
           clauses.push([-kv, AGG[ci]]);
           clauses.push([-kv, killTimeVars[ci][t]]);
         }
-        if (victimsAtTimes.length > 1){
-          clauses.push(...atMostOne(victimsAtTimes));
-        }
       }
     }
 
@@ -678,19 +675,13 @@ export function buildCNF(config){
 
     for (let ci=0; ci<C.length; ci++){
       const killTimes = killTimeVars[ci];
-      const total = buildTotalizer(killTimes, vp, clauses, `AGGTotal_${C[ci]}`);
       if (requiredKills > killTimes.length){
         clauses.push([-AGG[ci]]);
-      } else {
-        // Must have at least requiredKills timesteps where aggrosassin kills
-        clauses.push([-AGG[ci], total[requiredKills-1]]);
-      }
-      
-      // Must have at least one victim (at least one kill must happen)
-      if (killTimes.length > 0) {
-        clauses.push([-AGG[ci], ...killTimes]);
-      } else {
-        clauses.push([-AGG[ci]]);
+      } else if (requiredKills > 0) {
+        const combos = atLeastK(killTimes, requiredKills);
+        for (const combo of combos){
+          clauses.push([-AGG[ci], ...combo]);
+        }
       }
     }
 
@@ -796,11 +787,16 @@ export function buildCNF(config){
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
 
     // Bombers are the ONLY pair ever alone together
+    const bomberAloneChoices = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>[]));
+
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
         for (let ci=0; ci<C.length; ci++){
           for (let cj=ci+1; cj<C.length; cj++){
             const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
+
+            bomberAloneChoices[ci][cj].push(exactlyTwo);
+            bomberAloneChoices[cj][ci].push(exactlyTwo);
 
             clauses.push([-exactlyTwo, X(ci,t,ri)]);
             clauses.push([-exactlyTwo, X(cj,t,ri)]);
@@ -831,6 +827,15 @@ export function buildCNF(config){
             clauses.push([-exactlyTwo, pair1, pair2]);
           }
         }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let cj=ci+1; cj<C.length; cj++){
+        const choices = bomberAloneChoices[ci][cj];
+        if (!choices.length) continue;
+        clauses.push([-A1[ci], -A2[cj], ...choices]);
+        clauses.push([-A1[cj], -A2[ci], ...choices]);
       }
     }
     

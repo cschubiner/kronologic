@@ -104,6 +104,7 @@ Players must deduce the secret scenario by combining:
 **Rules**:
 - Exactly two characters are the bombers (A1 and A2)
 - The bombers are distinct (A1 ≠ A2)
+- They must be alone together (exactly those two, no one else) in at least one room/time during the schedule
 - **Critical constraint**: For ANY (time, room) pair, if exactly 2 characters are present in that room at that time, those 2 characters MUST be the bombers
 - Equivalently: The bombers are the ONLY pair who can ever be alone together
 - Other character groupings are allowed:
@@ -170,30 +171,28 @@ Players must deduce the secret scenario by combining:
    - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
    - This ensures the aggrosassin is actively hunting throughout the timeline
 
-3. **Frequency dominance**: If the aggrosassin has N total 1-on-1 meetings across all timesteps, then every other character has at most **⌊N/2⌋** 1-on-1 meetings
-   - Count per character: how many timesteps they're alone with exactly 1 other person
-   - Example: If aggrosassin has 6 total 1-on-1 meetings, no other character can have more than 3
-   - This ensures the aggrosassin has a distinctly high "alone time" pattern
+3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
+   - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
+   - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
 
-4. **Victims**: The aggrosassin kills everyone they meet 1-on-1 with
+4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
    - A character can be alone with the aggrosassin multiple times (still counts as one victim)
 
-5. **Other 1-on-1 meetings allowed**: Non-aggrosassin characters CAN have 1-on-1 meetings with each other
-   - But their counts are limited by constraint #3
-   - This creates noise in the data
+5. **Flexibility otherwise**: The aggrosassin can spend other timesteps alone, in pairs with victims, or in larger groups (which help disguise them between kills)
+   - Repeated meetings with the same victim are allowed
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 
 **Difficulty Factors**: 
 - More victims = harder to identify the pattern (more characters to track)
-- Other character pairs having 1-on-1 meetings creates confusion about who has the highest count
+- Aggrosassin appearing in large groups between kills can obscure which 1-on-1s were lethal
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
 - The "half of timesteps" constraint ensures consistent killing behavior, making the pattern more detectable
 
 **Scoring**: Difficulty = (number of victims × 10) + (total 2-person meetings in entire scenario)
 - More victims increases difficulty significantly (heavily weighted)
-- More "pair meetings" in general creates more noise in the data
+- More kill moments (each 2-person meeting) also raises the score
 
 ---
 
@@ -244,7 +243,7 @@ Enable one or more scenarios:
 - **S1 (Poison)**: Optional fixed room/time
 - **S2 (Phantom)**: No configuration needed
 - **S3 (Singer's Jewels)**: No configuration needed
-- **S4 (Bomb)**: No configuration needed
+- **S4 (Bomb)**: No configuration needed (bombers automatically share a private 1-on-1 moment)
 - **S5 (Lovers)**: No configuration needed
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed

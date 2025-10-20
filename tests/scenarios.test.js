@@ -623,6 +623,7 @@ describe('S4: Bomb Duo Scenario', () => {
     testWithThreshold(cfg, (res, cfg) => {
       const [bomber1, bomber2] = res.priv.bomb_duo
       const bombersSorted = [bomber1, bomber2].sort()
+      let aloneCount = 0
 
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
@@ -633,9 +634,12 @@ describe('S4: Bomb Duo Scenario', () => {
           if (charsInRoom.length === 2) {
             const sorted = charsInRoom.sort()
             expect(sorted).toEqual(bombersSorted)
+            aloneCount++
           }
         }
       }
+
+      expect(aloneCount).toBeGreaterThan(0)
     })
   })
 
@@ -727,7 +731,7 @@ describe('S4: Bomb Duo Scenario', () => {
     })
   })
 
-  it('should allow bombers to never meet alone', () => {
+  it('should require bombers to be alone together at least once', () => {
     const cfg = {
       rooms: ['A', 'B', 'C'],
       edges: [['A', 'B'], ['B', 'C']],
@@ -742,6 +746,7 @@ describe('S4: Bomb Duo Scenario', () => {
     testWithThreshold(cfg, (res, cfg) => {
       const [bomber1, bomber2] = res.priv.bomb_duo
       const bombersSorted = [bomber1, bomber2].sort()
+      let aloneCount = 0
 
       // Verify the core constraint: no non-bomber pairs are alone
       for (let t = 0; t < cfg.T; t++) {
@@ -752,9 +757,12 @@ describe('S4: Bomb Duo Scenario', () => {
             const sorted = charsInRoom.sort()
             // If exactly 2 people, they must be the bombers
             expect(sorted).toEqual(bombersSorted)
+            aloneCount++
           }
         }
       }
+
+      expect(aloneCount).toBeGreaterThan(0)
     })
   })
 
@@ -775,6 +783,7 @@ describe('S4: Bomb Duo Scenario', () => {
     expect(res.priv.bomb_duo).toHaveLength(2)
 
     const [bomber1, bomber2] = res.priv.bomb_duo
+    let aloneCount = 0
 
     // Verify constraint
     for (let t = 0; t < cfg.T; t++) {
@@ -784,9 +793,12 @@ describe('S4: Bomb Duo Scenario', () => {
         if (charsInRoom.length === 2) {
           expect(charsInRoom).toContain(bomber1)
           expect(charsInRoom).toContain(bomber2)
+          aloneCount++
         }
       }
     }
+
+    expect(aloneCount).toBeGreaterThan(0)
   })
 
   it('should work with moderate number of characters', () => {
@@ -834,6 +846,7 @@ describe('S4: Bomb Duo Scenario', () => {
     testWithThreshold(cfg, (res, cfg) => {
       const [bomber1, bomber2] = res.priv.bomb_duo
       const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false)
+      let aloneCount = 0
 
       // Verify movement constraints
       for (const char of cfg.chars) {
@@ -857,9 +870,12 @@ describe('S4: Bomb Duo Scenario', () => {
             const sorted = charsInRoom.sort()
             const bombersSorted = [bomber1, bomber2].sort()
             expect(sorted).toEqual(bombersSorted)
+            aloneCount++
           }
         }
       }
+
+      expect(aloneCount).toBeGreaterThan(0)
     })
   })
 
@@ -896,13 +912,26 @@ describe('S4: Bomb Duo Scenario', () => {
               if (charsInRoom.length === 2 && 
                   charsInRoom.includes(char1) && 
                   charsInRoom.includes(char2)) {
-                // This should never happen
                 throw new Error(`Non-bomber pair ${char1},${char2} found alone in ${room} at t=${t+1}`)
               }
             }
           }
         }
       }
+
+      let duoAloneCount = 0
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2 &&
+              charsInRoom.includes(bomber1) &&
+              charsInRoom.includes(bomber2)) {
+            duoAloneCount++
+          }
+        }
+      }
+
+      expect(duoAloneCount).toBeGreaterThan(0)
     })
   })
 
