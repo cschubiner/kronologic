@@ -50,37 +50,26 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
     return true;
   }
 
-  function chooseVar(){
-    // Heuristic: pick variable from a random non-satisfied clause
-    const unsatClauses = [];
-    for (let i = 0; i < clauses.length; i++) {
-      const c = clauses[i];
-      if (c.length === 1 && c[0] === 0) continue; // satisfied
-      if (c.length > 0) {
-        unsatClauses.push(i);
-      }
-    }
-    
-    if (unsatClauses.length > 0) {
-      // Pick a random unsat clause
-      const clauseIdx = unsatClauses[Math.floor(rng() * unsatClauses.length)];
-      const clause = clauses[clauseIdx];
-      
-      // Pick a random unassigned literal from that clause
-      const unassigned = [];
-      for (const lit of clause) {
+  function chooseLiteral(){
+    let bestClause = null;
+    for (const c of clauses){
+      if (c.length===1){
+        const lit = c[0];
+        if (lit===0) continue;
         const v = Math.abs(lit);
-        if (assigns[v] === 0) unassigned.push(v);
-      }
-      
-      if (unassigned.length > 0) {
-        return unassigned[Math.floor(rng() * unassigned.length)];
+        if (assigns[v]===0) return lit;
+      } else if (c.length>1){
+        if (!bestClause || c.length < bestClause.length) bestClause = c;
       }
     }
-    
-    // Fallback: pick first unassigned variable
-    for (let v = 1; v <= numVars; v++) {
-      if (assigns[v] === 0) return v;
+    if (bestClause){
+      for (const lit of bestClause){
+        const v = Math.abs(lit);
+        if (assigns[v]===0) return lit;
+      }
+    }
+    for (let v=1; v<=numVars; v++){
+      if (assigns[v]===0) return v;
     }
     return 0;
   }
@@ -104,14 +93,16 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
     }
     if (allSat) return true;
 
-    const v = chooseVar();
-    if (v===0) return true; // nothing left
-    // branch true, then false
-    for (const tryVal of [true,false]){
+    const lit = chooseLiteral();
+    if (lit===0) return true; // nothing left
+    // branch with suggested literal first, then opposite
+    for (const tryLit of [lit, -lit]){
+      const v = Math.abs(tryLit);
+      if (assigns[v] !== 0 && assigns[v] !== (tryLit>0?1:-1)) continue;
       // clone state (clauses + assigns) cheaply via snapshots
       const snapshotClauses = clauses.map(c=>c.slice());
       const snapshotAssigns = assigns.slice();
-      if (unitProp([tryVal ? v : -v])){
+      if (unitProp([tryLit])){
         if (dfs()) return true;
       }
       // restore
