@@ -2335,20 +2335,97 @@ describe('S9: Doctor freeze scenario', () => {
       expect(healTimes.some(t => t > 1)).toBe(true)
       expect(healTimes.some(t => t < cfg.T)).toBe(true)
 
+      const midHeals = res.priv.heals.filter(h => h.time > 1 && h.time < cfg.T)
+      expect(midHeals.length).toBeGreaterThan(0)
+
       for (const { character, time, room } of res.priv.heals){
         const idx = time - 1
         expect(res.schedule[character][idx]).toBe(room)
         expect(res.schedule[res.priv.doctor][idx]).toBe(room)
       }
 
-      const movedFrozen = res.priv.frozen.filter(ch =>
-        res.schedule[ch][0] !== res.schedule[ch][cfg.T - 1]
-      )
-      expect(movedFrozen.length).toBeGreaterThan(0)
+      const healsByChar = new Map()
+      for (const heal of res.priv.heals) {
+        if (!healsByChar.has(heal.character)) healsByChar.set(heal.character, [])
+        healsByChar.get(heal.character).push(heal)
+      }
 
-      const showcase = movedFrozen[0]
-      expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1])
-      expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
+      const thawed = []
+      for (const frozenChar of res.priv.frozen) {
+        const heals = (healsByChar.get(frozenChar) || []).sort((a, b) => a.time - b.time)
+        expect(heals.length).toBeGreaterThan(0)
+
+        const firstHealBeforeEnd = heals.find(h => h.time < cfg.T)
+        if (firstHealBeforeEnd) {
+          const idx = firstHealBeforeEnd.time - 1
+          const freezeRoom = res.schedule[frozenChar][idx]
+          expect(res.schedule[frozenChar][idx + 1]).not.toBe(freezeRoom)
+          thawed.push(frozenChar)
+        }
+      }
+
+      expect(thawed.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('forces healed characters to move immediately after treatment', () => {
+    const cfg = {
+      rooms: ['Clinic', 'Hall', 'Garden'],
+      edges: [['Clinic', 'Hall'], ['Hall', 'Garden']],
+      chars: ['Iris', 'Jun', 'Kole', 'Lara'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 640
+    }
+
+    testWithThreshold(cfg, (res) => {
+      expect(res.priv.heals).toBeTruthy()
+      const timelyHeals = res.priv.heals.filter(h => h.time < cfg.T)
+      expect(timelyHeals.length).toBeGreaterThan(0)
+
+      for (const heal of timelyHeals) {
+        const idx = heal.time - 1
+        const before = res.schedule[heal.character][idx]
+        const after = res.schedule[heal.character][idx + 1]
+        expect(after).not.toBe(before)
+      }
+    })
+  })
+
+  it('keeps the doctor distinct and actively making rounds', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Bay', 'Cellar', 'Den'],
+      edges: [
+        ['Atrium', 'Bay'],
+        ['Bay', 'Cellar'],
+        ['Cellar', 'Den'],
+        ['Den', 'Atrium']
+      ],
+      chars: ['Mara', 'Noor', 'Orin', 'Paz', 'Quin'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 910
+    }
+
+    testWithThreshold(cfg, (res) => {
+      expect(res.priv.doctor).toBeTruthy()
+      expect(res.priv.frozen).toBeTruthy()
+      expect(res.priv.frozen).not.toContain(res.priv.doctor)
+
+      expect(res.priv.heals).toBeTruthy()
+
+      const visitedRooms = new Set(res.schedule[res.priv.doctor])
+      expect(visitedRooms.size).toBeGreaterThan(1)
+
+      for (const heal of res.priv.heals) {
+        const idx = heal.time - 1
+        expect(res.schedule[res.priv.doctor][idx]).toBe(heal.room)
+        expect(res.schedule[heal.character][idx]).toBe(heal.room)
+      }
     })
   })
 })

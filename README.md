@@ -222,6 +222,27 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S9: Doctor's Rounds
+**Mystery**: A heroic doctor is racing to thaw victims before the night ends.
+
+**Rules**:
+- Exactly one character is the doctor (chosen at random)
+- One or more characters begin the game frozen in place
+- The doctor must reach every frozen character in the middle of the timeline and heal them
+- Healing requires the doctor and the frozen character to share a room at the same timestep
+- The moment a character is healed, they must leave that room on the very next timestep
+- Frozen characters cannot be the doctor and must eventually depart their starting room
+- At least one heal happens away from the opening and closing timesteps
+
+**Goal**: Work out who the doctor is, which characters were frozen, and when (and where) each cure occurred.
+
+**Difficulty Factors**:
+- More frozen characters create overlapping visits that obscure the doctor's identity
+- Maps with long corridors or loops make it harder to trace which route the doctor took between patients
+- Early heals vs. late heals dramatically change how long a victim stays locked in place
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -253,6 +274,7 @@ Enable one or more scenarios:
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
 - **S8 (The Freeze)**: No configuration needed
+- **S9 (Doctor's Rounds)**: No configuration needed
 
 ### Difficulty Control
 
