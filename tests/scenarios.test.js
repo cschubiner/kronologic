@@ -2271,6 +2271,125 @@ describe('Movement Constraints', () => {
   })
 })
 
+describe('S9: Doctor Scenario', () => {
+  it('freezes characters until the doctor heals them mid-game', () => {
+    const cfg = {
+      rooms: ['Infirmary', 'Lounge', 'Garage'],
+      edges: [['Infirmary', 'Lounge'], ['Lounge', 'Garage']],
+      chars: ['Dana', 'Felix', 'Gwen', 'Hank'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: { frozenCount: 2 } },
+      seed: 5
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.doctor).toBeTruthy()
+      expect(res.priv.initially_frozen).toHaveLength(2)
+      expect(res.priv.initially_frozen).not.toContain(res.priv.doctor)
+
+      const byChar = new Map()
+      for (const heal of res.priv.healings) {
+        if (!byChar.has(heal.character)) {
+          byChar.set(heal.character, [])
+        }
+        byChar.get(heal.character).push(heal)
+      }
+
+      for (const frozenChar of res.priv.initially_frozen) {
+        const heals = byChar.get(frozenChar) || []
+        expect(heals.length).toBeGreaterThan(0)
+
+        const earliest = heals.reduce((min, h) => Math.min(min, h.time), Infinity)
+        expect(earliest).toBeGreaterThan(1)
+        expect(earliest).toBeLessThan(cfg.T)
+
+        const timeIndex = earliest - 1
+        const startRoom = res.schedule[frozenChar][0]
+
+        for (let t = 1; t < earliest; t++) {
+          expect(res.schedule[frozenChar][t]).toBe(startRoom)
+        }
+
+        const doctor = res.priv.doctor
+        expect(res.schedule[doctor][timeIndex]).toBe(res.schedule[frozenChar][timeIndex])
+
+        let movedAfter = false
+        for (let t = timeIndex; t < cfg.T; t++) {
+          if (res.schedule[frozenChar][t] !== startRoom) {
+            movedAfter = true
+            break
+          }
+        }
+        expect(movedAfter).toBe(true)
+      }
+
+      const healingTimes = res.priv.healings.map(h => h.time)
+      expect(healingTimes.some(t => t > 1)).toBe(true)
+      expect(healingTimes.some(t => t < cfg.T)).toBe(true)
+    })
+  })
+
+  it('allows only frozen characters to wait when mustMove is enabled', () => {
+    const cfg = {
+      rooms: ['Hall', 'Lab', 'Yard'],
+      edges: [['Hall', 'Lab'], ['Lab', 'Yard']],
+      chars: ['Ivy', 'Jon', 'Kara'],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: { frozenCount: 1 } },
+      seed: 9
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const doctor = res.priv.doctor
+      const frozen = res.priv.initially_frozen[0]
+      const healings = res.priv.healings.filter(h => h.character === frozen)
+      expect(healings.length).toBeGreaterThan(0)
+
+      const earliest = healings.reduce((min, h) => Math.min(min, h.time), Infinity)
+      const startRoom = res.schedule[frozen][0]
+
+      for (let t = 1; t < earliest; t++) {
+        expect(res.schedule[frozen][t]).toBe(startRoom)
+      }
+
+      for (let t = earliest - 1; t < cfg.T - 1; t++) {
+        expect(res.schedule[frozen][t]).not.toBe(res.schedule[frozen][t + 1])
+      }
+
+      const others = cfg.chars.filter(c => c !== frozen)
+      for (const c of others) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          expect(res.schedule[c][t]).not.toBe(res.schedule[c][t + 1])
+        }
+      }
+
+      for (const heal of healings) {
+        const timeIndex = heal.time - 1
+        expect(res.schedule[doctor][timeIndex]).toBe(res.schedule[frozen][timeIndex])
+      }
+    })
+  })
+
+  it('rejects scenarios without enough time or rooms', () => {
+    const base = {
+      rooms: ['Alpha', 'Beta'],
+      edges: [['Alpha', 'Beta']],
+      chars: ['One', 'Two', 'Three'],
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true }
+    }
+
+    expect(() => solveAndDecode({ ...base, T: 2 })).toThrow('S9 requires at least three timesteps')
+    expect(() => solveAndDecode({ ...base, rooms: ['Only'], edges: [], T: 3 })).toThrow('S9 requires at least two rooms')
+    expect(() => solveAndDecode({ ...base, T: 3, scenarios: { s9: { frozenCount: 3 } } })).toThrow('S9 requires at least one non-frozen character')
+  })
+})
+
 describe('Edge Cases', () => {
   it('should handle minimum configuration', () => {
     const cfg = {
