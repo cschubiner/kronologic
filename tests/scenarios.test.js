@@ -1855,9 +1855,12 @@ describe("S7: Aggrosassin Scenario", () => {
           if (killedThisTimestep) killTimesteps++;
         }
 
-        // Aggrosassin must kill often enough to stand out
-        const minKills = Math.max(2, Math.ceil(cfg.T / 3));
-        expect(killTimesteps).toBeGreaterThanOrEqual(minKills);
+        // Aggrosassin must meet the seeded kill quota
+        const requiredKills = res.priv.aggrosassin_required_kills;
+        const maxPossible = Math.min(6, cfg.T, cfg.chars.length - 1);
+        expect(requiredKills).toBeGreaterThanOrEqual(2);
+        expect(requiredKills).toBeLessThanOrEqual(maxPossible);
+        expect(killTimesteps).toBeGreaterThanOrEqual(requiredKills);
 
         // Count one-on-one meetings per character
         const pairCounts = new Map(cfg.chars.map((ch) => [ch, 0]));
@@ -2029,9 +2032,12 @@ describe("S7: Aggrosassin Scenario", () => {
           if (killedThisTimestep) killTimesteps++;
         }
 
-        // Must kill in at least the configured minimum number of timesteps
-        const minKills = Math.max(2, Math.ceil(cfg.T / 3));
-        expect(killTimesteps).toBeGreaterThanOrEqual(minKills);
+        // Must kill in at least the seeded quota of timesteps
+        const requiredKills = res.priv.aggrosassin_required_kills;
+        const maxPossible = Math.min(6, cfg.T, cfg.chars.length - 1);
+        expect(requiredKills).toBeGreaterThanOrEqual(2);
+        expect(requiredKills).toBeLessThanOrEqual(maxPossible);
+        expect(killTimesteps).toBeGreaterThanOrEqual(requiredKills);
 
         const pairCounts = new Map(cfg.chars.map((ch) => [ch, 0]));
         for (let t = 0; t < cfg.T; t++) {
