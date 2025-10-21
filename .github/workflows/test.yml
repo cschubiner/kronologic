@@ -9,7 +9,15 @@ on:
 
 jobs:
   test:
-    name: Run Bun Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: "1/2"
+            coverage: true
+          - shard: "2/2"
+            coverage: false
+    name: Run Bun Tests (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
 
     steps:
@@ -25,13 +33,19 @@ jobs:
         run: bun install
 
       - name: Run tests
-        run: bun test
+        run: |
+          CMD="bunx vitest run --reporter=basic --shard=${{ matrix.shard }}"
+          if [ "${{ matrix.coverage }}" = "true" ]; then
+            CMD="$CMD --coverage"
+          fi
+          echo "Running: $CMD"
+          $CMD
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.shard }}
           path: |
             test-results/
             coverage/
