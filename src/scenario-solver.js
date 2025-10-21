@@ -88,10 +88,11 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
       }
     }
     if (found){
+      const eps = 1e-12;
       let bestLit = 0;
       let bestScore = -Infinity;
       for (const [lit, score] of literalScores.entries()){
-        if (score > bestScore){
+        if (score > bestScore + eps || (Math.abs(score - bestScore) <= eps && rng() < 0.5)){
           bestScore = score;
           bestLit = lit;
         }

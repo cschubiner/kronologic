@@ -338,6 +338,64 @@ describe('S1: Poison Scenario', () => {
   })
 })
 
+describe('Randomness Guarantees', () => {
+  it('should produce different schedules across seeds for a base configuration', () => {
+    const cfgBase = {
+      rooms: ['Alpha', 'Bravo', 'Charlie'],
+      edges: [['Alpha', 'Bravo'], ['Bravo', 'Charlie'], ['Charlie', 'Alpha']],
+      chars: ['A', 'B', 'C', 'D'],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: {}
+    }
+
+    const schedules = new Set()
+    for (let seed = 0; seed < 12; seed++) {
+      const res = solveAndDecode({ ...cfgBase, seed })
+      expect(res).not.toBeNull()
+      schedules.add(JSON.stringify(res.schedule))
+    }
+
+    expect(schedules.size).toBeGreaterThan(1)
+  })
+
+  it('should vary freeze scenarios across seeds', () => {
+    const cfgBase = {
+      rooms: ['Hall', 'Lab', 'Vault', 'Atrium'],
+      edges: [
+        ['Hall', 'Lab'],
+        ['Lab', 'Vault'],
+        ['Vault', 'Atrium'],
+        ['Atrium', 'Hall']
+      ],
+      chars: ['Freeze', 'Alpha', 'Bravo', 'Charlie', 'Delta'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s8: true }
+    }
+
+    const signatures = new Set()
+    let successCount = 0
+    for (let seed = 500; seed < 512; seed++) {
+      const res = solveAndDecode({ ...cfgBase, seed })
+      if (!res) continue
+      successCount++
+      signatures.add(
+        JSON.stringify({
+          schedule: res.schedule,
+          freeze: res.priv.freeze,
+          kills: res.priv.freeze_kills
+        })
+      )
+    }
+
+    expect(successCount).toBeGreaterThan(5)
+    expect(signatures.size).toBeGreaterThan(1)
+  })
+})
+
 describe('S2: Phantom Scenario', () => {
   it('should have exactly one phantom', () => {
     const cfg = {
