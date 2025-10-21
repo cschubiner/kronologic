@@ -711,20 +711,52 @@ export function buildCNF(config){
       }
     }
 
+    const pairVarsByChar = Array.from({length: C.length}, () => []);
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let cj=ci+1; cj<C.length; cj++){
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const pairVar = vp.get(`S7Pair_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
+            pairVarsByChar[ci].push(pairVar);
+            pairVarsByChar[cj].push(pairVar);
+
+            clauses.push([-pairVar, X(ci,t,ri)]);
+            clauses.push([-pairVar, X(cj,t,ri)]);
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-pairVar, -X(ck,t,ri)]);
+            }
+
+            const reverse = [ -X(ci,t,ri), -X(cj,t,ri) ];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              reverse.push( X(ck,t,ri) );
+            }
+            reverse.push(pairVar);
+            clauses.push(reverse);
+          }
+        }
+      }
+    }
+
+    const pairTotals = pairVarsByChar.map((vars, idx) => {
+      if (!vars.length) return [];
+      return buildTotalizer(vars, vp, clauses, `S7_pairTotal_${C[idx]}`);
+    });
+
     for (let ak=0; ak<C.length; ak++){
+      const aggTotals = pairTotals[ak];
       for (let ci=0; ci<C.length; ci++){
         if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
-            }
+        const otherTotals = pairTotals[ci];
+        const maxPairsToCheck = Math.min(T, otherTotals.length);
+        for (let b=1; b<=maxPairsToCheck; b++){
+          const aggIndex = 2*b - 1;
+          if (aggTotals.length <= aggIndex){
+            clauses.push([-AGG[ak], -otherTotals[b-1]]);
+          } else {
+            clauses.push([-AGG[ak], -otherTotals[b-1], aggTotals[aggIndex]]);
           }
         }
       }
