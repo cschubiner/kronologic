@@ -9,8 +9,14 @@ on:
 
 jobs:
   test:
-    name: Run Bun Tests
+    name: Run Bun Tests (shard ${{ matrix.shard }} of ${{ env.SHARD_TOTAL }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      SHARD_TOTAL: 3
 
     steps:
       - name: Checkout code
@@ -25,13 +31,13 @@ jobs:
         run: bun install
 
       - name: Run tests
-        run: bun test
+        run: bun test --shard=${{ matrix.shard }}/${{ env.SHARD_TOTAL }}
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-shard-${{ matrix.shard }}
           path: |
             test-results/
             coverage/
