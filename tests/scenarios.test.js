@@ -2351,4 +2351,73 @@ describe('S9: Doctor freeze scenario', () => {
       expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
     })
   })
+
+  it('forces thawed characters to leave the heal room immediately', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward', 'Gallery'],
+      edges: [
+        ['Atrium', 'Lab'],
+        ['Lab', 'Ward'],
+        ['Ward', 'Gallery'],
+        ['Lab', 'Gallery']
+      ],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus', 'Hera'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 700
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(Array.isArray(res.priv.heals)).toBe(true)
+      const actionableHeals = res.priv.heals.filter(h => h.time < cfg.T)
+      expect(actionableHeals.length).toBeGreaterThan(0)
+
+      for (const { character, time, room } of actionableHeals){
+        const idx = time - 1
+        expect(res.schedule[character][idx]).toBe(room)
+        expect(res.schedule[character][idx + 1]).not.toBe(room)
+      }
+    })
+  })
+
+  it('heals each frozen character exactly once', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward', 'Gallery', 'Observatory'],
+      edges: [
+        ['Atrium', 'Lab'],
+        ['Lab', 'Ward'],
+        ['Ward', 'Gallery'],
+        ['Gallery', 'Observatory'],
+        ['Lab', 'Observatory']
+      ],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus', 'Hera', 'Iris'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 900
+    }
+
+    testWithThreshold(cfg, (res) => {
+      expect(Array.isArray(res.priv.frozen)).toBe(true)
+      expect(res.priv.frozen.length).toBeGreaterThan(0)
+      expect(Array.isArray(res.priv.heals)).toBe(true)
+
+      const healCounts = new Map()
+      for (const { character } of res.priv.heals){
+        healCounts.set(character, (healCounts.get(character) || 0) + 1)
+      }
+
+      for (const frozenChar of res.priv.frozen){
+        expect(healCounts.get(frozenChar)).toBe(1)
+      }
+
+      const healedChars = Array.from(healCounts.keys())
+      for (const healed of healedChars){
+        expect(res.priv.frozen).toContain(healed)
+      }
+    })
+  })
 })

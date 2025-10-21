@@ -222,6 +222,28 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S9: Doctor's Rounds
+
+**Mystery**: A lone medic races to thaw the victims that Mr. Freeze left behind.
+
+**Rules**:
+- Exactly one character is the doctor (and is never frozen)
+- One or more other characters begin frozen in place and cannot move until healed
+- Each frozen victim is healed exactly once after the opening timestep, with at least one heal happening before the finale
+- Every heal occurs when the doctor and victim share a room at the recorded time
+- The moment a victim is healed at time <em>t</em>, they must leave that room in timestep <em>t + 1</em> (even if `allowStay=true`)
+- Frozen victims remain locked in place before their heal, regardless of global movement settings
+- At least one thawed victim eventually leaves their starting room, leaving a clear trail of activity
+
+**Goal**: Identify the doctor, list the frozen victims, and pinpoint when each heal occurred.
+
+**Difficulty Factors**:
+- More frozen victims force longer doctor patrols and complex routing
+- Limited heal windows create tight deductions around when meetings can happen
+- The forced post-heal movement generates noticeable but fleeting clues for observant players
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
