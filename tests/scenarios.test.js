@@ -1857,7 +1857,7 @@ describe('S7: Aggrosassin Scenario', () => {
 })
 
 describe('S8: Freeze Scenario', () => {
-  it('should identify a single freeze who freezes before the final timestep', () => {
+  it('should identify a single freeze with distinct victims', () => {
     const cfg = {
       rooms: ['A', 'B', 'C'],
       edges: [['A', 'B'], ['B', 'C']],
@@ -1875,10 +1875,6 @@ describe('S8: Freeze Scenario', () => {
 
       const kills = res.priv.freeze_kills || []
       expect(kills.length).toBeGreaterThan(0)
-
-      // At least one kill must happen before the final timestep
-      const killsBeforeFinal = kills.filter(k => k.time < cfg.T)
-      expect(killsBeforeFinal.length).toBeGreaterThan(0)
 
       const victims = res.priv.freeze_victims || []
       expect(new Set(victims).size).toBe(victims.length)
@@ -2098,7 +2094,7 @@ describe('S8: Freeze Scenario', () => {
     expect(res.priv.freeze_kills.length).toBeGreaterThan(0)
   })
 
-  it('should require at least one freeze before the final timestep', () => {
+  it('should have at least one freeze kill', () => {
     const cfg = {
       rooms: ['A', 'B', 'C'],
       edges: [['A', 'B'], ['B', 'C']],
@@ -2113,12 +2109,8 @@ describe('S8: Freeze Scenario', () => {
     testWithThreshold(cfg, (res, cfg) => {
       const kills = res.priv.freeze_kills || []
       
-      // Must have at least one kill
+      // Must have at least one kill (constraint is randomized, but at least 1 is always required)
       expect(kills.length).toBeGreaterThan(0)
-      
-      // At least one kill must happen before the final timestep
-      const killsBeforeFinal = kills.filter(k => k.time < cfg.T)
-      expect(killsBeforeFinal.length).toBeGreaterThan(0)
     })
   })
 

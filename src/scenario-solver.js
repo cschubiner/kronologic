@@ -757,7 +757,25 @@ export function buildCNF(config){
     const freezeDetailByVictim = Array.from({length:C.length}, ()=>
       Array.from({length:T}, ()=>Array.from({length:R.length}, ()=>[]))
     );
-    const freezeKillsBeforeFinal = Array.from({length:C.length}, ()=>[]);
+
+    // Randomize freeze constraints based on seed
+    const rng = mulberry32(config.seed || 0);
+    
+    // Randomly choose number of required kills (1-3)
+    const numRequiredKills = Math.floor(rng() * 3) + 1; // 1, 2, or 3
+    
+    // Randomly choose which timesteps must have kills (excluding final timestep)
+    const availableTimesteps = Array.from({length: T-1}, (_, i) => i);
+    const requiredKillTimesteps = [];
+    for (let i = 0; i < Math.min(numRequiredKills, availableTimesteps.length); i++) {
+      const idx = Math.floor(rng() * availableTimesteps.length);
+      requiredKillTimesteps.push(availableTimesteps[idx]);
+      availableTimesteps.splice(idx, 1);
+    }
+
+    const freezeKillsByTimestep = Array.from({length:C.length}, ()=>
+      Array.from({length:T}, ()=>[])
+    );
 
     for (let ci=0; ci<C.length; ci++){
       for (let vj=0; vj<C.length; vj++){
@@ -766,9 +784,7 @@ export function buildCNF(config){
           for (let ri=0; ri<R.length; ri++){
             const detail = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
             freezeDetailByVictim[vj][t][ri].push(detail);
-            if (t < T-1){
-              freezeKillsBeforeFinal[ci].push(detail);
-            }
+            freezeKillsByTimestep[ci][t].push(detail);
 
             clauses.push([-detail, FRZ[ci]]);
             clauses.push([-detail, X(ci,t,ri)]);
@@ -794,11 +810,15 @@ export function buildCNF(config){
       }
     }
 
+    // Require kills at the randomly chosen timesteps
     for (let ci=0; ci<C.length; ci++){
-      if (freezeKillsBeforeFinal[ci].length === 0){
-        throw new Error('S8 requires a kill opportunity before the final timestep');
+      for (const t of requiredKillTimesteps) {
+        const killsAtTime = freezeKillsByTimestep[ci][t];
+        if (killsAtTime.length === 0){
+          throw new Error(`S8 requires a kill opportunity at timestep ${t+1}`);
+        }
+        clauses.push([-FRZ[ci], ...killsAtTime]);
       }
-      clauses.push([-FRZ[ci], ...freezeKillsBeforeFinal[ci]]);
     }
 
     if (config.mustMove){
