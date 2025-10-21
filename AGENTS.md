@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`src/scenario-solver.js` houses the SAT solver, decoder, and helpers. Tests live in `tests/scenarios.test.js`, Vitest settings in `vitest.config.js`, and the static HTML prototypes (`scenario_handler_gpt.html`, `digital-note-sheet.html`) cover manual checks.
+`src/scenario-solver.js` houses the SAT solver, decoder, and helpers. Tests live in `tests/scenarios-basic.test.js` and `tests/scenarios-extended.test.js`, Vitest settings in `vitest.config.js`, and the static HTML prototypes (`scenario_handler_gpt.html`, `digital-note-sheet.html`) cover manual checks.
 
 ## Build, Test, and Development Commands
 Install dependencies with `bun install`. Iterate with `bun test`, run `bun test --coverage` before submitting, and preview HTML tools with `bun x serve .` or by opening them directly.
