@@ -297,6 +297,13 @@ This project uses [Bun](https://bun.sh) for running tests:
 bun test
 ```
 
+When invoking Bun's sharding locally, be sure to include the equals sign—`bun test --shard 1/2` is interpreted as a filename fil
+ter and will skip every test. The following runs shard 1 of 2:
+
+```bash
+bun test --shard="1/2"
+```
+
 To run tests in watch mode:
 
 ```bash
