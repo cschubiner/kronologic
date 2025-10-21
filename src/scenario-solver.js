@@ -356,13 +356,13 @@ export function neighbors(rooms, edges, includeSelf){
    Problem Encoding
    =========================== */
 export function buildCNF(config){
-  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5}, seed}
+  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5, s8, s9:{frozenCount?}}, seed}
   const vp = varPool();
   const clauses = [];
 
   const R = config.rooms, C = config.chars, T = config.T;
   const baseStay = config.allowStay && !config.mustMove;
-  const freezeStay = !!(config.scenarios && config.scenarios.s8);
+  const freezeStay = !!(config.scenarios && (config.scenarios.s8 || config.scenarios.s9));
   const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
 
   // Helper to get variable IDs
@@ -858,6 +858,152 @@ export function buildCNF(config){
     privKeys.FRZ = FRZ;
   }
 
+  // S9: Doctor heals frozen characters
+  if (config.scenarios && config.scenarios.s9){
+    if (T < 3) throw new Error('S9 requires at least three timesteps');
+    if (C.length < 2) throw new Error('S9 requires at least two characters');
+    if (R.length < 2) throw new Error('S9 requires at least two rooms');
+
+    const s9cfg = config.scenarios.s9 === true ? {} : config.scenarios.s9 || {};
+    const frozenCount = Number(s9cfg.frozenCount ?? 1);
+    if (!Number.isInteger(frozenCount) || frozenCount <= 0){
+      throw new Error('S9 requires frozenCount to be a positive integer');
+    }
+    if (frozenCount >= C.length){
+      throw new Error('S9 requires at least one non-frozen character');
+    }
+
+    const DOC = C.map((_,ci)=> vp.get(`S9Doc_${C[ci]}`));
+    clauses.push(...exactlyOne(DOC));
+
+    const initFrozen = C.map((_,ci)=> vp.get(`S9FrozenStart_${C[ci]}`));
+    const totalizer = buildTotalizer(initFrozen, vp, clauses, 'S9FrozenTotal');
+    if (frozenCount > initFrozen.length){
+      throw new Error('S9 frozenCount exceeds number of characters');
+    }
+    clauses.push([ totalizer[frozenCount-1] ]);
+    if (frozenCount < totalizer.length){
+      clauses.push([ -totalizer[frozenCount] ]);
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      clauses.push([-DOC[ci], -initFrozen[ci]]);
+    }
+
+    const frozenState = Array.from({length:C.length}, ()=>Array(T).fill(null));
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        frozenState[ci][t] = vp.get(`S9Frozen_${C[ci]}_${t}`);
+      }
+      clauses.push([-frozenState[ci][0], initFrozen[ci]]);
+      clauses.push([-initFrozen[ci], frozenState[ci][0]]);
+      for (let t=0; t<T-1; t++){
+        clauses.push([-frozenState[ci][t+1], frozenState[ci][t]]);
+      }
+      clauses.push([-initFrozen[ci], -frozenState[ci][T-1]]);
+    }
+
+    const healVarsByChar = Array.from({length:C.length}, ()=>Array.from({length:T-1}, ()=>[]));
+    const midHealsByChar = Array.from({length:C.length}, ()=>[]);
+    const healRecords = [];
+    const nonFirstHeals = [];
+
+    for (let di=0; di<C.length; di++){
+      for (let ci=0; ci<C.length; ci++){
+        if (ci === di) continue;
+        for (let t=0; t<T-1; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const healName = `S9Heal_${C[di]}_${C[ci]}_${t}_${R[ri]}`;
+            const healVar = vp.get(healName);
+            healVarsByChar[ci][t].push(healVar);
+            healRecords.push({ name: healName, doctor: C[di], target: C[ci], time: t, room: R[ri] });
+            if (t > 0){
+              nonFirstHeals.push(healVar);
+              midHealsByChar[ci].push(healVar);
+            }
+
+            clauses.push([-healVar, DOC[di]]);
+            clauses.push([-healVar, X(di,t,ri)]);
+            clauses.push([-healVar, X(ci,t,ri)]);
+            clauses.push([-healVar, frozenState[ci][t]]);
+
+            const reverse = [ -DOC[di], -X(di,t,ri), -X(ci,t,ri), -frozenState[ci][t], healVar ];
+            clauses.push(reverse);
+          }
+        }
+      }
+    }
+
+    if (nonFirstHeals.length === 0){
+      throw new Error('S9 requires enough time for mid-game healing');
+    }
+    clauses.push(nonFirstHeals);
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T-1; t++){
+        const healChoices = healVarsByChar[ci][t];
+        const clause = [ -frozenState[ci][t], frozenState[ci][t+1] ];
+        if (healChoices.length){ clause.push(...healChoices); }
+        clauses.push(clause);
+        for (const hv of healChoices){
+          clauses.push([-hv, -frozenState[ci][t+1]]);
+        }
+      }
+
+      for (let ri=0; ri<R.length; ri++){
+        const laterMoves = [];
+        for (let t=1; t<T; t++){
+          for (let rj=0; rj<R.length; rj++){
+            if (rj === ri) continue;
+            laterMoves.push(X(ci,t,rj));
+          }
+        }
+        if (laterMoves.length === 0){
+          throw new Error('S9 requires time and space for movement after healing');
+        }
+        clauses.push([-initFrozen[ci], -X(ci,0,ri), ...laterMoves]);
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T-1; t++){
+        for (let ri=0; ri<R.length; ri++){
+          clauses.push([-frozenState[ci][t], -X(ci,t,ri), X(ci,t+1,ri)]);
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      const healOptions = [];
+      for (let t=0; t<T-1; t++){
+        healOptions.push(...healVarsByChar[ci][t]);
+      }
+      if (healOptions.length){
+        clauses.push([-initFrozen[ci], ...healOptions]);
+      } else {
+        clauses.push([-initFrozen[ci]]);
+      }
+
+      const midHeals = midHealsByChar[ci];
+      if (midHeals.length === 0){
+        throw new Error('S9 requires healing opportunities after the first timestep for each frozen character');
+      }
+      clauses.push([-initFrozen[ci], ...midHeals]);
+    }
+
+    if (config.mustMove){
+      for (let ci=0; ci<C.length; ci++){
+        for (let t=0; t<T-1; t++){
+          for (let ri=0; ri<R.length; ri++){
+            clauses.push([-X(ci,t,ri), -X(ci,t+1,ri), frozenState[ci][t]]);
+          }
+        }
+      }
+    }
+
+    privKeys.S9 = { heals: healRecords };
+  }
+
   // S4: Bomb duo
   // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
@@ -1047,6 +1193,25 @@ export function solveAndDecode(cfg){
       priv.freeze_victims = Array.from(victims);
       priv.freeze_kills = killRecords;
     }
+  }
+  if (privKeys.S9){
+    let doctor = null;
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`S9Doc_${C[ci]}`)){ doctor = C[ci]; break; }
+    }
+    const frozenStart = [];
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`S9FrozenStart_${C[ci]}`)) frozenStart.push(C[ci]);
+    }
+    const healLog = [];
+    for (const record of privKeys.S9.heals){
+      if (val(record.name)){
+        healLog.push({ doctor: record.doctor, target: record.target, time: record.time+1, room: record.room });
+      }
+    }
+    if (doctor) priv.doctor = doctor;
+    if (frozenStart.length) priv.frozen = frozenStart;
+    if (healLog.length) priv.heals = healLog;
   }
 
   const stats = {
