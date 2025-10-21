@@ -967,6 +967,8 @@ export function buildCNF(config){
 
         if (t < T-1){
           for (let ri=0; ri<R.length; ri++){
+            // Frozen characters must stay: (NOT freed at t) AND (in ri at t) => (in ri at t+1)
+            // CNF: freed at t OR (not in ri at t) OR (in ri at t+1)
             clauses.push([freeVar, -X(ci,t,ri), X(ci,t+1,ri)]);
           }
         }
