@@ -3,7 +3,7 @@
    =========================== */
 function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
 
-export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
+export function satSolve(clauses, numVars, randSeed=0, timeoutMs=25000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
   const rng = mulberry32(randSeed);
@@ -327,7 +327,8 @@ export function buildCNF(config){
   const R = config.rooms, C = config.chars, T = config.T;
   const baseStay = config.allowStay && !config.mustMove;
   const freezeStay = !!(config.scenarios && config.scenarios.s8);
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
+  const doctorStay = !!(config.scenarios && config.scenarios.s9);
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay || doctorStay);
 
   // Helper to get variable IDs
   const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
@@ -797,6 +798,106 @@ export function buildCNF(config){
     privKeys.FRZ = FRZ;
   }
 
+  // S9: Doctor healer
+  if (config.scenarios && config.scenarios.s9){
+    const s9Cfg = config.scenarios.s9;
+    if (T < 3) throw new Error('S9 requires at least three timesteps');
+    if (!s9Cfg || !Array.isArray(s9Cfg.frozen) || !s9Cfg.frozen.length){
+      throw new Error('S9 requires a non-empty frozen character list');
+    }
+
+    const frozenSet = new Set(s9Cfg.frozen);
+    const frozenIndices = [];
+    for (const name of frozenSet){
+      const idx = C.indexOf(name);
+      if (idx === -1){
+        throw new Error(`S9 frozen character ${name} is not in the character list`);
+      }
+      frozenIndices.push(idx);
+    }
+    if (frozenIndices.length === C.length){
+      throw new Error('S9 requires at least one non-frozen character to act as the doctor');
+    }
+
+    const DOC = C.map((_,ci)=> vp.get(`DOC_${C[ci]}`));
+    clauses.push(...exactlyOne(DOC));
+
+    for (const fi of frozenIndices){
+      clauses.push([-DOC[fi]]);
+    }
+
+    const allHeals = [];
+    const healsAfterFirst = [];
+    const healsBeforeFinal = [];
+
+    for (const fi of frozenIndices){
+      const charName = C[fi];
+      const stillFrozen = [];
+      const heals = [];
+
+      for (let t=0; t<T; t++){
+        const sf = vp.get(`S9Frozen_${charName}_${t}`);
+        stillFrozen[t] = sf;
+        if (t === 0){
+          clauses.push([sf]);
+        }
+
+        const heal = vp.get(`S9Heal_${charName}_${t}`);
+        heals[t] = heal;
+        allHeals.push(heal);
+        if (t > 0) healsAfterFirst.push(heal);
+        if (t < T-1) healsBeforeFinal.push(heal);
+
+        clauses.push([-heal, sf]);
+
+        const meetChoices = [];
+        for (let di=0; di<C.length; di++){
+          const docName = C[di];
+          const meetByRoom = [];
+          for (let ri=0; ri<R.length; ri++){
+            const meet = vp.get(`S9Meet_${docName}_${charName}_${t}_${R[ri]}`);
+            meetByRoom.push(meet);
+            clauses.push([-meet, DOC[di]]);
+            clauses.push([-meet, X(di,t,ri)]);
+            clauses.push([-meet, X(fi,t,ri)]);
+            clauses.push([-DOC[di], -X(di,t,ri), -X(fi,t,ri), meet]);
+            clauses.push([-DOC[di], -X(di,t,ri), -X(fi,t,ri), -sf, heal]);
+          }
+          meetChoices.push(...meetByRoom);
+        }
+
+        if (meetChoices.length){
+          clauses.push([-heal, ...meetChoices]);
+        } else {
+          clauses.push([-heal]);
+        }
+      }
+
+      for (let t=0; t<T-1; t++){
+        clauses.push([-stillFrozen[t+1], stillFrozen[t]]);
+        clauses.push([-stillFrozen[t+1], -heals[t]]);
+        clauses.push([-stillFrozen[t], heals[t], stillFrozen[t+1]]);
+
+        for (let ri=0; ri<R.length; ri++){
+          clauses.push([-stillFrozen[t], -X(fi,t,ri), X(fi,t+1,ri)]);
+        }
+      }
+    }
+
+    if (!healsAfterFirst.length || !healsBeforeFinal.length){
+      throw new Error('S9 requires enough timesteps to allow middle-step healing');
+    }
+
+    clauses.push(allHeals);
+    clauses.push(healsAfterFirst);
+    clauses.push(healsBeforeFinal);
+
+    privKeys.S9 = {
+      doctorCandidates: C.slice(),
+      frozenChars: Array.from(frozenSet)
+    };
+  }
+
   // S4: Bomb duo
   // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
@@ -986,6 +1087,25 @@ export function solveAndDecode(cfg){
       priv.freeze_victims = Array.from(victims);
       priv.freeze_kills = killRecords;
     }
+  }
+  if (privKeys.S9){
+    let doctor = null;
+    for (const name of privKeys.S9.doctorCandidates){
+      if (val(`DOC_${name}`)){ doctor = name; break; }
+    }
+
+    const healings = [];
+    for (const frozenName of privKeys.S9.frozenChars){
+      for (let t=0; t<T; t++){
+        if (val(`S9Heal_${frozenName}_${t}`)){
+          healings.push({ character: frozenName, time: t+1, room: schedule[frozenName][t] });
+        }
+      }
+    }
+
+    priv.doctor = doctor;
+    priv.initially_frozen = privKeys.S9.frozenChars.slice();
+    priv.healings = healings;
   }
 
   const stats = {

@@ -2409,6 +2409,59 @@ describe('Movement Constraints', () => {
   })
 })
 
+describe('S9: Doctor Healer Scenario', () => {
+  it('should freeze characters until the doctor heals them mid-game', () => {
+    const cfg = {
+      rooms: ['Infirmary', 'Hall', 'Garden'],
+      edges: [['Infirmary', 'Hall'], ['Hall', 'Garden']],
+      chars: ['Daria', 'Ezra', 'Faye', 'Galen'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: {
+        s9: {
+          frozen: ['Faye', 'Galen']
+        }
+      },
+      seed: 42
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const { doctor, initially_frozen: initiallyFrozen, healings } = res.priv
+    expect(doctor).toBeTruthy()
+    expect([...initiallyFrozen].sort()).toEqual(['Faye', 'Galen'])
+    expect(healings.length).toBeGreaterThan(0)
+
+    const healTimes = healings.map(h => h.time)
+    expect(healTimes.some(t => t > 1)).toBe(true)
+    expect(healTimes.some(t => t < cfg.T)).toBe(true)
+
+    for (const event of healings) {
+      const timeIdx = event.time - 1
+      expect(res.schedule[event.character][timeIdx]).toBe(event.room)
+      expect(res.schedule[doctor][timeIdx]).toBe(event.room)
+    }
+
+    for (const frozen of cfg.scenarios.s9.frozen) {
+      const timeline = res.schedule[frozen]
+      const healsForChar = healings.filter(h => h.character === frozen)
+
+      if (healsForChar.length > 0) {
+        const firstHeal = Math.min(...healsForChar.map(h => h.time))
+        for (let t = 0; t < firstHeal; t++) {
+          expect(timeline[t]).toBe(timeline[0])
+        }
+      } else {
+        for (let t = 0; t < cfg.T; t++) {
+          expect(timeline[t]).toBe(timeline[0])
+        }
+      }
+    }
+  })
+})
+
 describe('Edge Cases', () => {
   it('should handle minimum configuration', () => {
     const cfg = {
