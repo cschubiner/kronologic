@@ -299,13 +299,13 @@ export function neighbors(rooms, edges, includeSelf){
    Problem Encoding
    =========================== */
 export function buildCNF(config){
-  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5}, seed}
+  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5, s8, s9}, seed}
   const vp = varPool();
   const clauses = [];
 
   const R = config.rooms, C = config.chars, T = config.T;
   const baseStay = config.allowStay && !config.mustMove;
-  const freezeStay = !!(config.scenarios && config.scenarios.s8);
+  const freezeStay = !!(config.scenarios && (config.scenarios.s8 || config.scenarios.s9));
   const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
 
   // Helper to get variable IDs
@@ -843,6 +843,94 @@ export function buildCNF(config){
     privKeys.A2 = A2;
   }
 
+  // S9: Doctor heals frozen characters
+  let DOC=null, FROZ=null, HEAL=null;
+  if (config.scenarios.s9){
+    if (T < 3) throw new Error('S9 requires at least three timesteps');
+    if (C.length < 2) throw new Error('S9 requires at least two characters');
+    if (!R.length) throw new Error('S9 requires at least one room');
+
+    DOC = C.map((_,ci)=> vp.get(`DOC_${C[ci]}`));
+    FROZ = C.map((_,ci)=> vp.get(`FROZ_${C[ci]}`));
+    clauses.push(...exactlyOne(DOC));
+    clauses.push(...atLeastOne(FROZ));
+
+    for (let ci=0; ci<C.length; ci++){
+      clauses.push([ -DOC[ci], -FROZ[ci] ]);
+    }
+
+    const healVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
+    const doctorMeet = Array.from({length:C.length}, ()=>
+      Array.from({length:C.length}, ()=>
+        Array.from({length:T}, ()=>Array(R.length).fill(null))
+      )
+    );
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let dj=0; dj<C.length; dj++){
+        if (ci === dj) continue;
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const meetVar = vp.get(`DOCMEET_${C[ci]}_${C[dj]}_${t}_${R[ri]}`);
+            doctorMeet[ci][dj][t][ri] = meetVar;
+            clauses.push([-meetVar, X(ci,t,ri)]);
+            clauses.push([-meetVar, X(dj,t,ri)]);
+            clauses.push([-X(ci,t,ri), -X(dj,t,ri), meetVar]);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      const healChoices = [];
+      for (let t=1; t<T-1; t++){
+        const healVar = vp.get(`HEAL_${C[ci]}_${t}`);
+        healVars[ci][t] = healVar;
+        healChoices.push(healVar);
+
+        clauses.push([-healVar, FROZ[ci]]);
+
+        for (let u=1; u<=t; u++){
+          for (let ri=0; ri<R.length; ri++){
+            clauses.push([-healVar, -X(ci,0,ri), X(ci,u,ri)]);
+          }
+        }
+
+        for (let dj=0; dj<C.length; dj++){
+          if (ci === dj) continue;
+
+          const meetList = [];
+          for (let ri=0; ri<R.length; ri++){
+            meetList.push(doctorMeet[ci][dj][t][ri]);
+          }
+          clauses.push([-healVar, -DOC[dj], ...meetList]);
+
+          for (let u=0; u<t; u++){
+            for (let ri=0; ri<R.length; ri++){
+              clauses.push([-healVar, -DOC[dj], -doctorMeet[ci][dj][u][ri]]);
+            }
+          }
+        }
+      }
+
+      if (healChoices.length === 0){
+        throw new Error('S9 requires at least three timesteps');
+      }
+
+      clauses.push([-FROZ[ci], ...healChoices]);
+
+      for (let i=0; i<healChoices.length; i++){
+        for (let j=i+1; j<healChoices.length; j++){
+          clauses.push([-healChoices[i], -healChoices[j]]);
+        }
+      }
+    }
+
+    privKeys.DOC = DOC;
+    privKeys.FROZ = FROZ;
+    privKeys.HEAL = healVars;
+  }
+
   return { vp, clauses, privKeys };
 }
 
@@ -918,6 +1006,34 @@ export function solveAndDecode(cfg){
     let a1=null, a2=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
     priv.bomb_duo = [a1,a2];
+  }
+  if (privKeys.DOC){
+    let doctor=null;
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`DOC_${C[ci]}`)){ doctor = C[ci]; break; }
+    }
+
+    const frozenList = [];
+    if (privKeys.FROZ){
+      for (let ci=0; ci<C.length; ci++){
+        if (val(`FROZ_${C[ci]}`)) frozenList.push(C[ci]);
+      }
+    }
+
+    const healingTimes = {};
+    if (privKeys.HEAL){
+      for (let ci=0; ci<C.length; ci++){
+        for (let t=1; t<T-1; t++){
+          if (val(`HEAL_${C[ci]}_${t}`)){
+            healingTimes[C[ci]] = t+1;
+          }
+        }
+      }
+    }
+
+    if (doctor) priv.doctor = doctor;
+    if (frozenList.length) priv.initially_frozen = frozenList;
+    if (Object.keys(healingTimes).length) priv.healing_times = healingTimes;
   }
   if (privKeys.AGG){
     let agg=null;

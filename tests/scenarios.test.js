@@ -2359,6 +2359,69 @@ describe('S6 Verification Tests', () => {
   })
 })
 
+describe('S9: Doctor Scenario', () => {
+  it('should require at least three timesteps', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['Doc', 'Patient'],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 1300
+    }
+
+    expect(() => solveAndDecode(cfg)).toThrow('S9 requires at least three timesteps')
+  })
+
+  it('should heal frozen characters after they stay put', () => {
+    const cfg = {
+      rooms: ['Infirmary', 'Hall', 'Lab'],
+      edges: [['Infirmary', 'Hall'], ['Hall', 'Lab']],
+      chars: ['Dana', 'Felix', 'Greta', 'Hale'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 1350
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.doctor).toBeTruthy()
+
+      const frozen = res.priv.initially_frozen || []
+      expect(frozen.length).toBeGreaterThan(0)
+
+      const healingTimes = res.priv.healing_times || {}
+      const doctor = res.priv.doctor
+
+      for (const char of frozen) {
+        expect(healingTimes[char]).toBeDefined()
+        const healTime = healingTimes[char]
+
+        expect(healTime).toBeGreaterThan(1)
+        expect(healTime).toBeLessThan(cfg.T)
+
+        const initialRoom = res.schedule[char][0]
+        for (let t = 0; t < healTime; t++) {
+          expect(res.schedule[char][t]).toBe(initialRoom)
+        }
+
+        const docRoomAtHeal = res.schedule[doctor][healTime - 1]
+        expect(docRoomAtHeal).toBe(initialRoom)
+
+        for (let t = 0; t < healTime - 1; t++) {
+          expect(res.schedule[doctor][t]).not.toBe(initialRoom)
+        }
+      }
+
+      const healMoments = Object.values(healingTimes)
+      expect(healMoments.some(t => t > 1 && t < cfg.T)).toBe(true)
+    })
+  })
+})
+
 describe('Movement Constraints', () => {
   it('should enforce adjacent movement when mustMove=true', () => {
     const cfg = {
