@@ -923,18 +923,24 @@
                         <p><strong>Mystery:</strong> Mr. Freeze is on the loose. Anyone they catch alone is frozen in place for the rest of the timeline.</p>
                         <p><strong>Rules:</strong></p>
                         <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li><strong>Exactly one character is the Freeze</strong></li>
+                            <li><strong>Exactly one character is the Freeze</strong> (randomly chosen from all characters)</li>
                             <li>Whenever the Freeze shares a room with exactly <strong>one</strong> other person, that person is frozen</li>
                             <li>Frozen characters remain in that room for all remaining timesteps (even if <code>mustMove=true</code>)</li>
-                            <li>The Freeze must freeze at least one victim before the final timestep (players need a visible clue)</li>
+                            <li><strong>Randomized kill constraints:</strong> The scenario randomly requires:
+                                <ul style="margin: 4px 0; padding-left: 20px;">
+                                    <li>Between 1-3 kills to occur</li>
+                                    <li>Specific timesteps where kills must happen (excluding the final timestep)</li>
+                                    <li>This creates variety - some scenarios have early kills, others have kills spread throughout</li>
+                                </ul>
+                            </li>
                             <li>Frozen victims can be visited later, but they never move again</li>
                         </ul>
                         <p><strong>Goal:</strong> Identify Mr. Freeze and list every frozen victim (with their freeze moments).</p>
                         <p><strong>Difficulty Factors:</strong></p>
                         <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>More frozen victims make the answer clearer (easier mystery)</li>
+                            <li>More frozen victims make the pattern more obvious (easier to identify)</li>
                             <li>1-on-1 meetings between non-Freeze characters act as red herrings and increase difficulty</li>
-                            <li>Late freeze events give fewer turns to notice immobilized victims, raising difficulty</li>
+                            <li>The randomized kill timing creates unpredictable patterns across different scenarios</li>
                         </ul>
                     </div>
                 </details>
