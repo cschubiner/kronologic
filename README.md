@@ -171,16 +171,16 @@ Players must deduce the secret scenario by combining:
    - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
    - This ensures the aggrosassin is actively hunting throughout the timeline
 
-3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
-   - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
-   - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
+3. **Double the face time**: The aggrosassin has at least twice as many 1-on-1 meetings as any other single character
+   - They still appear in at least **⌈T/2⌉** one-on-one encounters overall
+   - Other characters may have their own 1-on-1 meetings, but none of them come close to the aggrosassin's rate
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
    - A character can be alone with the aggrosassin multiple times (still counts as one victim)
 
 5. **Flexibility otherwise**: The aggrosassin can spend other timesteps alone, in pairs with victims, or in larger groups (which help disguise them between kills)
-   - Repeated meetings with the same victim are allowed
+   - Repeated meetings with the same victim are allowed, and non-aggrosassin pairs can appear as red herrings
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 

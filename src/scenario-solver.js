@@ -597,11 +597,81 @@ export function buildCNF(config){
       throw new Error('S7 requires at least as many potential victims as required kills');
     }
 
+    const pairVars = Array.from({ length: C.length }, () =>
+      Array.from({ length: C.length }, () => Array(T).fill(null))
+    );
+    for (let ci = 0; ci < C.length; ci++){
+      for (let cj = ci + 1; cj < C.length; cj++){
+        for (let t = 0; t < T; t++){
+          const pair = vp.get(`Pair_${C[ci]}_${C[cj]}_${t}`);
+          pairVars[ci][cj][t] = pair;
+          pairVars[cj][ci][t] = pair;
+
+          const details = [];
+          for (let ri = 0; ri < R.length; ri++){
+            const detail = vp.get(`PairDetail_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
+            details.push(detail);
+
+            clauses.push([-detail, X(ci, t, ri)]);
+            clauses.push([-detail, X(cj, t, ri)]);
+            for (let ck = 0; ck < C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-detail, -X(ck, t, ri)]);
+            }
+
+            const reverse = [ -X(ci, t, ri), -X(cj, t, ri) ];
+            for (let ck = 0; ck < C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              reverse.push( X(ck, t, ri) );
+            }
+            reverse.push(detail);
+            clauses.push(reverse);
+
+            clauses.push([-detail, pair]);
+          }
+
+          if (details.length){
+            clauses.push([-pair, ...details]);
+          } else {
+            clauses.push([-pair]);
+          }
+        }
+      }
+    }
+
+    const oneOnOneVars = Array.from({ length: C.length }, () => Array(T).fill(null));
+    for (let ci = 0; ci < C.length; ci++){
+      for (let t = 0; t < T; t++){
+        const varName = vp.get(`OneOnOne_${C[ci]}_${t}`);
+        oneOnOneVars[ci][t] = varName;
+
+        const supports = [];
+        for (let cj = 0; cj < C.length; cj++){
+          if (ci === cj) continue;
+          const pair = pairVars[ci][cj][t];
+          if (!pair) continue;
+          supports.push(pair);
+          clauses.push([-pair, varName]);
+        }
+
+        if (supports.length){
+          clauses.push([-varName, ...supports]);
+        } else {
+          clauses.push([-varName]);
+        }
+      }
+    }
+
+    const oneOnOneTotals = oneOnOneVars.map((vars, idx) =>
+      buildTotalizer(vars, vp, clauses, `OneOnOneTotal_${C[idx]}`)
+    );
+
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
     const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
     const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const killTotalizers = Array.from({ length: C.length }, () => []);
 
     for (let ci=0; ci<C.length; ci++){
       for (let t=0; t<T; t++){
@@ -694,6 +764,16 @@ export function buildCNF(config){
       }
     }
 
+    for (let ci = 0; ci < C.length; ci++){
+      for (let t = 0; t < T; t++){
+        const kt = killTimeVars[ci][t];
+        if (kt){
+          clauses.push([-kt, oneOnOneVars[ci][t]]);
+        }
+      }
+      killTotalizers[ci] = buildTotalizer(killTimeVars[ci], vp, clauses, `AggKillTotal_${C[ci]}`);
+    }
+
     for (let ci=0; ci<C.length; ci++){
       const killTimes = killTimeVars[ci];
       if (requiredKills > killTimes.length){
@@ -702,6 +782,24 @@ export function buildCNF(config){
         const combos = atLeastK(killTimes, requiredKills);
         for (const combo of combos){
           clauses.push([-AGG[ci], ...combo]);
+        }
+      }
+    }
+
+    for (let ci = 0; ci < C.length; ci++){
+      const aggTotals = killTotalizers[ci];
+      for (let cj = 0; cj < C.length; cj++){
+        if (ci === cj) continue;
+        const otherTotals = oneOnOneTotals[cj];
+        for (let level = 1; level <= otherTotals.length; level++){
+          const otherAtLeast = otherTotals[level - 1];
+          if (!otherAtLeast) continue;
+          const aggIndex = (2 * level) - 1;
+          if (aggTotals.length > aggIndex){
+            clauses.push([-AGG[ci], -otherAtLeast, aggTotals[aggIndex]]);
+          } else {
+            clauses.push([-AGG[ci], -otherAtLeast]);
+          }
         }
       }
     }
