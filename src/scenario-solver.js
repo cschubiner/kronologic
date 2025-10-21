@@ -638,6 +638,16 @@ export function buildCNF(config){
 
     const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
     const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const pairTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
+    const pairRoomVars = Array.from({length:C.length}, ()=>
+      Array.from({length:T}, ()=>Array(R.length).fill(null))
+    );
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        pairTimeVars[ci][t] = vp.get(`S7PairTime_${C[ci]}_${t}`);
+      }
+    }
 
     for (let ci=0; ci<C.length; ci++){
       for (let t=0; t<T; t++){
@@ -655,6 +665,35 @@ export function buildCNF(config){
           victimsAtTimes.push(kv);
           clauses.push([-kv, AGG[ci]]);
           clauses.push([-kv, killTimeVars[ci][t]]);
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        for (let ri=0; ri<R.length; ri++){
+          const pr = vp.get(`S7PairRoom_${C[ci]}_${t}_${R[ri]}`);
+          pairRoomVars[ci][t][ri] = pr;
+          clauses.push([-pr, X(ci,t,ri)]);
+
+          const others = [];
+          for (let cj=0; cj<C.length; cj++){
+            if (cj === ci) continue;
+            others.push(X(cj,t,ri));
+          }
+          if (others.length){
+            clauses.push([-pr, ...others]);
+          }
+
+          for (let cj=0; cj<C.length; cj++){
+            if (cj === ci) continue;
+            for (let ck=cj+1; ck<C.length; ck++){
+              if (ck === ci) continue;
+              clauses.push([-pr, -X(cj,t,ri), -X(ck,t,ri)]);
+            }
+          }
+
+          clauses.push([-pr, pairTimeVars[ci][t]]);
         }
       }
     }
@@ -711,24 +750,36 @@ export function buildCNF(config){
       }
     }
 
-    for (let ak=0; ak<C.length; ak++){
-      for (let ci=0; ci<C.length; ci++){
-        if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
+    for (let ci=0; ci<C.length; ci++){
+      for (let cj=ci+1; cj<C.length; cj++){
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const clauseA = [ -X(ci,t,ri), -X(cj,t,ri) ];
+            const clauseB = [ -X(ci,t,ri), -X(cj,t,ri) ];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauseA.push( X(ck,t,ri) );
+              clauseB.push( X(ck,t,ri) );
             }
+            clauseA.push(pairRoomVars[ci][t][ri]);
+            clauseB.push(pairRoomVars[cj][t][ri]);
+            clauses.push(clauseA);
+            clauses.push(clauseB);
           }
         }
       }
     }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        const rooms = pairRoomVars[ci][t];
+        clauses.push([-pairTimeVars[ci][t], ...rooms]);
+      }
+    }
+
+    const pairTotals = pairTimeVars.map((vars, ci) =>
+      buildTotalizer(vars, vp, clauses, `S7PairTotal_${C[ci]}`)
+    );
 
     for (let ci=0; ci<C.length; ci++){
       const killTimes = killTimeVars[ci];
@@ -738,6 +789,23 @@ export function buildCNF(config){
         const combos = atLeastK(killTimes, requiredKills);
         for (const combo of combos){
           clauses.push([-AGG[ci], ...combo]);
+        }
+      }
+    }
+
+    for (let aggIdx=0; aggIdx<C.length; aggIdx++){
+      const aggTotals = pairTotals[aggIdx];
+      for (let otherIdx=0; otherIdx<C.length; otherIdx++){
+        if (aggIdx === otherIdx) continue;
+        const otherTotals = pairTotals[otherIdx];
+        for (let m=1; m<=otherTotals.length; m++){
+          const otherIndicator = otherTotals[m-1];
+          const aggRequirementIndex = 2 * m - 1;
+          if (aggRequirementIndex < aggTotals.length){
+            clauses.push([-AGG[aggIdx], -otherIndicator, aggTotals[aggRequirementIndex]]);
+          } else {
+            clauses.push([-AGG[aggIdx], -otherIndicator]);
+          }
         }
       }
     }
