@@ -1092,6 +1092,36 @@ describe('S4: Bomb Duo Scenario', () => {
 
 })
 
+describe('Scenario combinations', () => {
+  it('should produce a valid schedule with S1 and S4 active', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Gallery', 'Vault'],
+      edges: [['Atrium', 'Gallery'], ['Gallery', 'Vault']],
+      chars: ['Assassin', 'Bishop', 'Courier', 'Dealer'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s1: true, s4: true },
+      seed: 0
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.assassin).toBe(cfg.chars[0])
+      expect(res.priv.bomb_duo).toHaveLength(2)
+      expect(res.priv.bomb_duo).toContain(res.priv.assassin)
+      expect(res.priv.bomb_duo).toContain(res.priv.victim)
+
+      for (const char of cfg.chars) {
+        const path = res.schedule[char]
+        expect(path).toHaveLength(cfg.T)
+        for (let t = 0; t < cfg.T; t++) {
+          expect(cfg.rooms).toContain(path[t])
+        }
+      }
+    })
+  })
+})
+
 describe('S5: Lovers Scenario', () => {
   it('should have non-lovers share rooms with others', () => {
     const cfg = {
