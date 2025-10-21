@@ -2341,14 +2341,95 @@ describe('S9: Doctor freeze scenario', () => {
         expect(res.schedule[res.priv.doctor][idx]).toBe(room)
       }
 
-      const movedFrozen = res.priv.frozen.filter(ch =>
-        res.schedule[ch][0] !== res.schedule[ch][cfg.T - 1]
-      )
-      expect(movedFrozen.length).toBeGreaterThan(0)
+      const healsByChar = new Map()
+      for (const entry of res.priv.heals){
+        if (!healsByChar.has(entry.character)){
+          healsByChar.set(entry.character, [])
+        }
+        healsByChar.get(entry.character).push(entry.time)
+      }
 
-      const showcase = movedFrozen[0]
-      expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1])
-      expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
+      for (const ch of res.priv.frozen){
+        expect(healsByChar.has(ch)).toBe(true)
+      }
+    })
+  })
+
+  it('forces every healed character to move on the next timestep', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward', 'Vault'],
+      edges: [
+        ['Atrium', 'Lab'],
+        ['Lab', 'Ward'],
+        ['Ward', 'Vault'],
+        ['Vault', 'Atrium']
+      ],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus', 'Hera'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 640
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.heals).toBeTruthy()
+
+      const actionableHeals = res.priv.heals.filter(h => h.time < cfg.T)
+      expect(actionableHeals.length).toBeGreaterThan(0)
+
+      for (const { character, time } of actionableHeals){
+        const idx = time - 1
+        const current = res.schedule[character][idx]
+        const next = res.schedule[character][idx + 1]
+        expect(next).not.toBe(current)
+      }
+    })
+  })
+
+  it('heals every frozen character before the finale even when movement is required', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward', 'Vault'],
+      edges: [
+        ['Atrium', 'Lab'],
+        ['Lab', 'Ward'],
+        ['Ward', 'Vault'],
+        ['Vault', 'Atrium']
+      ],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus', 'Hera'],
+      T: 6,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: true },
+      seed: 720
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.doctor).toBeTruthy()
+      expect(res.priv.frozen).toBeTruthy()
+      expect(res.priv.heals).toBeTruthy()
+
+      const doctor = res.priv.doctor
+      const frozen = res.priv.frozen
+      const healsByChar = new Map()
+
+      for (const entry of res.priv.heals){
+        if (!healsByChar.has(entry.character)){
+          healsByChar.set(entry.character, [])
+        }
+        healsByChar.get(entry.character).push(entry.time)
+      }
+
+      for (const ch of frozen){
+        expect(ch).not.toBe(doctor)
+        expect(healsByChar.has(ch)).toBe(true)
+        const times = healsByChar.get(ch)
+        expect(times.length).toBeGreaterThan(0)
+      }
+
+      expect(
+        Array.from(healsByChar.values()).some(times => times.some(t => t < cfg.T))
+      ).toBe(true)
     })
   })
 })
