@@ -751,16 +751,21 @@ export function buildCNF(config){
     if (T < 2) throw new Error('S8 requires at least two timesteps');
     if (C.length < 2) throw new Error('S8 requires at least two characters');
 
+    // Randomly choose which character is the freeze based on seed
+    const rng = mulberry32(config.seed || 0);
+    const freezeIdx = Math.floor(rng() * C.length);
+
     FRZ = C.map((_,ci)=> vp.get(`FRZ_${C[ci]}`));
     clauses.push(...exactlyOne(FRZ));
+    
+    // Force the randomly chosen character to be the freeze
+    clauses.push([FRZ[freezeIdx]]);
 
     const freezeDetailByVictim = Array.from({length:C.length}, ()=>
       Array.from({length:T}, ()=>Array.from({length:R.length}, ()=>[]))
     );
 
-    // Randomize freeze constraints based on seed
-    const rng = mulberry32(config.seed || 0);
-    
+    // Randomize freeze constraints based on seed (reuse RNG from freeze selection)
     // Randomly choose number of required kills (1-3)
     const numRequiredKills = Math.floor(rng() * 3) + 1; // 1, 2, or 3
     
