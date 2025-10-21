@@ -171,9 +171,9 @@ Players must deduce the secret scenario by combining:
    - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
    - This ensures the aggrosassin is actively hunting throughout the timeline
 
-3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
-   - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
-   - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
+3. **Dominant 1-on-1 streak**: The aggrosassin participates in at least twice as many 1-on-1 meetings as any other character
+   - Other characters are allowed to have their own 1-on-1 meetings (with or without the aggrosassin)
+   - The aggrosassin simply racks up far more of these encounters, creating a standout pattern in the timeline
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
@@ -188,6 +188,7 @@ Players must deduce the secret scenario by combining:
 - More victims = harder to identify the pattern (more characters to track)
 - Aggrosassin appearing in large groups between kills can obscure which 1-on-1s were lethal
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
+- Other characters may have their own 1-on-1 meetings, creating noise, but none can match the aggrosassin's kill streak
 - The "half of timesteps" constraint ensures consistent killing behavior, making the pattern more detectable
 
 **Scoring**: Difficulty = (number of victims × 10) + (total 2-person meetings in entire scenario)
