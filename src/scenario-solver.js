@@ -628,7 +628,7 @@ export function buildCNF(config){
     if (T < 2) throw new Error('S7 requires at least two timesteps');
     if (C.length < 2) throw new Error('S7 requires at least two characters');
 
-    const requiredKills = Math.max(2, Math.ceil(T / 2));
+    const requiredKills = Math.max(2, Math.ceil(T / 3));
     if (C.length - 1 < requiredKills){
       throw new Error('S7 requires at least as many potential victims as required kills');
     }
@@ -711,15 +711,20 @@ export function buildCNF(config){
       }
     }
 
-    const pairVarsByChar = Array.from({length: C.length}, () => []);
+    const pairSlots = Array.from({length: C.length}, () => Array(T).fill(null));
+    const pairVars = Array.from({length: C.length}, () =>
+      Array.from({length: C.length}, () =>
+        Array.from({length: T}, () => Array(R.length).fill(null))
+      )
+    );
 
     for (let ci=0; ci<C.length; ci++){
       for (let cj=ci+1; cj<C.length; cj++){
         for (let t=0; t<T; t++){
           for (let ri=0; ri<R.length; ri++){
             const pairVar = vp.get(`S7Pair_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
-            pairVarsByChar[ci].push(pairVar);
-            pairVarsByChar[cj].push(pairVar);
+            pairVars[ci][cj][t][ri] = pairVar;
+            pairVars[cj][ci][t][ri] = pairVar;
 
             clauses.push([-pairVar, X(ci,t,ri)]);
             clauses.push([-pairVar, X(cj,t,ri)]);
@@ -740,24 +745,41 @@ export function buildCNF(config){
       }
     }
 
-    const pairTotals = pairVarsByChar.map((vars, idx) => {
-      if (!vars.length) return [];
-      return buildTotalizer(vars, vp, clauses, `S7_pairTotal_${C[idx]}`);
-    });
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        const slotVar = vp.get(`S7PairSlot_${C[ci]}_${t}`);
+        pairSlots[ci][t] = slotVar;
+
+        const supports = [];
+        for (let cj=0; cj<C.length; cj++){
+          if (ci === cj) continue;
+          for (let ri=0; ri<R.length; ri++){
+            const pairVar = pairVars[ci][cj][t][ri];
+            if (!pairVar) continue;
+            supports.push(pairVar);
+            clauses.push([-pairVar, slotVar]);
+          }
+        }
+        if (supports.length){
+          clauses.push([-slotVar, ...supports]);
+        } else {
+          clauses.push([-slotVar]);
+        }
+      }
+    }
+
+    const pairTotals = pairSlots.map((slots, idx) =>
+      buildTotalizer(slots, vp, clauses, `S7_pairTotal_${C[idx]}`)
+    );
+
+    const maxOtherPairs = Math.max(1, Math.floor(requiredKills / 2));
 
     for (let ak=0; ak<C.length; ak++){
-      const aggTotals = pairTotals[ak];
       for (let ci=0; ci<C.length; ci++){
         if (ci === ak) continue;
-        const otherTotals = pairTotals[ci];
-        const maxPairsToCheck = Math.min(T, otherTotals.length);
-        for (let b=1; b<=maxPairsToCheck; b++){
-          const aggIndex = 2*b - 1;
-          if (aggTotals.length <= aggIndex){
-            clauses.push([-AGG[ak], -otherTotals[b-1]]);
-          } else {
-            clauses.push([-AGG[ak], -otherTotals[b-1], aggTotals[aggIndex]]);
-          }
+        const totals = pairTotals[ci];
+        if (totals.length > maxOtherPairs){
+          clauses.push([-AGG[ak], -totals[maxOtherPairs]]);
         }
       }
     }

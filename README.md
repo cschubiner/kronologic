@@ -167,28 +167,30 @@ Players must deduce the secret scenario by combining:
 **Rules**:
 1. **Exactly one aggrosassin** exists (can be any character, not necessarily the first)
 
-2. **Minimum kill frequency**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **⌈T/2⌉ timesteps**
-   - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
-   - This ensures the aggrosassin is actively hunting throughout the timeline
+2. **Active hunt cadence**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **⌈T/3⌉** different timesteps (minimum 2)
+   - Example: With T=6, the aggrosassin logs private meetings in at least two timesteps
+   - Keeps the killer present without forcing them to dominate *every* round
 
-3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
-   - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
-   - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
+3. **Runaway meeting volume**: Tally how often each character appears in a 1-on-1 meeting; the aggrosassin's count is **≥ 2×** the count of any other character
+   - Other characters *can* have their own private chats, but each non-agg participant is limited to a handful (≤ ⌊required kills / 2⌋) of 1-on-1s
+   - Every 1-on-1 meeting with the aggrosassin still marks a confirmed kill moment
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
    - A character can be alone with the aggrosassin multiple times (still counts as one victim)
 
-5. **Flexibility otherwise**: The aggrosassin can spend other timesteps alone, in pairs with victims, or in larger groups (which help disguise them between kills)
-   - Repeated meetings with the same victim are allowed
+5. **Flexibility otherwise**: Everyone else is free to mingle: they can travel in groups, take solo detours, or even have the odd 1-on-1 themselves (just not enough to rival the killer's volume)
+   - Repeated meetings with the same victim are allowed as long as no one exceeds the per-character cap
+   - The aggrosassin can still disappear into larger groups between kills to mask their pattern
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 
 **Difficulty Factors**: 
 - More victims = harder to identify the pattern (more characters to track)
 - Aggrosassin appearing in large groups between kills can obscure which 1-on-1s were lethal
+- Extra non-agg 1-on-1s add noise, forcing players to spot the outlier by volume instead of exclusivity
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
-- The "half of timesteps" constraint ensures consistent killing behavior, making the pattern more detectable
+- The "one third of timesteps" cadence keeps the killer active without freezing the timeline
 
 **Scoring**: Difficulty = (number of victims × 10) + (total 2-person meetings in entire scenario)
 - More victims increases difficulty significantly (heavily weighted)
