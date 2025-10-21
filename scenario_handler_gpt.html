@@ -456,39 +456,32 @@ function scoreJewels(res, cfg) {
 }
 function scoreBomb(res, cfg) {
   // Higher score = harder puzzle
-  // Measure: How often bombers are with other people (camouflage)
-  // and how many "near miss" groups of 3 exist
+  // Measure: How well bombers blend WITHOUT relying on their joint meetup
   const [bomber1, bomber2] = res.priv.bomb_duo;
   const T = cfg.T;
   const chars = cfg.chars;
 
   let score = 0;
 
-  // Count times when bombers are together WITH other people (not alone)
+  // Reward moments where each bomber mingles solo with other people
   for (let t = 0; t < T; t++) {
-    const room1 = res.schedule[bomber1][t];
-    const room2 = res.schedule[bomber2][t];
-
-    if (room1 === room2) {
-      const othersInRoom = chars.filter(c =>
-        c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1
-      ).length;
-
-      if (othersInRoom > 0) {
-        // Bombers together but not alone - camouflage
-        score += 40;
-      }
+    for (const bomber of [bomber1, bomber2]) {
+      const room = res.schedule[bomber][t];
+      const others = chars.filter(c => c !== bomber && res.schedule[c][t] === room);
+      if (!others.length) continue;
+      const partner = bomber === bomber1 ? bomber2 : bomber1;
+      if (others.includes(partner)) continue; // skip their shared meetings
+      score += 40;
     }
   }
 
-  // Count "near miss" situations: groups of exactly 3 people
-  // These are confusing because they're "almost" a suspicious pair
+  // Count near-miss trios that do not feature the duo together
   for (let t = 0; t < T; t++) {
     for (const room of cfg.rooms) {
       const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
-      if (charsInRoom.length === 3) {
-        score += 30; // Near-miss group
-      }
+      if (charsInRoom.length !== 3) continue;
+      if (charsInRoom.includes(bomber1) && charsInRoom.includes(bomber2)) continue;
+      score += 30;
     }
   }
 
