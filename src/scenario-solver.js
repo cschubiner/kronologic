@@ -975,6 +975,16 @@ export function buildCNF(config){
       }
     }
 
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T-1; t++){
+        const freeVar = Freed[ci][t];
+        for (let ri=0; ri<R.length; ri++){
+          // Once healed (freeVar true) frozen characters must keep moving
+          clauses.push([-FROZ[ci], -freeVar, -X(ci,t,ri), -X(ci,t+1,ri)]);
+        }
+      }
+    }
+
     clauses.push(healNotFirst);
     clauses.push(healNotLast);
 

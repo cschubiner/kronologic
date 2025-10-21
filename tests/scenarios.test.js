@@ -1628,7 +1628,7 @@ describe('S7: Aggrosassin Scenario', () => {
     })
   })
 
-  it('should have aggrosassin alone with people more often than other pairs', () => {
+  it('should have aggrosassin meet one-on-one twice as often as anyone else', () => {
     const cfg = {
       rooms: ['A', 'B', 'C', 'D'],
       edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
@@ -1661,44 +1661,27 @@ describe('S7: Aggrosassin Scenario', () => {
       const minKills = Math.ceil(cfg.T / 2)
       expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
-      // Count how many times aggrosassin is alone with someone (total instances)
-      let aggAloneCount = 0
+      // Count one-on-one meetings per character
+      const pairCounts = new Map(cfg.chars.map(ch => [ch, 0]))
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
           if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
-            aggAloneCount++
+            pairCounts.set(agg, pairCounts.get(agg) + 1)
+            const partner = charsInRoom.find(c => c !== agg)
+            pairCounts.set(partner, pairCounts.get(partner) + 1)
+          } else if (charsInRoom.length === 2) {
+            const [c1, c2] = charsInRoom
+            pairCounts.set(c1, pairCounts.get(c1) + 1)
+            pairCounts.set(c2, pairCounts.get(c2) + 1)
           }
         }
       }
 
-      // Count max times any other pair is alone together
-      let maxOtherPairCount = 0
-      for (let i = 0; i < cfg.chars.length; i++) {
-        for (let j = i + 1; j < cfg.chars.length; j++) {
-          const char1 = cfg.chars[i]
-          const char2 = cfg.chars[j]
-          
-          // Skip if either is the aggrosassin
-          if (char1 === agg || char2 === agg) continue
-
-          let pairCount = 0
-          for (let t = 0; t < cfg.T; t++) {
-            for (const room of cfg.rooms) {
-              const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
-              if (charsInRoom.length === 2 && 
-                  charsInRoom.includes(char1) && 
-                  charsInRoom.includes(char2)) {
-                pairCount++
-              }
-            }
-          }
-          maxOtherPairCount = Math.max(maxOtherPairCount, pairCount)
-        }
-      }
-
-      // Aggrosassin should be alone at least twice as often as any other pair
-      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+      const aggCount = pairCounts.get(agg)
+      const otherMax = Math.max(...cfg.chars.filter(ch => ch !== agg).map(ch => pairCounts.get(ch)))
+      expect(aggCount).toBeGreaterThan(0)
+      expect(aggCount).toBeGreaterThanOrEqual(otherMax * 2)
     })
   })
 
@@ -1718,6 +1701,22 @@ describe('S7: Aggrosassin Scenario', () => {
     expect(res).not.toBeNull()
     expect(res.priv.aggrosassin).toBeTruthy()
     expect(res.priv.victims).toBeTruthy()
+
+    const agg = res.priv.aggrosassin
+    const pairCounts = new Map(cfg.chars.map(ch => [ch, 0]))
+    for (let t = 0; t < cfg.T; t++) {
+      for (const room of cfg.rooms) {
+        const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+        if (charsInRoom.length === 2) {
+          for (const ch of charsInRoom) {
+            pairCounts.set(ch, pairCounts.get(ch) + 1)
+          }
+        }
+      }
+    }
+    const aggCount = pairCounts.get(agg)
+    const otherMax = Math.max(...cfg.chars.filter(ch => ch !== agg).map(ch => pairCounts.get(ch)))
+    expect(aggCount).toBeGreaterThanOrEqual(otherMax * 2)
   })
 
   it('should track all unique victims', () => {
@@ -1806,25 +1805,26 @@ describe('S7: Aggrosassin Scenario', () => {
       const minKills = Math.ceil(cfg.T / 2)
       expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
-      // Aggrosassin constraint still holds
-      let aggAloneCount = 0
-      let maxOtherPairCount = 0
-
+      const pairCounts = new Map(cfg.chars.map(ch => [ch, 0]))
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
-          if (charsInRoom.length === 2) {
-            if (charsInRoom.includes(agg)) {
-              aggAloneCount++
-            } else {
-              // Count this as a non-agg pair instance
-              maxOtherPairCount = Math.max(maxOtherPairCount, 1)
-            }
+          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
+            pairCounts.set(agg, pairCounts.get(agg) + 1)
+            const partner = charsInRoom.find(c => c !== agg)
+            pairCounts.set(partner, pairCounts.get(partner) + 1)
+          } else if (charsInRoom.length === 2) {
+            const [c1, c2] = charsInRoom
+            pairCounts.set(c1, pairCounts.get(c1) + 1)
+            pairCounts.set(c2, pairCounts.get(c2) + 1)
           }
         }
       }
 
-      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+      const aggCount = pairCounts.get(agg)
+      const otherMax = Math.max(...cfg.chars.filter(ch => ch !== agg).map(ch => pairCounts.get(ch)))
+      expect(aggCount).toBeGreaterThan(0)
+      expect(aggCount).toBeGreaterThanOrEqual(otherMax * 2)
     })
   })
 
@@ -2349,6 +2349,66 @@ describe('S9: Doctor freeze scenario', () => {
       const showcase = movedFrozen[0]
       expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1])
       expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
+    })
+  })
+
+  it('keeps healed characters moving after recovery', () => {
+    const cfg = {
+      rooms: ['Hall', 'Clinic', 'Garden', 'Roof'],
+      edges: [['Hall', 'Clinic'], ['Clinic', 'Garden'], ['Garden', 'Roof'], ['Roof', 'Hall']],
+      chars: ['Ada', 'Bryn', 'Cole', 'Devi', 'Eran'],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 550
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const healByChar = new Map()
+      for (const heal of res.priv.heals || []) {
+        const idx = heal.time - 1
+        const current = healByChar.get(heal.character)
+        if (current == null || idx < current) healByChar.set(heal.character, idx)
+      }
+
+      for (const char of res.priv.frozen || []) {
+        const healIdx = healByChar.get(char)
+        expect(healIdx).toBeDefined()
+        for (let t = healIdx; t < cfg.T - 1; t++) {
+          expect(res.schedule[char][t]).not.toBe(res.schedule[char][t + 1])
+        }
+      }
+    })
+  })
+
+  it('keeps frozen characters immobile until healed', () => {
+    const cfg = {
+      rooms: ['NorthWing', 'SouthWing', 'ICU'],
+      edges: [['NorthWing', 'SouthWing'], ['SouthWing', 'ICU']],
+      chars: ['Nia', 'Omar', 'Pia', 'Quinn'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 560
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const healByChar = new Map()
+      for (const heal of res.priv.heals || []) {
+        const idx = heal.time - 1
+        const current = healByChar.get(heal.character)
+        if (current == null || idx < current) healByChar.set(heal.character, idx)
+      }
+
+      for (const char of res.priv.frozen || []) {
+        const healIdx = healByChar.get(char)
+        expect(healIdx).toBeDefined()
+        for (let t = 0; t < healIdx; t++) {
+          expect(res.schedule[char][t]).toBe(res.schedule[char][t + 1])
+        }
+      }
     })
   })
 })
