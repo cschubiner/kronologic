@@ -297,6 +297,12 @@ This project uses [Bun](https://bun.sh) for running tests:
 bun test
 ```
 
+To exercise a specific shard locally, pass the shard index with an equals sign so Bun treats it as a flag value instead of a filter:
+
+```bash
+bun test --shard=1/2
+```
+
 To run tests in watch mode:
 
 ```bash
