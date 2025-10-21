@@ -3,7 +3,7 @@
    =========================== */
 function mulberry32(a){return function(){var t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}}
 
-export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
+export function satSolve(clauses, numVars, randSeed=0, timeoutMs=20000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
   const rng = mulberry32(randSeed);
@@ -593,115 +593,95 @@ export function buildCNF(config){
     if (C.length < 2) throw new Error('S7 requires at least two characters');
 
     const requiredKills = Math.max(2, Math.ceil(T / 2));
-    if (C.length - 1 < requiredKills){
-      throw new Error('S7 requires at least as many potential victims as required kills');
-    }
 
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
-    const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
-    const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const pairDetail = Array.from({length:C.length}, ()=>
+      Array.from({length:C.length}, ()=>
+        Array.from({length:T}, ()=>Array(R.length).fill(null))
+      )
+    );
+    const pairAtTime = Array.from({length:C.length}, ()=>Array(T).fill(null));
 
     for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const kt = vp.get(`AGGKillTime_${C[ci]}_${t}`);
-        killTimeVars[ci][t] = kt;
-        clauses.push([-kt, AGG[ci]]);
-      }
-
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        const victimsAtTimes = [];
+      for (let cj=ci+1; cj<C.length; cj++){
         for (let t=0; t<T; t++){
-          const kv = vp.get(`AGGKillVictim_${C[ci]}_${C[vj]}_${t}`);
-          killVictimVars[ci][vj][t] = kv;
-          victimsAtTimes.push(kv);
-          clauses.push([-kv, AGG[ci]]);
-          clauses.push([-kv, killTimeVars[ci][t]]);
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const choices = [];
-        for (let vj=0; vj<C.length; vj++){
-          if (ci === vj) continue;
-          const kv = killVictimVars[ci][vj][t];
-          if (kv) choices.push(kv);
-        }
-        if (choices.length){
-          clauses.push([-killTimeVars[ci][t], ...choices]);
-        } else {
-          clauses.push([-killTimeVars[ci][t]]);
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        for (let t=0; t<T; t++){
-          const kv = killVictimVars[ci][vj][t];
-          if (!kv) continue;
-          const detailVars = [];
           for (let ri=0; ri<R.length; ri++){
-            const detail = vp.get(`AGGKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
-            detailVars.push(detail);
-            clauses.push([-detail, AGG[ci]]);
-            clauses.push([-detail, kv]);
+            const detail = vp.get(`PAIR_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
+            pairDetail[ci][cj][t][ri] = detail;
+            pairDetail[cj][ci][t][ri] = detail;
+
             clauses.push([-detail, X(ci,t,ri)]);
-            clauses.push([-detail, X(vj,t,ri)]);
+            clauses.push([-detail, X(cj,t,ri)]);
             for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === vj) continue;
+              if (ck === ci || ck === cj) continue;
               clauses.push([-detail, -X(ck,t,ri)]);
             }
 
-            const reverse = [ -AGG[ci], -X(ci,t,ri), -X(vj,t,ri) ];
+            const reverse = [ -X(ci,t,ri), -X(cj,t,ri) ];
             for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === vj) continue;
+              if (ck === ci || ck === cj) continue;
               reverse.push( X(ck,t,ri) );
             }
             reverse.push(detail);
             clauses.push(reverse);
           }
-          if (detailVars.length){
-            clauses.push([-kv, ...detailVars]);
-          } else {
-            clauses.push([-kv]);
-          }
-        }
-      }
-    }
-
-    for (let ak=0; ak<C.length; ak++){
-      for (let ci=0; ci<C.length; ci++){
-        if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
-            }
-          }
         }
       }
     }
 
     for (let ci=0; ci<C.length; ci++){
-      const killTimes = killTimeVars[ci];
+      for (let t=0; t<T; t++){
+        const pt = vp.get(`PAIRTIME_${C[ci]}_${t}`);
+        pairAtTime[ci][t] = pt;
+
+        const supports = [];
+        for (let cj=0; cj<C.length; cj++){
+          if (ci === cj) continue;
+          for (let ri=0; ri<R.length; ri++){
+            const detail = pairDetail[ci][cj][t][ri];
+            if (detail){
+              supports.push(detail);
+              clauses.push([-detail, pt]);
+            }
+          }
+        }
+
+        if (supports.length){
+          clauses.push([-pt, ...supports]);
+        } else {
+          clauses.push([-pt]);
+        }
+      }
+    }
+
+    const pairTotals = pairAtTime.map((times, ci)=>
+      buildTotalizer(times, vp, clauses, `PAIRCOUNT_${C[ci]}`)
+    );
+
+    for (let ci=0; ci<C.length; ci++){
+      const killTimes = pairAtTime[ci];
       if (requiredKills > killTimes.length){
         clauses.push([-AGG[ci]]);
       } else if (requiredKills > 0) {
         const combos = atLeastK(killTimes, requiredKills);
         for (const combo of combos){
           clauses.push([-AGG[ci], ...combo]);
+        }
+      }
+
+      for (let cj=0; cj<C.length; cj++){
+        if (ci === cj) continue;
+        const otherTotals = pairTotals[cj];
+        const aggTotals = pairTotals[ci];
+        for (let m=1; m<=otherTotals.length; m++){
+          const aggNeeded = 2 * m;
+          if (aggNeeded - 1 < aggTotals.length){
+            clauses.push([-AGG[ci], -otherTotals[m-1], aggTotals[aggNeeded-1]]);
+          } else {
+            clauses.push([-AGG[ci], -otherTotals[m-1]]);
+          }
         }
       }
     }
@@ -872,12 +852,27 @@ export function buildCNF(config){
    =========================== */
 
 export function solveAndDecode(cfg){
-  const { vp, clauses, privKeys } = buildCNF(cfg);
+  const { vp, clauses: rawClauses, privKeys } = buildCNF(cfg);
   const numVars = vp.count();
   const seed = Number(cfg.seed||0) || 0;
-  const solveStartTime = Date.now();
-  const sol = satSolve(clauses, numVars, seed);
-  const solveTime = Date.now() - solveStartTime;
+  const baseClauses = rawClauses.map(c => c.slice());
+
+  const maxAttempts = cfg.retryAttempts != null ? cfg.retryAttempts : 3;
+  let sol = null;
+  let solveTime = 0;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++){
+    const attemptSeed = seed + attempt;
+    const attemptClauses = baseClauses.map(c => c.slice());
+    const attemptStart = Date.now();
+    const attemptSol = satSolve(attemptClauses, numVars, attemptSeed);
+    solveTime += Date.now() - attemptStart;
+    if (attemptSol){
+      sol = attemptSol;
+      break;
+    }
+  }
+
   if (!sol) return null;
 
   const val = name => sol[ vp.get(name) ]===true;
@@ -990,8 +985,8 @@ export function solveAndDecode(cfg){
 
   const stats = {
     totalVars: numVars,
-    totalClauses: clauses.length,
-    avgClauseLength: clauses.length > 0 ? clauses.reduce((sum, c) => sum + c.length, 0) / clauses.length : 0,
+    totalClauses: baseClauses.length,
+    avgClauseLength: baseClauses.length > 0 ? baseClauses.reduce((sum, c) => sum + c.length, 0) / baseClauses.length : 0,
     solveTimeMs: solveTime
   };
 
