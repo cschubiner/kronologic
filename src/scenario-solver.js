@@ -627,117 +627,66 @@ export function buildCNF(config){
   if (config.scenarios.s7){
     if (T < 2) throw new Error('S7 requires at least two timesteps');
     if (C.length < 2) throw new Error('S7 requires at least two characters');
+    if (C.length < 3) throw new Error('S7 requires at least three characters to satisfy meeting dominance');
 
-    const requiredKills = Math.max(2, Math.ceil(T / 2));
-    if (C.length - 1 < requiredKills){
-      throw new Error('S7 requires at least as many potential victims as required kills');
-    }
+    const requiredKills = Math.max(2, Math.floor(T / 2));
 
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
-    const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
-    const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const kt = vp.get(`AGGKillTime_${C[ci]}_${t}`);
-        killTimeVars[ci][t] = kt;
-        clauses.push([-kt, AGG[ci]]);
-      }
-
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        const victimsAtTimes = [];
-        for (let t=0; t<T; t++){
-          const kv = vp.get(`AGGKillVictim_${C[ci]}_${C[vj]}_${t}`);
-          killVictimVars[ci][vj][t] = kv;
-          victimsAtTimes.push(kv);
-          clauses.push([-kv, AGG[ci]]);
-          clauses.push([-kv, killTimeVars[ci][t]]);
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const choices = [];
-        for (let vj=0; vj<C.length; vj++){
-          if (ci === vj) continue;
-          const kv = killVictimVars[ci][vj][t];
-          if (kv) choices.push(kv);
-        }
-        if (choices.length){
-          clauses.push([-killTimeVars[ci][t], ...choices]);
-        } else {
-          clauses.push([-killTimeVars[ci][t]]);
-        }
-      }
-    }
+    const oneOnOneVarsByChar = Array.from({ length: C.length }, () => []);
 
     for (let ci=0; ci<C.length; ci++){
       for (let vj=0; vj<C.length; vj++){
         if (ci === vj) continue;
         for (let t=0; t<T; t++){
-          const kv = killVictimVars[ci][vj][t];
-          if (!kv) continue;
-          const detailVars = [];
           for (let ri=0; ri<R.length; ri++){
-            const detail = vp.get(`AGGKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
-            detailVars.push(detail);
-            clauses.push([-detail, AGG[ci]]);
-            clauses.push([-detail, kv]);
-            clauses.push([-detail, X(ci,t,ri)]);
-            clauses.push([-detail, X(vj,t,ri)]);
+            const pairVar = vp.get(`AGGPair_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+            oneOnOneVarsByChar[ci].push(pairVar);
+
+            clauses.push([-pairVar, X(ci,t,ri)]);
+            clauses.push([-pairVar, X(vj,t,ri)]);
             for (let ck=0; ck<C.length; ck++){
               if (ck === ci || ck === vj) continue;
-              clauses.push([-detail, -X(ck,t,ri)]);
+              clauses.push([-pairVar, -X(ck,t,ri)]);
             }
 
-            const reverse = [ -AGG[ci], -X(ci,t,ri), -X(vj,t,ri) ];
+            const reverse = [pairVar, -X(ci,t,ri), -X(vj,t,ri)];
             for (let ck=0; ck<C.length; ck++){
               if (ck === ci || ck === vj) continue;
-              reverse.push( X(ck,t,ri) );
+              reverse.push(X(ck,t,ri));
             }
-            reverse.push(detail);
             clauses.push(reverse);
           }
-          if (detailVars.length){
-            clauses.push([-kv, ...detailVars]);
-          } else {
-            clauses.push([-kv]);
-          }
         }
       }
     }
 
-    for (let ak=0; ak<C.length; ak++){
-      for (let ci=0; ci<C.length; ci++){
-        if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
-            }
-          }
-        }
-      }
-    }
+    const aggTotals = oneOnOneVarsByChar.map((vars, idx) => {
+      if (!vars.length) return [];
+      return buildTotalizer(vars, vp, clauses, `AGGPairCount_${C[idx]}`);
+    });
 
     for (let ci=0; ci<C.length; ci++){
-      const killTimes = killTimeVars[ci];
-      if (requiredKills > killTimes.length){
-        clauses.push([-AGG[ci]]);
-      } else if (requiredKills > 0) {
-        const combos = atLeastK(killTimes, requiredKills);
-        for (const combo of combos){
-          clauses.push([-AGG[ci], ...combo]);
+      const aggCounts = aggTotals[ci];
+      if (requiredKills > 0){
+        if (aggCounts.length < requiredKills){
+          clauses.push([-AGG[ci]]);
+        } else {
+          clauses.push([-AGG[ci], aggCounts[requiredKills - 1]]);
+        }
+      }
+
+      for (let vj=0; vj<C.length; vj++){
+        if (ci === vj) continue;
+        const otherCounts = aggTotals[vj];
+        for (let k=0; k<otherCounts.length; k++){
+          const aggIndex = (k + 1) * 2 - 1;
+          if (aggCounts.length > aggIndex){
+            clauses.push([-AGG[ci], -otherCounts[k], aggCounts[aggIndex]]);
+          } else {
+            clauses.push([-AGG[ci], -otherCounts[k]]);
+          }
         }
       }
     }
