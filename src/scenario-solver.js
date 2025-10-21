@@ -600,6 +600,58 @@ export function buildCNF(config){
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
+    const pairTimeVars = Array.from({length:C.length}, ()=>Array(T));
+    const pairSupports = Array.from({length:C.length}, ()=>Array.from({length:T}, ()=>[]));
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        pairTimeVars[ci][t] = vp.get(`AGGPairTime_${C[ci]}_${t}`);
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let cj=ci+1; cj<C.length; cj++){
+        for (let t=0; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const pairVar = vp.get(`AGGPair_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
+
+            clauses.push([-pairVar, X(ci,t,ri)]);
+            clauses.push([-pairVar, X(cj,t,ri)]);
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-pairVar, -X(ck,t,ri)]);
+            }
+
+            const reverse = [-X(ci,t,ri), -X(cj,t,ri)];
+            for (let ck=0; ck<C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              reverse.push(X(ck,t,ri));
+            }
+            reverse.push(pairVar);
+            clauses.push(reverse);
+
+            pairSupports[ci][t].push(pairVar);
+            pairSupports[cj][t].push(pairVar);
+            clauses.push([-pairVar, pairTimeVars[ci][t]]);
+            clauses.push([-pairVar, pairTimeVars[cj][t]]);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        const supports = pairSupports[ci][t];
+        if (supports.length){
+          clauses.push([-pairTimeVars[ci][t], ...supports]);
+        } else {
+          clauses.push([-pairTimeVars[ci][t]]);
+        }
+      }
+    }
+
+    const pairTotals = pairTimeVars.map((vars, ci)=> buildTotalizer(vars, vp, clauses, `AGGPairTotal_${C[ci]}`));
+
     const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
     const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
 
@@ -675,25 +727,6 @@ export function buildCNF(config){
       }
     }
 
-    for (let ak=0; ak<C.length; ak++){
-      for (let ci=0; ci<C.length; ci++){
-        if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
-            }
-          }
-        }
-      }
-    }
-
     for (let ci=0; ci<C.length; ci++){
       const killTimes = killTimeVars[ci];
       if (requiredKills > killTimes.length){
@@ -702,6 +735,26 @@ export function buildCNF(config){
         const combos = atLeastK(killTimes, requiredKills);
         for (const combo of combos){
           clauses.push([-AGG[ci], ...combo]);
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      const aggTotal = pairTotals[ci];
+      if (!aggTotal || !aggTotal.length) continue;
+      for (let cj=0; cj<C.length; cj++){
+        if (ci === cj) continue;
+        const otherTotal = pairTotals[cj];
+        if (!otherTotal || !otherTotal.length) continue;
+        for (let k=1; k<=otherTotal.length; k++){
+          const otherLevel = otherTotal[k-1];
+          if (!otherLevel) continue;
+          const aggIdx = 2 * k - 1;
+          if (aggIdx < aggTotal.length){
+            clauses.push([-AGG[ci], -otherLevel, aggTotal[aggIdx]]);
+          } else {
+            clauses.push([-AGG[ci], -otherLevel]);
+          }
         }
       }
     }
