@@ -16,28 +16,33 @@ A deduction game where players ask questions about character movements through r
 Players investigate what happened during a night at a mansion (or other location) by asking two types of questions:
 
 #### 1. Location + Time Questions
+
 **"How many different characters were in [Location] at [Time X]?"**
 
 - **Shared Information (🟢)**: Everyone hears the COUNT of characters
 - **Private Information (⚪)**: Only the asker sees ONE randomly selected character who was there
 
 Example: "How many characters were in the Gallery at t=3?"
+
 - Shared: "4 characters were in Gallery at t=3"
 - Private: "One character present: Detective"
 
 #### 2. Location + Character Questions
+
 **"How many times did [Character] visit [Location] across all timesteps?"**
 
 - **Shared Information (🟢)**: Everyone hears the total VISIT COUNT
 - **Private Information (⚪)**: Only the asker sees ONE randomly selected time when they visited
 
 Example: "How many times did Servant visit the Foyer?"
+
 - Shared: "3 visits by Servant to Foyer"
 - Private: "One time visited: t=2"
 
 ### Winning the Game
 
 Players must deduce the secret scenario by combining:
+
 - Public information (counts) that everyone knows
 - Private information only they've seen
 - Logical deduction about what's possible given the constraints
@@ -47,9 +52,11 @@ Players must deduce the secret scenario by combining:
 **Note**: You can only select ONE scenario per puzzle generation. Each scenario creates a unique mystery to solve.
 
 ### S1: Poison (Assassin)
+
 **Mystery**: One character poisoned someone at a specific time and location.
 
 **Rules**:
+
 - The assassin is always the **first character** in your character list (by default "A")
 - Exactly one victim (not the assassin) was poisoned
 - At exactly one (time, room) pair (the "poison moment"):
@@ -68,9 +75,11 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S2: Phantom
+
 **Mystery**: One character was mysteriously alone at every single timestep.
 
 **Rules**:
+
 - Exactly one character is the phantom
 - At EVERY timestep (t=1, t=2, ..., t=T):
   - The phantom is in some room
@@ -86,9 +95,11 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S3: The Singer's Jewels
+
 **Mystery**: A priceless necklace keeps changing hands. The first thief is the first person alone with it in the first listed room (the “Dance Hall”), and any time the holder meets exactly one other person, the jewels pass.
 
 **Rules**:
+
 - At least one character must visit the first room defined in the map during the timeline
 - Beyond the guaranteed visit, schedules remain unconstrained; the passing narrative is left for downstream clue logic
 
@@ -99,9 +110,11 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S4: Bomb Duo
+
 **Mystery**: Two accomplices are planning something suspicious.
 
 **Rules**:
+
 - Exactly two characters are the bombers (A1 and A2)
 - The bombers are distinct (A1 ≠ A2)
 - They must be alone together (exactly those two, no one else) in at least one room/time during the schedule
@@ -119,9 +132,11 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S5: Lovers
+
 **Mystery**: Two characters are secret lovers who never meet.
 
 **Rules**:
+
 - Exactly two characters are the lovers (L1 and L2)
 - The lovers are distinct (L1 ≠ L2)
 - The lovers NEVER share a room at any timestep:
@@ -138,9 +153,11 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S6: Phantom + Lovers
+
 **Mystery**: One character is a phantom (alone at every timestep) AND there are two lovers who never meet.
 
 **Rules**:
+
 - Combines S2 (Phantom) and S5 (Lovers) constraints
 - Exactly one character is the phantom:
   - At EVERY timestep, the phantom is alone in their room
@@ -162,17 +179,19 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S7: Aggrosassin
+
 **Mystery**: One character is a serial poisoner who kills everyone they meet one-on-one.
 
 **Rules**:
+
 1. **Exactly one aggrosassin** exists (can be any character, not necessarily the first)
 
-2. **Active hunt cadence**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **⌈T/3⌉** different timesteps (minimum 2)
-   - Example: With T=6, the aggrosassin logs private meetings in at least two timesteps
-   - Keeps the killer present without forcing them to dominate *every* round
+2. **Kill quota**: A random quota between 2 and 6 kill moments (bounded by available timesteps and victims) is chosen using the scenario seed
+   - The aggrosassin must log that many distinct 1-on-1 meetings (each meeting marks a kill)
+   - Keeps the killer active while allowing variability across seeds
 
 3. **Runaway meeting volume**: Tally how often each character appears in a 1-on-1 meeting; the aggrosassin's count is **≥ 2×** the count of any other character
-   - Other characters *can* have their own private chats, but each non-agg participant is limited to a handful (≤ ⌊required kills / 2⌋) of 1-on-1s
+   - Other characters _can_ have their own private chats, but each non-agg participant is limited to a handful (≤ ⌊required kills / 2⌋) of 1-on-1s
    - Every 1-on-1 meeting with the aggrosassin still marks a confirmed kill moment
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
@@ -185,23 +204,27 @@ Players must deduce the secret scenario by combining:
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 
-**Difficulty Factors**: 
+**Difficulty Factors**:
+
 - More victims = harder to identify the pattern (more characters to track)
 - Aggrosassin appearing in large groups between kills can obscure which 1-on-1s were lethal
 - Extra non-agg 1-on-1s add noise, forcing players to spot the outlier by volume instead of exclusivity
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
-- The "one third of timesteps" cadence keeps the killer active without freezing the timeline
+- The randomized kill quota keeps the killer active without freezing the timeline
 
 **Scoring**: Difficulty = (number of victims × 10) + (total 2-person meetings in entire scenario)
+
 - More victims increases difficulty significantly (heavily weighted)
 - More kill moments (each 2-person meeting) also raises the score
 
 ---
 
 ### S8: The Freeze
+
 **Mystery**: Mr. Freeze is on the loose. Anyone they catch alone is frozen in place for the rest of the timeline.
 
 **Rules**:
+
 - Exactly one character is the Freeze (randomly chosen from all characters)
 - Whenever the Freeze shares a room with exactly **one** other person, that person is frozen
 - Frozen characters remain in that room for all remaining timesteps (even if `mustMove=true`)
@@ -214,11 +237,13 @@ Players must deduce the secret scenario by combining:
 **Goal**: Identify Mr. Freeze and list every frozen victim (with their freeze moments).
 
 **Difficulty Factors**:
+
 - More frozen victims make the pattern more obvious (easier to identify)
 - 1-on-1 meetings between non-Freeze characters act as red herrings and increase difficulty
 - The randomized kill timing creates unpredictable patterns across different scenarios
 
 **Scoring**: Difficulty = (number of victims × 100) + (non-Freeze 1-on-1 meetings × 5)
+
 - More victims significantly increase difficulty (heavily weighted)
 - Red herring 1-on-1 meetings between non-Freeze characters add moderate difficulty
 
@@ -229,6 +254,7 @@ Players must deduce the secret scenario by combining:
 ### Basic Setup
 
 1. **Define the Map**: Use Mermaid-like syntax to create room connections
+
    ```
    graph TD
      Foyer --- Stairs
@@ -247,6 +273,7 @@ Players must deduce the secret scenario by combining:
 ### Scenario Selection
 
 Enable one or more scenarios:
+
 - **S1 (Poison)**: Optional fixed room/time
 - **S2 (Phantom)**: No configuration needed
 - **S3 (Singer's Jewels)**: No configuration needed
@@ -259,11 +286,13 @@ Enable one or more scenarios:
 ### Difficulty Control
 
 **Percentile (0-100)**: Controls puzzle difficulty
+
 - **0-20**: Easiest puzzles (few red herrings)
 - **40-60**: Medium difficulty
 - **80-100**: Hardest puzzles (many confusing patterns)
 
 **Samples**: How many scenarios to generate (10-5000)
+
 - More samples = better percentile accuracy
 - Recommended: 100-500 for good results
 
@@ -286,6 +315,7 @@ bun run dev
 ```
 
 Then open your browser to:
+
 - **Scenario Generator**: http://localhost:3000/scenario_handler_gpt.html
 - **Note Sheet**: http://localhost:3000/digital-note-sheet.html
 
@@ -312,6 +342,7 @@ The **note-sheet.html** file provides an interactive note-taking tool designed f
 ### Features
 
 **Time-Step Mini-Maps**
+
 - Visual representation of the location graph for each timestep
 - Click any room to add/remove character placements
 - Color-coded character chips show who you believe was where
@@ -319,27 +350,32 @@ The **note-sheet.html** file provides an interactive note-taking tool designed f
 - Adaptive grid layout (responsive for mobile/tablet/desktop)
 
 **Character Placement Tracking**
+
 - Add character initials to rooms by clicking
 - Toggle strikethrough to mark negative deductions (e.g., "Detective was NOT in Office at t=3")
 - Remove placements with × button
 - Visual feedback: room borders change color when characters are placed
 
 **Visit Count Table**
+
 - Track how many times each character visited each location
 - Input boxes for recording shared information from questions
 - Helps identify patterns and contradictions
 
 **Deduction Notes**
+
 - Rich text editor with formatting (bold, italic, lists)
 - Record logical chains and elimination reasoning
 - Auto-saves to browser localStorage
 
 **Undo/Redo System**
+
 - Full history tracking (up to 50 states)
 - Keyboard shortcuts: Ctrl+Z (undo), Ctrl+Y (redo)
 - Recover from mistakes easily
 
 **Data Persistence**
+
 - Auto-saves all placements, counts, and notes to localStorage
 - Export to JSON file for backup or sharing
 - Survives page refresh
@@ -361,6 +397,7 @@ The **note-sheet.html** file provides an interactive note-taking tool designed f
 ### Integration with Main Generator
 
 The note sheet is designed to work alongside the scenario generator:
+
 - Generator provides the **questions and answers**
 - Note sheet provides the **workspace for deduction**
 - Players manually transfer information between the two tools

@@ -686,7 +686,16 @@ export function buildCNF(config) {
     if (T < 2) throw new Error("S7 requires at least two timesteps");
     if (C.length < 2) throw new Error("S7 requires at least two characters");
 
-    const requiredKills = Math.max(2, Math.ceil(T / 3));
+    const rng = mulberry32(Number(config.seed || 0));
+    const killOptions = [2, 3, 4, 5, 6].filter(
+      (k) => k <= T && k <= C.length - 1,
+    );
+    if (!killOptions.length) {
+      throw new Error(
+        "S7 requires enough time steps and victims to support at least two kills",
+      );
+    }
+    const requiredKills = killOptions[Math.floor(rng() * killOptions.length)];
     if (C.length - 1 < requiredKills) {
       throw new Error(
         "S7 requires at least as many potential victims as required kills",
@@ -823,6 +832,7 @@ export function buildCNF(config) {
     }
 
     privKeys.AGG = AGG;
+    privKeys.AGG_requiredKills = requiredKills;
   }
 
   // S8: Freeze
@@ -1283,6 +1293,9 @@ export function solveAndDecode(cfg) {
 
     priv.aggrosassin = agg;
     priv.victims = Array.from(victims);
+    if (privKeys.AGG_requiredKills != null) {
+      priv.aggrosassin_required_kills = privKeys.AGG_requiredKills;
+    }
   }
   if (privKeys.FRZ) {
     let freezeChar = null;
