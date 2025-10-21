@@ -326,7 +326,7 @@ export function buildCNF(config){
 
   const R = config.rooms, C = config.chars, T = config.T;
   const baseStay = config.allowStay && !config.mustMove;
-  const freezeStay = !!(config.scenarios && config.scenarios.s8);
+  const freezeStay = !!(config.scenarios && (config.scenarios.s8 || config.scenarios.s9));
   const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
 
   // Helper to get variable IDs
@@ -797,6 +797,87 @@ export function buildCNF(config){
     privKeys.FRZ = FRZ;
   }
 
+  // S9: Doctor freeze relief
+  if (config.scenarios && config.scenarios.s9){
+    if (T < 3) throw new Error('S9 requires at least three timesteps');
+    if (C.length < 2) throw new Error('S9 requires at least two characters');
+
+    const DOC = C.map((_,ci)=> vp.get(`DOC_${C[ci]}`));
+    const FZ = C.map((_,ci)=> vp.get(`FZ_${C[ci]}`));
+    clauses.push(...exactlyOne(DOC));
+    clauses.push([...FZ]);
+
+    for (let ci=0; ci<C.length; ci++){
+      clauses.push([-DOC[ci], -FZ[ci]]);
+    }
+
+    const healVars = Array.from({length:C.length}, ()=>[]);
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=1; t<=T-2; t++){
+        const healVar = vp.get(`Heal_${C[ci]}_${t}`);
+        healVars[ci].push({ time: t, var: healVar });
+        clauses.push([-healVar, FZ[ci]]);
+      }
+
+      if (!healVars[ci].length){
+        throw new Error('S9 requires at least one healing timestep per frozen character');
+      }
+
+      clauses.push([-FZ[ci], ...healVars[ci].map(h=>h.var)]);
+      clauses.push(...atMostOne(healVars[ci].map(h=>h.var)));
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (const { time: t, var: healVar } of healVars[ci]){
+        const detailChoices = [];
+        for (let ri=0; ri<R.length; ri++){
+          for (let dk=0; dk<C.length; dk++){
+            const detail = vp.get(`HealDetail_${C[ci]}_${t}_${R[ri]}_${C[dk]}`);
+            detailChoices.push(detail);
+            clauses.push([-detail, healVar]);
+            clauses.push([-detail, DOC[dk]]);
+            clauses.push([-detail, X(ci,t,ri)]);
+            clauses.push([-detail, X(dk,t,ri)]);
+          }
+        }
+        clauses.push([-healVar, ...detailChoices]);
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T-1; t++){
+        const healsUpTo = healVars[ci]
+          .filter(h=>h.time<=t)
+          .map(h=>h.var);
+        for (let ri=0; ri<R.length; ri++){
+          const clause = [ -X(ci,t,ri), -FZ[ci], ...healsUpTo, X(ci,t+1,ri) ];
+          clauses.push(clause);
+        }
+      }
+    }
+
+    const moveWitness = Array.from({length:C.length}, ()=>[]);
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T-1; t++){
+        for (let ri=0; ri<R.length; ri++){
+          for (let rj=0; rj<R.length; rj++){
+            if (ri===rj) continue;
+            const mv = vp.get(`Move_${C[ci]}_${t}_${R[ri]}_${R[rj]}`);
+            moveWitness[ci].push(mv);
+            clauses.push([-mv, X(ci,t,ri)]);
+            clauses.push([-mv, X(ci,t+1,rj)]);
+            clauses.push([mv, -X(ci,t,ri), -X(ci,t+1,rj)]);
+          }
+        }
+      }
+      if (moveWitness[ci].length){
+        clauses.push([-FZ[ci], ...moveWitness[ci]]);
+      }
+    }
+
+    privKeys.S9 = true;
+  }
+
   // S4: Bomb duo
   // Constraint: A1 and A2 are the ONLY pair ever alone together (exactly 2 people in a room)
   let A1=null, A2=null;
@@ -876,7 +957,11 @@ export function solveAndDecode(cfg){
   const numVars = vp.count();
   const seed = Number(cfg.seed||0) || 0;
   const solveStartTime = Date.now();
-  const sol = satSolve(clauses, numVars, seed);
+  const copyClauses = () => clauses.map(c => c.slice());
+  let sol = satSolve(copyClauses(), numVars, seed, 4000);
+  if (!sol){
+    sol = satSolve(copyClauses(), numVars, seed+1, 24000);
+  }
   const solveTime = Date.now() - solveStartTime;
   if (!sol) return null;
 
@@ -986,6 +1071,23 @@ export function solveAndDecode(cfg){
       priv.freeze_victims = Array.from(victims);
       priv.freeze_kills = killRecords;
     }
+  }
+  if (privKeys.S9){
+    let doctor = null;
+    const frozen = [];
+    const healings = [];
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`DOC_${C[ci]}`)) doctor = C[ci];
+      if (val(`FZ_${C[ci]}`)) frozen.push(C[ci]);
+      for (let t=1; t<=T-2; t++){
+        if (val(`Heal_${C[ci]}_${t}`)){
+          healings.push({ patient: C[ci], time: t+1, room: schedule[C[ci]][t] });
+        }
+      }
+    }
+    if (doctor) priv.doctor = doctor;
+    if (frozen.length) priv.frozen = frozen;
+    if (healings.length) priv.healings = healings;
   }
 
   const stats = {
