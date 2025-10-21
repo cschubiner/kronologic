@@ -717,7 +717,8 @@ qs("genBtn").addEventListener("click", async ()=>{
     // Multi-generation with scoring
     const solutions = [];
     let skipped = 0;
-    const baseSeed = Number(qs("seed").value) || 0;
+    const seedInput = qs("seed").value.trim();
+    const baseSeed = seedInput === "" ? Math.floor(Math.random() * 10000000) + 1 : Number(seedInput) || 0;
     
     for (let i = 0; i < sampleCount; i++) {
       cfg.seed = baseSeed + i;
