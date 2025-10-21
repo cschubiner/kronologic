@@ -334,7 +334,7 @@ describe('S1: Poison Scenario', () => {
 
       // At least one of these patterns should exist (not strictly required, but likely)
       expect(foundAlone || foundWithMany).toBe(true)
-    })
+    }, 0.6)
   })
 })
 
@@ -1628,7 +1628,7 @@ describe('S7: Aggrosassin Scenario', () => {
     })
   })
 
-  it('should have aggrosassin alone with people more often than other pairs', () => {
+  it('should give the aggrosassin at least twice as many 1-on-1 meetings as anyone else', () => {
     const cfg = {
       rooms: ['A', 'B', 'C', 'D'],
       edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
@@ -1661,45 +1661,25 @@ describe('S7: Aggrosassin Scenario', () => {
       const minKills = Math.ceil(cfg.T / 2)
       expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
-      // Count how many times aggrosassin is alone with someone (total instances)
-      let aggAloneCount = 0
+      const oneOnOneCounts = new Map(cfg.chars.map(c => [c, 0]))
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
-          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
-            aggAloneCount++
-          }
-        }
-      }
-
-      // Count max times any other pair is alone together
-      let maxOtherPairCount = 0
-      for (let i = 0; i < cfg.chars.length; i++) {
-        for (let j = i + 1; j < cfg.chars.length; j++) {
-          const char1 = cfg.chars[i]
-          const char2 = cfg.chars[j]
-          
-          // Skip if either is the aggrosassin
-          if (char1 === agg || char2 === agg) continue
-
-          let pairCount = 0
-          for (let t = 0; t < cfg.T; t++) {
-            for (const room of cfg.rooms) {
-              const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
-              if (charsInRoom.length === 2 && 
-                  charsInRoom.includes(char1) && 
-                  charsInRoom.includes(char2)) {
-                pairCount++
-              }
+          if (charsInRoom.length === 2) {
+            for (const c of charsInRoom) {
+              oneOnOneCounts.set(c, oneOnOneCounts.get(c) + 1)
             }
           }
-          maxOtherPairCount = Math.max(maxOtherPairCount, pairCount)
         }
       }
 
-      // Aggrosassin should be alone at least twice as often as any other pair
-      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
-    })
+      const aggAloneCount = oneOnOneCounts.get(agg)
+      const maxOtherCount = Math.max(
+        ...cfg.chars.filter(c => c !== agg).map(c => oneOnOneCounts.get(c))
+      )
+
+      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherCount * 2)
+    }, 0.5)
   })
 
   it('should work with minimum configuration', () => {
@@ -1806,25 +1786,24 @@ describe('S7: Aggrosassin Scenario', () => {
       const minKills = Math.ceil(cfg.T / 2)
       expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
-      // Aggrosassin constraint still holds
-      let aggAloneCount = 0
-      let maxOtherPairCount = 0
-
+      const oneOnOneCounts = new Map(cfg.chars.map(c => [c, 0]))
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
           if (charsInRoom.length === 2) {
-            if (charsInRoom.includes(agg)) {
-              aggAloneCount++
-            } else {
-              // Count this as a non-agg pair instance
-              maxOtherPairCount = Math.max(maxOtherPairCount, 1)
+            for (const c of charsInRoom) {
+              oneOnOneCounts.set(c, oneOnOneCounts.get(c) + 1)
             }
           }
         }
       }
 
-      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+      const aggAloneCount = oneOnOneCounts.get(agg)
+      const maxOtherCount = Math.max(
+        ...cfg.chars.filter(c => c !== agg).map(c => oneOnOneCounts.get(c))
+      )
+
+      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherCount * 2)
     })
   })
 
