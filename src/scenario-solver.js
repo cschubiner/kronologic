@@ -227,6 +227,7 @@ export function atLeastK(vars, k){
   return combos;
 }
 
+
 export function buildTotalizer(vars, vp, clauses, prefix){
   let nodeCounter = 0;
 
@@ -636,110 +637,96 @@ export function buildCNF(config){
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
-    const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
-    const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const pairVars = Array.from({ length: C.length }, () => Array.from({ length: C.length }, () => Array(T).fill(null)));
+    const pairWith = Array.from({ length: C.length }, () => Array(T).fill(null));
 
-    for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const kt = vp.get(`AGGKillTime_${C[ci]}_${t}`);
-        killTimeVars[ci][t] = kt;
-        clauses.push([-kt, AGG[ci]]);
-      }
+    for (let ci = 0; ci < C.length; ci++){
+      for (let cj = ci + 1; cj < C.length; cj++){
+        for (let t = 0; t < T; t++){
+          const pairVar = vp.get(`AGGPair_${C[ci]}_${C[cj]}_${t}`);
+          pairVars[ci][cj][t] = pairVar;
+          pairVars[cj][ci][t] = pairVar;
 
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        const victimsAtTimes = [];
-        for (let t=0; t<T; t++){
-          const kv = vp.get(`AGGKillVictim_${C[ci]}_${C[vj]}_${t}`);
-          killVictimVars[ci][vj][t] = kv;
-          victimsAtTimes.push(kv);
-          clauses.push([-kv, AGG[ci]]);
-          clauses.push([-kv, killTimeVars[ci][t]]);
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const choices = [];
-        for (let vj=0; vj<C.length; vj++){
-          if (ci === vj) continue;
-          const kv = killVictimVars[ci][vj][t];
-          if (kv) choices.push(kv);
-        }
-        if (choices.length){
-          clauses.push([-killTimeVars[ci][t], ...choices]);
-        } else {
-          clauses.push([-killTimeVars[ci][t]]);
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        for (let t=0; t<T; t++){
-          const kv = killVictimVars[ci][vj][t];
-          if (!kv) continue;
           const detailVars = [];
-          for (let ri=0; ri<R.length; ri++){
-            const detail = vp.get(`AGGKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+          for (let ri = 0; ri < R.length; ri++){
+            const detail = vp.get(`AGGPairDetail_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
             detailVars.push(detail);
-            clauses.push([-detail, AGG[ci]]);
-            clauses.push([-detail, kv]);
-            clauses.push([-detail, X(ci,t,ri)]);
-            clauses.push([-detail, X(vj,t,ri)]);
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === vj) continue;
-              clauses.push([-detail, -X(ck,t,ri)]);
-            }
 
-            const reverse = [ -AGG[ci], -X(ci,t,ri), -X(vj,t,ri) ];
-            for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === vj) continue;
-              reverse.push( X(ck,t,ri) );
+            clauses.push([-detail, X(ci, t, ri)]);
+            clauses.push([-detail, X(cj, t, ri)]);
+            for (let ck = 0; ck < C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              clauses.push([-detail, -X(ck, t, ri)]);
+            }
+            clauses.push([-detail, pairVar]);
+
+            const reverse = [ -X(ci, t, ri), -X(cj, t, ri) ];
+            for (let ck = 0; ck < C.length; ck++){
+              if (ck === ci || ck === cj) continue;
+              reverse.push( X(ck, t, ri) );
             }
             reverse.push(detail);
             clauses.push(reverse);
           }
+
           if (detailVars.length){
-            clauses.push([-kv, ...detailVars]);
+            clauses.push([-pairVar, ...detailVars]);
           } else {
-            clauses.push([-kv]);
+            clauses.push([-pairVar]);
           }
         }
       }
     }
 
-    for (let ak=0; ak<C.length; ak++){
-      for (let ci=0; ci<C.length; ci++){
-        if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
-            }
+    for (let ci = 0; ci < C.length; ci++){
+      for (let t = 0; t < T; t++){
+        const pairLit = vp.get(`AGGPairWith_${C[ci]}_${t}`);
+        pairWith[ci][t] = pairLit;
+
+        const involvement = [];
+        for (let cj = 0; cj < C.length; cj++){
+          if (ci === cj) continue;
+          const pairVar = pairVars[ci][cj][t];
+          if (pairVar) involvement.push(pairVar);
+        }
+
+        if (involvement.length){
+          clauses.push([-pairLit, ...involvement]);
+          for (const pv of involvement){
+            clauses.push([-pv, pairLit]);
           }
+        } else {
+          clauses.push([-pairLit]);
         }
       }
     }
 
-    for (let ci=0; ci<C.length; ci++){
-      const killTimes = killTimeVars[ci];
-      if (requiredKills > killTimes.length){
+    const pairTotals = pairWith.map((vars, ci) => buildTotalizer(vars, vp, clauses, `AGGPairTotal_${C[ci]}`));
+
+    for (let ci = 0; ci < C.length; ci++){
+      const totals = pairTotals[ci];
+      if (requiredKills > totals.length){
         clauses.push([-AGG[ci]]);
-      } else if (requiredKills > 0) {
-        const combos = atLeastK(killTimes, requiredKills);
-        for (const combo of combos){
-          clauses.push([-AGG[ci], ...combo]);
+      } else if (requiredKills > 0){
+        clauses.push([-AGG[ci], totals[requiredKills - 1]]);
+      }
+    }
+
+    for (let ak = 0; ak < C.length; ak++){
+      const aggTotals = pairTotals[ak];
+      for (let ci = 0; ci < C.length; ci++){
+        if (ci === ak) continue;
+        const otherTotals = pairTotals[ci];
+        for (let k = 0; k < otherTotals.length; k++){
+          const neededIdx = 2 * (k + 1) - 1;
+          if (neededIdx >= aggTotals.length){
+            clauses.push([-AGG[ak], -otherTotals[k]]);
+          } else {
+            clauses.push([-AGG[ak], -otherTotals[k], aggTotals[neededIdx]]);
+          }
         }
       }
+
     }
 
     privKeys.AGG = AGG;
