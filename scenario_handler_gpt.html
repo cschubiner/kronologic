@@ -521,7 +521,7 @@ function scoreFreeze(res, cfg) {
   const T = cfg.T;
   const chars = cfg.chars;
 
-  let score = kills.length * 40;
+  let score = kills.length * 100;
 
   // Late freezes are harder to detect (fewer timesteps to observe immobility)
   for (const kill of kills) {
