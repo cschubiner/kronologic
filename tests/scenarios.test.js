@@ -2351,4 +2351,46 @@ describe('S9: Doctor freeze scenario', () => {
       expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
     })
   })
+
+  it('forces movement for everyone except still-frozen patients', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward'],
+      edges: [['Atrium', 'Lab'], ['Lab', 'Ward']],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: true },
+      seed: 900
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const frozen = new Set(res.priv.frozen || [])
+      const healTimes = new Map()
+
+      for (const entry of res.priv.heals || []) {
+        const prev = healTimes.get(entry.character)
+        if (!prev || entry.time < prev) {
+          healTimes.set(entry.character, entry.time)
+        }
+      }
+
+      for (const ch of cfg.chars) {
+        const firstHeal = healTimes.get(ch) ?? Infinity
+        const isFrozen = frozen.has(ch)
+
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const here = res.schedule[ch][t]
+          const next = res.schedule[ch][t + 1]
+
+          if (here === next) {
+            expect(isFrozen).toBe(true)
+            expect(t + 1).toBeLessThan(firstHeal)
+          } else if (isFrozen) {
+            expect(t + 1).toBeGreaterThanOrEqual(firstHeal)
+          }
+        }
+      }
+    })
+  })
 })
