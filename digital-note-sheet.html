@@ -889,10 +889,10 @@
                         <p><strong>Rules:</strong></p>
                         <ol style="margin: 8px 0; padding-left: 20px;">
                             <li><strong>Exactly one aggrosassin</strong> exists (can be any character, not necessarily the first)</li>
-                            <li><strong>Minimum kill frequency:</strong> The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least <strong>⌈T/2⌉ timesteps</strong>
+                            <li><strong>Random kill quota:</strong> Using the scenario seed, a quota between <strong>2 and 6</strong> kills is chosen (capped by available victims and timesteps)
                                 <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps</li>
-                                    <li>This ensures the aggrosassin is actively hunting throughout the timeline</li>
+                                    <li>The aggrosassin must log that many distinct 1-on-1 meetings (each marks a kill)</li>
+                                    <li>This keeps the aggrosassin active while letting different seeds vary in intensity</li>
                                 </ul>
                             </li>
                             <li><strong>Exclusive two-person meetings:</strong> Any room with exactly two people must include the aggrosassin

@@ -128,6 +128,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (identify Mr. Freeze and the frozen victims)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s9" value="s9" /> S9: Doctor (frozen characters thaw mid-game when healed by the doctor)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -248,7 +251,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor - frozen characters thaw mid-game).</div>
 
 <script type="module">
 /* ===========================
@@ -308,6 +311,12 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s8 && res.priv.freeze) {
     scores.freeze = scoreFreeze(res, cfg);
     score += scores.freeze;
+  }
+
+  // S9: Doctor scoring
+  if (cfg.scenarios.s9 && res.priv.doctor) {
+    scores.doctor = scoreDoctor(res, cfg);
+    score += scores.doctor;
   }
 
   return { total: score, breakdown: scores };
@@ -447,39 +456,32 @@ function scoreJewels(res, cfg) {
 }
 function scoreBomb(res, cfg) {
   // Higher score = harder puzzle
-  // Measure: How often bombers are with other people (camouflage)
-  // and how many "near miss" groups of 3 exist
+  // Measure: How well bombers blend WITHOUT relying on their joint meetup
   const [bomber1, bomber2] = res.priv.bomb_duo;
   const T = cfg.T;
   const chars = cfg.chars;
 
   let score = 0;
 
-  // Count times when bombers are together WITH other people (not alone)
+  // Reward moments where each bomber mingles solo with other people
   for (let t = 0; t < T; t++) {
-    const room1 = res.schedule[bomber1][t];
-    const room2 = res.schedule[bomber2][t];
-
-    if (room1 === room2) {
-      const othersInRoom = chars.filter(c =>
-        c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1
-      ).length;
-
-      if (othersInRoom > 0) {
-        // Bombers together but not alone - camouflage
-        score += 40;
-      }
+    for (const bomber of [bomber1, bomber2]) {
+      const room = res.schedule[bomber][t];
+      const others = chars.filter(c => c !== bomber && res.schedule[c][t] === room);
+      if (!others.length) continue;
+      const partner = bomber === bomber1 ? bomber2 : bomber1;
+      if (others.includes(partner)) continue; // skip their shared meetings
+      score += 40;
     }
   }
 
-  // Count "near miss" situations: groups of exactly 3 people
-  // These are confusing because they're "almost" a suspicious pair
+  // Count near-miss trios that do not feature the duo together
   for (let t = 0; t < T; t++) {
     for (const room of cfg.rooms) {
       const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
-      if (charsInRoom.length === 3) {
-        score += 30; // Near-miss group
-      }
+      if (charsInRoom.length !== 3) continue;
+      if (charsInRoom.includes(bomber1) && charsInRoom.includes(bomber2)) continue;
+      score += 30;
     }
   }
 
@@ -534,6 +536,41 @@ function scoreFreeze(res, cfg) {
   }
 
   score += redHerrings * 5;
+  return score;
+}
+
+function scoreDoctor(res, cfg) {
+  // Higher score = harder puzzle
+  // Measure: Number of frozen characters, heal timing spread, and character movement complexity
+  const doctor = res.priv.doctor;
+  if (!doctor) return 0;
+
+  const frozen = res.priv.frozen || [];
+  const heals = res.priv.heals || [];
+  const T = cfg.T;
+
+  let score = 0;
+
+  // More frozen characters = harder (need to track more)
+  score += frozen.length * 50;
+
+  // Heals spread throughout timeline = harder
+  if (heals.length > 1) {
+    const healTimes = heals.map(h => h.time);
+    const minTime = Math.min(...healTimes);
+    const maxTime = Math.max(...healTimes);
+    const timeSpread = maxTime - minTime;
+    score += timeSpread * 10;
+  }
+
+  // Characters that moved after being frozen = harder to track
+  const movedFrozen = frozen.filter(char => {
+    const startRoom = res.schedule[char][0];
+    const endRoom = res.schedule[char][T - 1];
+    return startRoom !== endRoom;
+  });
+  score += movedFrozen.length * 30;
+
   return score;
 }
 
@@ -702,6 +739,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s7: scenarioValue === 's7',
       s8: scenarioValue === 's8',
+      s9: scenarioValue === 's9',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -780,6 +818,19 @@ qs("genBtn").addEventListener("click", async ()=>{
         }
       }
       pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+    }
+    if (res.priv.doctor) {
+      const frozen = res.priv.frozen || [];
+      const heals = res.priv.heals || [];
+      let detail = '';
+      if (frozen.length) {
+        detail = ` with <b>${frozen.length}</b> frozen character${frozen.length === 1 ? '' : 's'}: ${frozen.join(', ')}`;
+        if (heals.length) {
+          const healSummary = heals.map(h => `${h.character} @ t=${h.time}, ${h.room}`).join('; ');
+          detail += ` (heals: ${healSummary})`;
+        }
+      }
+      pf.push(`<div>Doctor: <b>${res.priv.doctor}</b>${detail}</div>`);
     }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
