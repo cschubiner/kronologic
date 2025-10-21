@@ -941,6 +941,18 @@ export function buildCNF(config){
       }
     }
 
+    if (config.mustMove){
+      for (let ci=0; ci<C.length; ci++){
+        for (let t=0; t<T-1; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const freeVar = Freed[ci][t];
+            if (!freeVar) continue;
+            clauses.push([-X(ci,t,ri), -X(ci,t+1,ri), -freeVar]);
+          }
+        }
+      }
+    }
+
     clauses.push(healNotFirst);
     clauses.push(healNotLast);
 
