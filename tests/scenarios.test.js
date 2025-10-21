@@ -2409,6 +2409,83 @@ describe('Movement Constraints', () => {
   })
 })
 
+describe('S9: Doctor Freeze Scenario', () => {
+  it('freezes characters until healed mid timeline', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Clinic', 'Lounge'],
+      edges: [['Atrium', 'Clinic'], ['Clinic', 'Lounge']],
+      chars: ['Dana', 'Eli', 'Faye', 'Gus'],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: true },
+      seed: 12
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const { schedule, priv } = res
+    expect(priv.doctor).toBeDefined()
+    expect(priv.frozen_characters?.length).toBeGreaterThan(0)
+    expect(priv.healings?.length).toBeGreaterThan(0)
+
+    const times = priv.healings.map(h => h.time)
+    expect(times.some(t => t > 1)).toBe(true)
+    expect(times.some(t => t < cfg.T)).toBe(true)
+
+    const doctor = priv.doctor
+    const frozenSet = new Set(priv.frozen_characters)
+
+    for (const frozen of frozenSet){
+      expect(schedule[frozen][0]).toBe(schedule[frozen][1])
+    }
+
+    const firstHealByChar = new Map()
+    for (const heal of priv.healings){
+      if (!firstHealByChar.has(heal.patient) || heal.time < firstHealByChar.get(heal.patient)){
+        firstHealByChar.set(heal.patient, heal.time)
+      }
+    }
+
+    for (const frozen of frozenSet){
+      const healTime = firstHealByChar.get(frozen)
+      expect(healTime).toBeDefined()
+      expect(healTime).toBeLessThan(cfg.T)
+
+      let movedAfter = false
+      for (let t = healTime - 1; t < cfg.T - 1; t++){
+        if (schedule[frozen][t] !== schedule[frozen][t+1]){
+          movedAfter = true
+          break
+        }
+      }
+      expect(movedAfter).toBe(true)
+    }
+
+    for (const heal of priv.healings){
+      const docRoom = schedule[doctor][heal.time - 1]
+      expect(docRoom).toBe(heal.room)
+      expect(schedule[heal.patient][heal.time - 1]).toBe(heal.room)
+    }
+  })
+
+  it('requires at least three timesteps', () => {
+    const cfg = {
+      rooms: ['A', 'B'],
+      edges: [['A', 'B']],
+      chars: ['Doc', 'Pat'],
+      T: 2,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: true },
+      seed: 3
+    }
+
+    expect(() => solveAndDecode(cfg)).toThrow('S9 requires at least three timesteps')
+  })
+})
+
 describe('Edge Cases', () => {
   it('should handle minimum configuration', () => {
     const cfg = {

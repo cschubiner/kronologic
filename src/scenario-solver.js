@@ -170,6 +170,32 @@ export function exactlyOne(vars){
   return [...atLeastOne(vars), ...atMostOne(vars)];
 }
 
+export function atLeastK(vars, k){
+  if (k <= 0) return [];
+  if (k > vars.length) throw new Error('atLeastK requires k <= vars.length');
+
+  const needed = vars.length - k + 1;
+  if (needed <= 0) return [];
+
+  const out = [];
+  const combo = [];
+
+  function build(start){
+    if (combo.length === needed){
+      out.push(combo.slice());
+      return;
+    }
+    for (let i=start; i<vars.length; i++){
+      combo.push(vars[i]);
+      build(i+1);
+      combo.pop();
+    }
+  }
+
+  build(0);
+  return out;
+}
+
 export function buildTotalizer(vars, vp, clauses, prefix){
   let nodeCounter = 0;
 
@@ -305,7 +331,7 @@ export function buildCNF(config){
 
   const R = config.rooms, C = config.chars, T = config.T;
   const baseStay = config.allowStay && !config.mustMove;
-  const freezeStay = !!(config.scenarios && config.scenarios.s8);
+  const freezeStay = !!(config.scenarios && (config.scenarios.s8 || config.scenarios.s9));
   const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
 
   // Helper to get variable IDs
@@ -563,6 +589,152 @@ export function buildCNF(config){
     privKeys.V = V;
     privKeys.PT = PT;
     privKeys.PR = PR;
+  }
+
+  // S9: Doctor heals frozen characters
+  let DOC=null, FROZ=null;
+  if (config.scenarios.s9){
+    if (T < 3) throw new Error('S9 requires at least three timesteps');
+    if (C.length < 2) throw new Error('S9 requires at least two characters');
+
+    DOC = C.map((_,ci)=> vp.get(`DOC_${C[ci]}`));
+    FROZ = C.map((_,ci)=> vp.get(`FROZ_${C[ci]}`));
+
+    clauses.push(...exactlyOne(DOC));
+
+    const frozenCountSetting = config.scenarios.s9_frozenCount;
+    if (frozenCountSetting != null){
+      const frozenCount = Number(frozenCountSetting);
+      if (!Number.isInteger(frozenCount) || frozenCount < 1){
+        throw new Error('S9 requires at least one frozen character');
+      }
+      if (frozenCount >= C.length){
+        throw new Error('S9 needs at least one non-frozen character');
+      }
+
+      const tot = buildTotalizer(FROZ, vp, clauses, 'S9_FROZ');
+      const exactIdx = frozenCount - 1;
+      for (let i=0; i<tot.length; i++){
+        if (i === exactIdx) continue;
+        clauses.push([-tot[i]]);
+      }
+    } else {
+      clauses.push([...FROZ]);
+    }
+
+    const healByTime = Array.from({length:C.length}, ()=>Array(T).fill(null));
+    const healNowVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
+    const healTriggers = Array.from({length:C.length}, ()=>Array.from({length:T}, ()=>[]));
+    const healBeforeFinalByChar = Array.from({length:C.length}, ()=>[]);
+    const healEventsNotFirst = [];
+    const healEventsNotFinal = [];
+
+    for (let ci=0; ci<C.length; ci++){
+      clauses.push([-DOC[ci], -FROZ[ci]]);
+
+      for (let t=0; t<T; t++){
+        healByTime[ci][t] = vp.get(`HEAL_${C[ci]}_${t}`);
+      }
+
+      clauses.push([FROZ[ci], healByTime[ci][0]]);
+      clauses.push([-healByTime[ci][0], -FROZ[ci]]);
+
+      for (let t=1; t<T; t++){
+        const healNow = vp.get(`HEALNOW_${C[ci]}_${t}`);
+        healNowVars[ci][t] = healNow;
+
+        clauses.push([-healByTime[ci][t-1], healByTime[ci][t]]);
+        clauses.push([-healNow, healByTime[ci][t]]);
+        clauses.push([-healByTime[ci][t], healByTime[ci][t-1], healNow]);
+
+        if (t < T-1){
+          healEventsNotFinal.push(healNow);
+          healBeforeFinalByChar[ci].push(healNow);
+        }
+        healEventsNotFirst.push(healNow);
+      }
+
+      clauses.push([-FROZ[ci], healByTime[ci][T-1]]);
+    }
+
+    for (let di=0; di<C.length; di++){
+      for (let ci=0; ci<C.length; ci++){
+        if (ci === di) continue;
+        for (let t=1; t<T; t++){
+          for (let ri=0; ri<R.length; ri++){
+            const detail = vp.get(`HEALDetail_${C[di]}_${C[ci]}_${t}_${R[ri]}`);
+            healTriggers[ci][t].push(detail);
+
+            clauses.push([-detail, DOC[di]]);
+            clauses.push([-detail, FROZ[ci]]);
+            clauses.push([-detail, -healByTime[ci][t-1]]);
+            clauses.push([-detail, X(di,t,ri)]);
+            clauses.push([-detail, X(ci,t,ri)]);
+
+            const rev = [ -DOC[di], -FROZ[ci], healByTime[ci][t-1], -X(di,t,ri), -X(ci,t,ri), detail ];
+            clauses.push(rev);
+          }
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=1; t<T; t++){
+        const healNow = healNowVars[ci][t];
+        if (!healNow) continue;
+        const triggers = healTriggers[ci][t];
+        if (!triggers.length){
+          clauses.push([-healNow]);
+          continue;
+        }
+        clauses.push([-healNow, ...triggers]);
+        for (const detail of triggers){
+          clauses.push([-detail, healNow]);
+        }
+      }
+    }
+
+    if (!healEventsNotFirst.length){
+      throw new Error('S9 requires the healing to occur after the first timestep');
+    }
+    if (!healEventsNotFinal.length){
+      throw new Error('S9 requires the healing to occur before the final timestep');
+    }
+
+    clauses.push(healEventsNotFirst);
+    clauses.push(healEventsNotFinal);
+
+    for (let ci=0; ci<C.length; ci++){
+      const options = healBeforeFinalByChar[ci];
+      if (!options.length){
+        throw new Error('S9 needs a timestep before the finale for healing');
+      }
+      clauses.push([-FROZ[ci], ...options]);
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T-1; t++){
+        for (let ri=0; ri<R.length; ri++){
+          clauses.push([ healByTime[ci][t], -X(ci,t,ri), X(ci,t+1,ri) ]);
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      for (let ri=0; ri<R.length; ri++){
+        const clause = [ -FROZ[ci], -X(ci,0,ri) ];
+        for (let t=1; t<T; t++){
+          for (let rj=0; rj<R.length; rj++){
+            if (rj === ri) continue;
+            clause.push(X(ci,t,rj));
+          }
+        }
+        clauses.push(clause);
+      }
+    }
+
+    privKeys.DOC = DOC;
+    privKeys.FROZ = FROZ;
   }
 
   // S7: Aggrosassin
@@ -918,6 +1090,38 @@ export function solveAndDecode(cfg){
     let a1=null, a2=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
     priv.bomb_duo = [a1,a2];
+  }
+  if (privKeys.DOC && privKeys.FROZ){
+    let doctor=null;
+    const frozen = [];
+    for (let ci=0; ci<C.length; ci++){
+      if (val(`DOC_${C[ci]}`)) doctor = C[ci];
+      if (val(`FROZ_${C[ci]}`)) frozen.push(C[ci]);
+    }
+    if (doctor) priv.doctor = doctor;
+    if (frozen.length) priv.frozen_characters = frozen;
+
+    if (doctor && frozen.length){
+      const frozenSet = new Set(frozen);
+      const healedState = new Map();
+      for (const c of C){
+        healedState.set(c, !frozenSet.has(c));
+      }
+
+      const healings = [];
+      for (let t=0; t<T; t++){
+        if (t === 0) continue;
+        const docRoom = schedule[doctor][t];
+        for (const target of frozen){
+          if (healedState.get(target)) continue;
+          if (schedule[target][t] === docRoom){
+            healedState.set(target, true);
+            healings.push({ patient: target, time: t+1, room: docRoom });
+          }
+        }
+      }
+      priv.healings = healings;
+    }
   }
   if (privKeys.AGG){
     let agg=null;
