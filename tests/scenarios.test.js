@@ -2271,6 +2271,61 @@ describe('Movement Constraints', () => {
   })
 })
 
+describe('S9: Doctor Scenario', () => {
+  it('ensures frozen characters thaw mid-game and move after healing', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Bay', 'Courtyard'],
+      edges: [['Atrium', 'Bay'], ['Bay', 'Courtyard']],
+      chars: ['Dana', 'Eli', 'Faye', 'Gus'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true, s9_frozenCount: 2 },
+      seed: 77
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const { doctor, frozen, healings } = res.priv
+    expect(doctor).toBeTruthy()
+    expect(frozen).toHaveLength(2)
+    expect(frozen).not.toContain(doctor)
+
+    expect(healings.length).toBeGreaterThanOrEqual(frozen.length)
+    expect(healings.some(h => h.time > 1)).toBe(true)
+    expect(healings.some(h => h.time < cfg.T)).toBe(true)
+    expect(healings.some(h => h.time > 1 && h.time < cfg.T)).toBe(true)
+
+    const earliestHeal = new Map()
+    for (const entry of healings) {
+      if (!earliestHeal.has(entry.patient) || earliestHeal.get(entry.patient) > entry.time) {
+        earliestHeal.set(entry.patient, entry.time)
+      }
+    }
+
+    for (const frozenChar of frozen) {
+      expect(earliestHeal.has(frozenChar)).toBe(true)
+
+      const healTime = earliestHeal.get(frozenChar)
+      const timeline = res.schedule[frozenChar]
+
+      for (let t = 0; t < healTime - 1; t++) {
+        expect(timeline[t + 1]).toBe(timeline[t])
+      }
+
+      let movedAfterHeal = false
+      for (let t = Math.max(healTime - 1, 0); t < cfg.T - 1; t++) {
+        if (timeline[t + 1] !== timeline[t]) {
+          movedAfterHeal = true
+          break
+        }
+      }
+      expect(movedAfterHeal).toBe(true)
+    }
+  })
+})
+
 describe('Edge Cases', () => {
   it('should handle minimum configuration', () => {
     const cfg = {
