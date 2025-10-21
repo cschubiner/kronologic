@@ -171,9 +171,9 @@ Players must deduce the secret scenario by combining:
    - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
    - This ensures the aggrosassin is actively hunting throughout the timeline
 
-3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
-   - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
-   - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
+3. **Dominant 1-on-1 trail**: Other characters are allowed to have private meetings, but the aggrosassin stands out by volume
+   - Count every timestep where exactly two people share a room; the aggrosassin must appear in **at least twice as many** of those meetings as any other pair of non-aggrosassin characters
+   - Non-aggrosassin characters may still be alone together occasionally, creating red herrings, but none of them approach the aggrosassin's meeting count
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
