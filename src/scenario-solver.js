@@ -633,111 +633,99 @@ export function buildCNF(config){
       throw new Error('S7 requires at least as many potential victims as required kills');
     }
 
+    const maxOtherMeetings = Math.floor((T - 1) / 2);
+    const aggMinMeetings = Math.max(requiredKills, 2 * maxOtherMeetings);
+
     AGG = C.map((_,ci)=> vp.get(`AGG_${C[ci]}`));
     clauses.push(...exactlyOne(AGG));
 
-    const killTimeVars = Array.from({length:C.length}, ()=>Array(T).fill(null));
-    const killVictimVars = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>Array(T).fill(null)));
+    const pairExact = Array.from({length:C.length}, () => Array.from({length:C.length}, () => Array(T).fill(null)));
+    const meetingVars = Array.from({length:C.length}, () => Array(T).fill(null));
 
     for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const kt = vp.get(`AGGKillTime_${C[ci]}_${t}`);
-        killTimeVars[ci][t] = kt;
-        clauses.push([-kt, AGG[ci]]);
-      }
-
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        const victimsAtTimes = [];
+      for (let cj=ci+1; cj<C.length; cj++){
         for (let t=0; t<T; t++){
-          const kv = vp.get(`AGGKillVictim_${C[ci]}_${C[vj]}_${t}`);
-          killVictimVars[ci][vj][t] = kv;
-          victimsAtTimes.push(kv);
-          clauses.push([-kv, AGG[ci]]);
-          clauses.push([-kv, killTimeVars[ci][t]]);
-        }
-      }
-    }
+          const pairVar = vp.get(`PairExact_${C[ci]}_${C[cj]}_${t}`);
+          pairExact[ci][cj][t] = pairVar;
+          pairExact[cj][ci][t] = pairVar;
 
-    for (let ci=0; ci<C.length; ci++){
-      for (let t=0; t<T; t++){
-        const choices = [];
-        for (let vj=0; vj<C.length; vj++){
-          if (ci === vj) continue;
-          const kv = killVictimVars[ci][vj][t];
-          if (kv) choices.push(kv);
-        }
-        if (choices.length){
-          clauses.push([-killTimeVars[ci][t], ...choices]);
-        } else {
-          clauses.push([-killTimeVars[ci][t]]);
-        }
-      }
-    }
-
-    for (let ci=0; ci<C.length; ci++){
-      for (let vj=0; vj<C.length; vj++){
-        if (ci === vj) continue;
-        for (let t=0; t<T; t++){
-          const kv = killVictimVars[ci][vj][t];
-          if (!kv) continue;
           const detailVars = [];
           for (let ri=0; ri<R.length; ri++){
-            const detail = vp.get(`AGGKillDetail_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+            const detail = vp.get(`PairDetail_${C[ci]}_${C[cj]}_${t}_${R[ri]}`);
             detailVars.push(detail);
-            clauses.push([-detail, AGG[ci]]);
-            clauses.push([-detail, kv]);
             clauses.push([-detail, X(ci,t,ri)]);
-            clauses.push([-detail, X(vj,t,ri)]);
+            clauses.push([-detail, X(cj,t,ri)]);
             for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === vj) continue;
+              if (ck === ci || ck === cj) continue;
               clauses.push([-detail, -X(ck,t,ri)]);
             }
 
-            const reverse = [ -AGG[ci], -X(ci,t,ri), -X(vj,t,ri) ];
+            const reverse = [ -X(ci,t,ri), -X(cj,t,ri) ];
             for (let ck=0; ck<C.length; ck++){
-              if (ck === ci || ck === vj) continue;
+              if (ck === ci || ck === cj) continue;
               reverse.push( X(ck,t,ri) );
             }
             reverse.push(detail);
             clauses.push(reverse);
           }
-          if (detailVars.length){
-            clauses.push([-kv, ...detailVars]);
-          } else {
-            clauses.push([-kv]);
-          }
-        }
-      }
-    }
 
-    for (let ak=0; ak<C.length; ak++){
-      for (let ci=0; ci<C.length; ci++){
-        if (ci === ak) continue;
-        for (let cj=ci+1; cj<C.length; cj++){
-          if (cj === ak) continue;
-          for (let t=0; t<T; t++){
-            for (let ri=0; ri<R.length; ri++){
-              const clause = [ -AGG[ak], -X(ci,t,ri), -X(cj,t,ri), X(ak,t,ri) ];
-              for (let ck=0; ck<C.length; ck++){
-                if (ck === ak || ck === ci || ck === cj) continue;
-                clause.push( X(ck,t,ri) );
-              }
-              clauses.push(clause);
+          if (detailVars.length){
+            clauses.push([-pairVar, ...detailVars]);
+            for (const dv of detailVars){
+              clauses.push([-dv, pairVar]);
             }
+          } else {
+            clauses.push([-pairVar]);
           }
         }
       }
     }
 
     for (let ci=0; ci<C.length; ci++){
-      const killTimes = killTimeVars[ci];
-      if (requiredKills > killTimes.length){
+      for (let t=0; t<T; t++){
+        const meetVar = vp.get(`PairMeeting_${C[ci]}_${t}`);
+        meetingVars[ci][t] = meetVar;
+        const options = [];
+        for (let cj=0; cj<C.length; cj++){
+          if (ci === cj) continue;
+          const pv = pairExact[ci][cj][t];
+          if (pv) options.push(pv);
+        }
+        if (options.length){
+          clauses.push([-meetVar, ...options]);
+          for (const opt of options){
+            clauses.push([-opt, meetVar]);
+          }
+        } else {
+          clauses.push([-meetVar]);
+        }
+      }
+    }
+
+    for (let ci=0; ci<C.length; ci++){
+      const combos = atLeastK(meetingVars[ci], aggMinMeetings);
+      if (!combos.length){
         clauses.push([-AGG[ci]]);
-      } else if (requiredKills > 0) {
-        const combos = atLeastK(killTimes, requiredKills);
+      } else {
         for (const combo of combos){
           clauses.push([-AGG[ci], ...combo]);
+        }
+      }
+    }
+
+    const meetingTotals = meetingVars.map((vars, ci) => buildTotalizer(vars, vp, clauses, `AggMeetingTotal_${C[ci]}`));
+    if (maxOtherMeetings >= 0){
+      for (let ai=0; ai<C.length; ai++){
+        const aggTotals = meetingTotals[ai];
+        if (2 * maxOtherMeetings > aggTotals.length){
+          clauses.push([-AGG[ai]]);
+        }
+        for (let ci=0; ci<C.length; ci++){
+          if (ci === ai) continue;
+          const totals = meetingTotals[ci];
+          if (maxOtherMeetings < totals.length){
+            clauses.push([-AGG[ai], -totals[maxOtherMeetings]]);
+          }
         }
       }
     }
