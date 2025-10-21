@@ -19,68 +19,88 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
     }
   }
 
-  function unitProp(queue){
+  function assignLiteral(lit, trail){
+    const v = Math.abs(lit);
+    const val = lit>0 ? 1 : -1;
+    const current = assigns[v];
+    if (current !== 0){
+      return current === val;
+    }
+    assigns[v] = val;
+    trail.push(v);
+    return true;
+  }
+
+  function unitProp(queue, trail){
     while (queue.length){
       const lit = queue.pop();
+      if (!assignLiteral(lit, trail)) return false;
       const v = Math.abs(lit);
       const val = lit>0 ? 1 : -1;
-      if (assigns[v] !== 0){
-        if (assigns[v] !== val) return false; // conflict
-        continue;
-      }
-      assigns[v] = val;
-      // Satisfy clauses containing lit
-      const satList = val>0 ? occPos[v] : occNeg[v];
-      for (const ci of satList){ clauses[ci] = [0]; } // mark satisfied
-      // For clauses containing ~lit, remove ~lit
       const remList = val>0 ? occNeg[v] : occPos[v];
       for (const ci of remList){
-        if (clauses[ci].length===1 && clauses[ci][0]===0) continue;
-        // remove -lit
-        let arr = clauses[ci];
-        let idx = arr.indexOf(-lit);
-        if (idx>=0){ arr.splice(idx,1); }
-        if (arr.length===0) return false; // empty => conflict
-        if (arr.length===1){
-          const u = arr[0];
-          if (u!==0) queue.push(u);
+        const clause = clauses[ci];
+        let satisfied = false;
+        let unassigned = 0;
+        let lastUnassigned = 0;
+        for (const lit2 of clause){
+          const v2 = Math.abs(lit2);
+          const assign = assigns[v2];
+          if (assign === 1 && lit2 > 0){ satisfied = true; break; }
+          if (assign === -1 && lit2 < 0){ satisfied = true; break; }
+          if (assign === 0){
+            unassigned++;
+            lastUnassigned = lit2;
+          }
+        }
+        if (satisfied) continue;
+        if (unassigned === 0) return false;
+        if (unassigned === 1){
+          queue.push(lastUnassigned);
         }
       }
     }
     return true;
   }
 
-  function chooseVar(){
-    // Heuristic: pick variable from a random non-satisfied clause
-    const unsatClauses = [];
-    for (let i = 0; i < clauses.length; i++) {
-      const c = clauses[i];
-      if (c.length === 1 && c[0] === 0) continue; // satisfied
-      if (c.length > 0) {
-        unsatClauses.push(i);
-      }
-    }
-    
-    if (unsatClauses.length > 0) {
-      // Pick a random unsat clause
-      const clauseIdx = unsatClauses[Math.floor(rng() * unsatClauses.length)];
-      const clause = clauses[clauseIdx];
-      
-      // Pick a random unassigned literal from that clause
-      const unassigned = [];
-      for (const lit of clause) {
+  function chooseLiteral(){
+    const literalScores = new Map();
+    let found = false;
+    for (const clause of clauses){
+      let satisfied = false;
+      const unassignedLits = [];
+      for (const lit of clause){
         const v = Math.abs(lit);
-        if (assigns[v] === 0) unassigned.push(v);
+        const assign = assigns[v];
+        if ((assign === 1 && lit > 0) || (assign === -1 && lit < 0)){
+          satisfied = true;
+          break;
+        }
+        if (assign === 0){
+          unassignedLits.push(lit);
+        }
       }
-      
-      if (unassigned.length > 0) {
-        return unassigned[Math.floor(rng() * unassigned.length)];
+      if (satisfied || unassignedLits.length === 0) continue;
+      found = true;
+      const weight = Math.pow(2, -unassignedLits.length);
+      for (const lit of unassignedLits){
+        literalScores.set(lit, (literalScores.get(lit) || 0) + weight);
       }
     }
-    
-    // Fallback: pick first unassigned variable
-    for (let v = 1; v <= numVars; v++) {
-      if (assigns[v] === 0) return v;
+    if (found){
+      const eps = 1e-12;
+      let bestLit = 0;
+      let bestScore = -Infinity;
+      for (const [lit, score] of literalScores.entries()){
+        if (score > bestScore + eps || (Math.abs(score - bestScore) <= eps && rng() < 0.5)){
+          bestScore = score;
+          bestLit = lit;
+        }
+      }
+      if (bestLit !== 0) return bestLit;
+    }
+    for (let v=1; v<=numVars; v++){
+      if (assigns[v]===0) return v;
     }
     return 0;
   }
@@ -88,7 +108,8 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
   // initial unit clauses
   let initQ = [];
   for (const c of clauses){ if (c.length===1 && c[0]!==0) initQ.push(c[0]); }
-  if (!unitProp(initQ)) return null;
+  const trail = [];
+  if (!unitProp(initQ, trail)) return null;
 
   function dfs(){
     // Check timeout
@@ -98,25 +119,40 @@ export function satSolve(clauses, numVars, randSeed=0, timeoutMs=12000) {
 
     // check all satisfied?
     let allSat = true;
-    for (const c of clauses){
-      if (c.length===0) return false;
-      if (!(c.length===1 && c[0]===0)) { allSat=false; break; }
+    for (const clause of clauses){
+      let satisfied = false;
+      let unassigned = false;
+      for (const lit of clause){
+        const v = Math.abs(lit);
+        const assign = assigns[v];
+        if (assign === 0){ unassigned = true; continue; }
+        if ((assign === 1 && lit > 0) || (assign === -1 && lit < 0)){
+          satisfied = true;
+          break;
+        }
+      }
+      if (!satisfied){
+        if (!unassigned) return false;
+        allSat = false;
+      }
     }
     if (allSat) return true;
 
-    const v = chooseVar();
-    if (v===0) return true; // nothing left
-    // branch true, then false
-    for (const tryVal of [true,false]){
-      // clone state (clauses + assigns) cheaply via snapshots
-      const snapshotClauses = clauses.map(c=>c.slice());
-      const snapshotAssigns = assigns.slice();
-      if (unitProp([tryVal ? v : -v])){
+    const lit = chooseLiteral();
+    if (lit===0) return true; // nothing left
+    // branch with suggested literal first, then opposite
+    for (const tryLit of [lit, -lit]){
+      const trailSize = trail.length;
+      const v = Math.abs(tryLit);
+      if (assigns[v] !== 0 && assigns[v] !== (tryLit>0?1:-1)) continue;
+      const stack = [tryLit];
+      if (unitProp(stack, trail)){
         if (dfs()) return true;
       }
-      // restore
-      clauses = snapshotClauses;
-      assigns = snapshotAssigns;
+      while (trail.length > trailSize){
+        const reverted = trail.pop();
+        assigns[reverted] = 0;
+      }
     }
     return false;
   }
@@ -715,13 +751,36 @@ export function buildCNF(config){
     if (T < 2) throw new Error('S8 requires at least two timesteps');
     if (C.length < 2) throw new Error('S8 requires at least two characters');
 
+    // Randomly choose which character is the freeze based on seed
+    const rng = mulberry32(config.seed || 0);
+    const freezeIdx = Math.floor(rng() * C.length);
+
     FRZ = C.map((_,ci)=> vp.get(`FRZ_${C[ci]}`));
     clauses.push(...exactlyOne(FRZ));
+    
+    // Force the randomly chosen character to be the freeze
+    clauses.push([FRZ[freezeIdx]]);
 
     const freezeDetailByVictim = Array.from({length:C.length}, ()=>
       Array.from({length:T}, ()=>Array.from({length:R.length}, ()=>[]))
     );
-    const freezeKillsBeforeFinal = Array.from({length:C.length}, ()=>[]);
+
+    // Randomize freeze constraints based on seed (reuse RNG from freeze selection)
+    // Randomly choose number of required kills (1-3)
+    const numRequiredKills = Math.floor(rng() * 3) + 1; // 1, 2, or 3
+    
+    // Randomly choose which timesteps must have kills (excluding final timestep)
+    const availableTimesteps = Array.from({length: T-1}, (_, i) => i);
+    const requiredKillTimesteps = [];
+    for (let i = 0; i < Math.min(numRequiredKills, availableTimesteps.length); i++) {
+      const idx = Math.floor(rng() * availableTimesteps.length);
+      requiredKillTimesteps.push(availableTimesteps[idx]);
+      availableTimesteps.splice(idx, 1);
+    }
+
+    const freezeKillsByTimestep = Array.from({length:C.length}, ()=>
+      Array.from({length:T}, ()=>[])
+    );
 
     for (let ci=0; ci<C.length; ci++){
       for (let vj=0; vj<C.length; vj++){
@@ -730,9 +789,7 @@ export function buildCNF(config){
           for (let ri=0; ri<R.length; ri++){
             const detail = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
             freezeDetailByVictim[vj][t][ri].push(detail);
-            if (t < T-1){
-              freezeKillsBeforeFinal[ci].push(detail);
-            }
+            freezeKillsByTimestep[ci][t].push(detail);
 
             clauses.push([-detail, FRZ[ci]]);
             clauses.push([-detail, X(ci,t,ri)]);
@@ -758,11 +815,15 @@ export function buildCNF(config){
       }
     }
 
+    // Require kills at the randomly chosen timesteps
     for (let ci=0; ci<C.length; ci++){
-      if (freezeKillsBeforeFinal[ci].length === 0){
-        throw new Error('S8 requires a kill opportunity before the final timestep');
+      for (const t of requiredKillTimesteps) {
+        const killsAtTime = freezeKillsByTimestep[ci][t];
+        if (killsAtTime.length === 0){
+          throw new Error(`S8 requires a kill opportunity at timestep ${t+1}`);
+        }
+        clauses.push([-FRZ[ci], ...killsAtTime]);
       }
-      clauses.push([-FRZ[ci], ...freezeKillsBeforeFinal[ci]]);
     }
 
     if (config.mustMove){

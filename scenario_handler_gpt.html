@@ -513,7 +513,7 @@ function scoreAggrosassin(res, cfg) {
 
 function scoreFreeze(res, cfg) {
   // Higher score = harder puzzle
-  // Measure: Fewer freeze victims, timing of freezes, and red herring 1:1 meetings
+  // Measure: More freeze victims and red herring 1:1 meetings
   const freeze = res.priv.freeze;
   if (!freeze) return 0;
 
@@ -521,13 +521,7 @@ function scoreFreeze(res, cfg) {
   const T = cfg.T;
   const chars = cfg.chars;
 
-  let score = Math.max(0, 40 - kills.length * 2);
-
-  // Late freezes are harder to detect (fewer timesteps to observe immobility)
-  for (const kill of kills) {
-    const lateness = kill.time / T; // 0.0 to 1.0
-    score += lateness * 15; // Up to +15 for very late freezes
-  }
+  let score = kills.length * 100;
 
   let redHerrings = 0;
   for (let t = 0; t < T; t++) {
@@ -717,9 +711,11 @@ qs("genBtn").addEventListener("click", async ()=>{
     // Multi-generation with scoring
     const solutions = [];
     let skipped = 0;
+    const seedInput = qs("seed").value.trim();
+    const baseSeed = seedInput === "" ? Math.floor(Math.random() * 10000000) + 1 : Number(seedInput) || 0;
     
     for (let i = 0; i < sampleCount; i++) {
-      cfg.seed = i;
+      cfg.seed = baseSeed + i;
       try {
         const res = solveAndDecode(cfg);
         if (res) {

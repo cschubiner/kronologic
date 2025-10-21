@@ -200,20 +200,25 @@ Players must deduce the secret scenario by combining:
 **Mystery**: Mr. Freeze is on the loose. Anyone they catch alone is frozen in place for the rest of the timeline.
 
 **Rules**:
-- Exactly one character is the Freeze
+- Exactly one character is the Freeze (randomly chosen from all characters)
 - Whenever the Freeze shares a room with exactly **one** other person, that person is frozen
 - Frozen characters remain in that room for all remaining timesteps (even if `mustMove=true`)
-- The Freeze must freeze at least one victim before the final timestep (players need a visible clue)
+- **Randomized kill constraints**: The scenario randomly requires:
+  - Between 1-3 kills to occur
+  - Specific timesteps where kills must happen (excluding the final timestep)
+  - This creates variety - some scenarios have early kills, others have kills spread throughout
 - Frozen victims can be visited later, but they never move again
 
 **Goal**: Identify Mr. Freeze and list every frozen victim (with their freeze moments).
 
 **Difficulty Factors**:
-- More frozen victims make the answer clearer (easier mystery)
+- More frozen victims make the pattern more obvious (easier to identify)
 - 1-on-1 meetings between non-Freeze characters act as red herrings and increase difficulty
-- Late freeze events give fewer turns to notice immobilised victims, raising difficulty
+- The randomized kill timing creates unpredictable patterns across different scenarios
 
-**Scoring**: Difficulty starts at 40, decreases by 10 for each frozen victim, and increases by 5 for every 1-on-1 meeting that does **not** include the Freeze.
+**Scoring**: Difficulty = (number of victims × 100) + (non-Freeze 1-on-1 meetings × 5)
+- More victims significantly increase difficulty (heavily weighted)
+- Red herring 1-on-1 meetings between non-Freeze characters add moderate difficulty
 
 ---
 
@@ -259,68 +264,6 @@ Enable one or more scenarios:
 **Samples**: How many scenarios to generate (10-5000)
 - More samples = better percentile accuracy
 - Recommended: 100-500 for good results
-
-### How Difficulty Scoring Works
-
-The generator creates many valid scenarios and scores them based on "red herrings" - patterns that look suspicious but aren't the actual solution. Higher scores = harder puzzles.
-
-#### S1: Poison Scoring
-**What makes it harder**: Other character pairs being alone together at various times
-
-- **+60 points** for each pair of characters (not assassin-victim) who are alone together at any time/room
-- The more "suspicious pairs" exist, the harder it is to identify the actual poisoning
-
-**Example**: If characters B and C are alone in the Library at t=2, and D and E are alone in the Kitchen at t=4, that's +120 difficulty (2 red herring pairs).
-
-#### S2: Phantom Scoring
-**What makes it harder**: Characters who are alone frequently (but not always)
-
-- **+100 points** per character who is alone T-1 or T-2 times (weighted by proportion)
-- **+50 points** per character who is alone ≥50% of the time (weighted by proportion)
-- Characters who are "almost phantoms" make it much harder to identify the true phantom
-
-**Example**: With T=6 timesteps, if character B is alone 5 times (but not all 6), that's a strong red herring worth ~83 points.
-
-#### S4: Bomb Duo Scoring
-**What makes it harder**: Bombers being camouflaged in larger groups, and "near miss" groups of 3
-
-- **+40 points** each time the bombers are together in a room WITH other people (not alone)
-  - This camouflages them since they're not obviously the "only pair"
-- **+30 points** for each group of exactly 3 people at any time/room
-  - Groups of 3 are "near misses" - one person away from being a suspicious pair
-  - Creates confusion about what counts as a "pair"
-
-**Example**: If bombers meet in the Library with 2 other people at t=2 and t=4, that's +80. If there are 4 groups of 3 people throughout the timeline, that's +120 more, for +200 total difficulty.
-
-#### S5: Lovers Scoring
-**What makes it harder**: Character pairs who rarely meet
-
-- **+100 points** for pairs who never meet (0 meetings)
-- **+80 points** for pairs who meet exactly once
-- **+40 points** for pairs who meet 2 times
-- Pairs that avoid each other create confusion about who the actual lovers are
-
-**Example**: With T=6, if characters A and B never meet, C and D meet once, and E and F meet twice, that's +220 difficulty from red herrings.
-
-#### S7: Aggrosassin Scoring
-**What makes it harder**: More victims and more pair meetings in general
-
-- **+10 points per victim** (character who was alone with aggrosassin)
-  - More victims = more characters to track and more complex patterns
-  - Heavily weighted to emphasize kill count as primary difficulty factor
-- **+1 point per instance** of exactly 2 people in a room (any pair, including aggrosassin)
-  - Creates noise in the data - harder to identify which pairs are significant
-  - Every "alone together" moment adds to the confusion
-
-**Example**: If the aggrosassin kills 3 victims (30 points) and there are 12 total instances of pairs being alone throughout the timeline (12 points), that's 42 difficulty total.
-
-#### Combined Scoring
-When multiple scenarios are enabled, scores are added together. The percentile selection then picks from the sorted list:
-- **0th percentile**: Minimum score (easiest)
-- **50th percentile**: Median score
-- **100th percentile**: Maximum score (hardest)
-
-Higher percentiles select scenarios with more confusing patterns.
 
 ## Technical Details
 
