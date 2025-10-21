@@ -742,6 +742,53 @@ describe("S3: Singer's Jewels Scenario", () => {
     );
     expect(visited).toBe(true);
   });
+
+  it("should visit the first room across multiple seeds", () => {
+    const cfg = {
+      rooms: ["Gallery", "Office", "Courtyard"],
+      edges: [
+        ["Gallery", "Office"],
+        ["Office", "Courtyard"],
+      ],
+      chars: ["Singer", "Guard", "Guest"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5020,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const firstRoom = cfg.rooms[0];
+      const visited = cfg.chars.some((char) =>
+        res.schedule[char].includes(firstRoom),
+      );
+      expect(visited).toBe(true);
+    });
+  });
+
+  it("should record visit counts for the first room", () => {
+    const cfg = {
+      rooms: ["Ballroom", "Balcony"],
+      edges: [["Ballroom", "Balcony"]],
+      chars: ["A", "B", "C"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5030,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    const firstRoom = cfg.rooms[0];
+    const totalVisits = cfg.chars.reduce(
+      (sum, char) => sum + (res.visits[char]?.[firstRoom] || 0),
+      0,
+    );
+    expect(totalVisits).toBeGreaterThan(0);
+  });
 });
 
 describe("S4: Bomb Duo Scenario", () => {
@@ -2714,6 +2761,64 @@ describe("S9: Doctor freeze scenario", () => {
         for (let t = 0; t < healIdx; t++) {
           expect(res.schedule[char][t]).toBe(res.schedule[char][t + 1]);
         }
+      }
+    });
+  });
+
+  it("heals only frozen characters", () => {
+    const cfg = {
+      rooms: ["Atrium", "Lab", "Ward", "Garden"],
+      edges: [
+        ["Atrium", "Lab"],
+        ["Lab", "Ward"],
+        ["Ward", "Garden"],
+      ],
+      chars: ["A", "B", "C", "D", "E"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 570,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      expect(res.priv.frozen).toBeTruthy();
+      expect(res.priv.heals).toBeTruthy();
+      const frozenSet = new Set(res.priv.frozen || []);
+      const healSet = new Set();
+
+      for (const heal of res.priv.heals || []) {
+        healSet.add(heal.character);
+        expect(frozenSet.has(heal.character)).toBe(true);
+        expect(heal.character).not.toBe(res.priv.doctor);
+      }
+
+      expect(healSet.size).toBeGreaterThan(0);
+    });
+  });
+
+  it("heals every frozen character at least once", () => {
+    const cfg = {
+      rooms: ["Hall", "Clinic", "Garden"],
+      edges: [
+        ["Hall", "Clinic"],
+        ["Clinic", "Garden"],
+      ],
+      chars: ["J", "K", "L", "M"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 580,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const frozenSet = new Set(res.priv.frozen || []);
+      expect(frozenSet.size).toBeGreaterThan(0);
+
+      const healedSet = new Set((res.priv.heals || []).map((h) => h.character));
+      for (const frozen of frozenSet) {
+        expect(healedSet.has(frozen)).toBe(true);
       }
     });
   });
