@@ -2192,6 +2192,68 @@ describe('S8: Freeze Scenario', () => {
   })
 })
 
+describe('S9: Doctor Freeze Scenario', () => {
+  const baseCfg = {
+    rooms: ['Infirmary', 'Hall', 'Lab', 'Garden'],
+    edges: [
+      ['Infirmary', 'Hall'],
+      ['Hall', 'Lab'],
+      ['Lab', 'Garden'],
+      ['Garden', 'Infirmary']
+    ],
+    chars: ['Alice', 'Bob', 'Charlie', 'Dana'],
+    T: 5,
+    mustMove: false,
+    allowStay: true,
+    scenarios: { s9: true },
+    seed: 7
+  }
+
+  it('delays frozen characters until the doctor heals them', () => {
+    testWithThreshold(baseCfg, (res, cfg) => {
+      const { doctor, frozen, healings } = res.priv
+      expect(doctor).toBeTruthy()
+      expect(frozen.length).toBeGreaterThan(0)
+      expect(healings.length).toBe(frozen.length)
+      expect(frozen).not.toContain(doctor)
+
+      for (const patient of frozen) {
+        const heal = healings.find(h => h.patient === patient)
+        expect(heal).toBeTruthy()
+        expect(heal.time).toBeGreaterThan(1)
+        expect(heal.time).toBeLessThan(cfg.T)
+
+        const healIndex = heal.time - 1
+        expect(res.schedule[patient][healIndex]).toBe(res.schedule[doctor][healIndex])
+
+        for (let t = 0; t < healIndex; t++) {
+          expect(res.schedule[patient][t]).toBe(res.schedule[patient][t + 1])
+        }
+
+        let movedAfter = false
+        for (let t = healIndex; t < cfg.T - 1; t++) {
+          if (res.schedule[patient][t] !== res.schedule[patient][t + 1]) {
+            movedAfter = true
+            break
+          }
+        }
+        expect(movedAfter).toBe(true)
+      }
+    })
+  })
+
+  it('keeps healing actions away from the first and final steps', () => {
+    testWithThreshold(baseCfg, (res, cfg) => {
+      const { healings } = res.priv
+      expect(healings.length).toBeGreaterThan(0)
+      for (const heal of healings) {
+        expect(heal.time).toBeGreaterThan(1)
+        expect(heal.time).toBeLessThan(cfg.T)
+      }
+    })
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it('should have phantom separate from two lovers who never meet', () => {
     const cfg = {
