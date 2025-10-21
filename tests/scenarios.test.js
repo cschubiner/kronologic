@@ -2266,6 +2266,70 @@ describe('S8: Freeze Scenario', () => {
   })
 })
 
+describe('S9: Doctor Scenario', () => {
+  it('should freeze characters until a mid-game heal frees them to move', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Ward', 'Lab'],
+      edges: [
+        ['Atrium', 'Ward'],
+        ['Ward', 'Lab'],
+        ['Lab', 'Atrium']
+      ],
+      chars: ['Dana', 'Eli', 'Fran', 'Gus'],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: { frozenCount: 2 } },
+      seed: 37
+    }
+
+    const res = solveAndDecode(cfg)
+    expect(res).not.toBeNull()
+
+    const { schedule, priv } = res
+    expect(priv.doctor).toBeTruthy()
+
+    const frozenChars = priv.frozen || []
+    expect(frozenChars).toHaveLength(2)
+    expect(frozenChars).not.toContain(priv.doctor)
+
+    const healLog = priv.heals || []
+    expect(healLog.length).toBeGreaterThan(0)
+    expect(healLog.some(h => h.time > 1 && h.time < cfg.T)).toBe(true)
+
+    for (const frozen of frozenChars) {
+      expect(schedule[frozen][0]).toBe(schedule[frozen][1])
+      const movedLater = schedule[frozen].slice(1).some(room => room !== schedule[frozen][0])
+      expect(movedLater).toBe(true)
+
+      const healsForChar = healLog.filter(h => h.target === frozen)
+      expect(healsForChar.length).toBeGreaterThan(0)
+
+      for (const heal of healsForChar) {
+        expect(heal.doctor).toBe(priv.doctor)
+        const tIndex = heal.time - 1
+        expect(schedule[frozen][tIndex]).toBe(heal.room)
+        expect(schedule[priv.doctor][tIndex]).toBe(heal.room)
+      }
+    }
+  })
+
+  it('should require at least three timesteps', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Ward'],
+      edges: [['Atrium', 'Ward']],
+      chars: ['Dana', 'Eli', 'Fran'],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: { frozenCount: 1 } },
+      seed: 12
+    }
+
+    expect(() => solveAndDecode(cfg)).toThrow(/at least three timesteps/)
+  })
+})
+
 describe('S6 Verification Tests', () => {
   it.skip('should verify phantom is separate from lovers', () => {
     // Test with multiple seeds
