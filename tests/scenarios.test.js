@@ -2345,10 +2345,60 @@ describe('S9: Doctor freeze scenario', () => {
         res.schedule[ch][0] !== res.schedule[ch][cfg.T - 1]
       )
       expect(movedFrozen.length).toBeGreaterThan(0)
+    })
+  })
 
-      const showcase = movedFrozen[0]
-      expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1])
-      expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
+  it('forces healed characters to leave the heal room immediately', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward', 'Garden'],
+      edges: [
+        ['Atrium', 'Lab'], ['Lab', 'Ward'],
+        ['Ward', 'Garden'], ['Garden', 'Atrium']
+      ],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 800
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.heals?.length ?? 0).toBeGreaterThan(0)
+
+      for (const heal of res.priv.heals) {
+        if (heal.time >= cfg.T) continue
+        const nextRoom = res.schedule[heal.character][heal.time]
+        expect(nextRoom).not.toBe(heal.room)
+      }
+    })
+  })
+
+  it('only heals characters who were actually frozen', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Lab', 'Ward'],
+      edges: [['Atrium', 'Lab'], ['Lab', 'Ward']],
+      chars: ['Dana', 'Eli', 'Farah', 'Gus'],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: true },
+      seed: 900
+    }
+
+    testWithThreshold(cfg, (res) => {
+      expect(res.priv.frozen?.length ?? 0).toBeGreaterThan(0)
+      const frozenSet = new Set(res.priv.frozen)
+      const healedSet = new Set()
+
+      for (const heal of res.priv.heals ?? []) {
+        expect(frozenSet.has(heal.character)).toBe(true)
+        healedSet.add(heal.character)
+      }
+
+      for (const frozen of frozenSet) {
+        expect(healedSet.has(frozen)).toBe(true)
+      }
     })
   })
 })

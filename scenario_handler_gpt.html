@@ -128,6 +128,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (identify Mr. Freeze and the frozen victims)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s9" value="s9" /> S9: Doctor's Rounds (doctor heals every frozen friend, who must bolt after thawing)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -780,6 +783,13 @@ qs("genBtn").addEventListener("click", async ()=>{
         }
       }
       pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+    }
+    if (res.priv.doctor) {
+      const frozenList = res.priv.frozen?.length ? res.priv.frozen.join(', ') : 'none';
+      const healRecords = res.priv.heals?.length
+        ? res.priv.heals.map(h => `${h.character} @ t=${h.time} (${h.room})`).join('; ')
+        : 'no heals recorded';
+      pf.push(`<div>Doctor: <b>${res.priv.doctor}</b> — frozen: ${frozenList}; heals: ${healRecords}</div>`);
     }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");
