@@ -1628,7 +1628,7 @@ describe('S7: Aggrosassin Scenario', () => {
     })
   })
 
-  it('should have aggrosassin alone with people more often than other pairs', () => {
+  it('should have aggrosassin alone with people far more often than anyone else', () => {
     const cfg = {
       rooms: ['A', 'B', 'C', 'D'],
       edges: [['A', 'B'], ['B', 'C'], ['C', 'D']],
@@ -1661,44 +1661,29 @@ describe('S7: Aggrosassin Scenario', () => {
       const minKills = Math.ceil(cfg.T / 2)
       expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
-      // Count how many times aggrosassin is alone with someone (total instances)
-      let aggAloneCount = 0
+      // Count one-on-one meetings for each character
+      const soloCounts = new Map()
+      for (const char of cfg.chars) soloCounts.set(char, 0)
+
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
-          if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
-            aggAloneCount++
-          }
-        }
-      }
-
-      // Count max times any other pair is alone together
-      let maxOtherPairCount = 0
-      for (let i = 0; i < cfg.chars.length; i++) {
-        for (let j = i + 1; j < cfg.chars.length; j++) {
-          const char1 = cfg.chars[i]
-          const char2 = cfg.chars[j]
-          
-          // Skip if either is the aggrosassin
-          if (char1 === agg || char2 === agg) continue
-
-          let pairCount = 0
-          for (let t = 0; t < cfg.T; t++) {
-            for (const room of cfg.rooms) {
-              const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
-              if (charsInRoom.length === 2 && 
-                  charsInRoom.includes(char1) && 
-                  charsInRoom.includes(char2)) {
-                pairCount++
-              }
+          if (charsInRoom.length === 2) {
+            for (const char of charsInRoom) {
+              soloCounts.set(char, soloCounts.get(char) + 1)
             }
           }
-          maxOtherPairCount = Math.max(maxOtherPairCount, pairCount)
         }
       }
 
-      // Aggrosassin should be alone at least twice as often as any other pair
-      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+      const aggAloneCount = soloCounts.get(agg)
+      const otherCounts = cfg.chars
+        .filter(char => char !== agg)
+        .map(char => soloCounts.get(char))
+      const maxOtherCount = otherCounts.length ? Math.max(...otherCounts) : 0
+
+      // Aggrosassin should have at least twice as many 1-on-1 meetings as anyone else
+      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherCount * 2)
     })
   })
 
@@ -1807,24 +1792,27 @@ describe('S7: Aggrosassin Scenario', () => {
       expect(killTimesteps).toBeGreaterThanOrEqual(minKills)
 
       // Aggrosassin constraint still holds
-      let aggAloneCount = 0
-      let maxOtherPairCount = 0
+      const soloCounts = new Map()
+      for (const char of cfg.chars) soloCounts.set(char, 0)
 
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
           if (charsInRoom.length === 2) {
-            if (charsInRoom.includes(agg)) {
-              aggAloneCount++
-            } else {
-              // Count this as a non-agg pair instance
-              maxOtherPairCount = Math.max(maxOtherPairCount, 1)
+            for (const char of charsInRoom) {
+              soloCounts.set(char, soloCounts.get(char) + 1)
             }
           }
         }
       }
 
-      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherPairCount * 2)
+      const aggAloneCount = soloCounts.get(agg)
+      const maxOtherCount = Math.max(
+        0,
+        ...cfg.chars.filter(char => char !== agg).map(char => soloCounts.get(char))
+      )
+
+      expect(aggAloneCount).toBeGreaterThanOrEqual(maxOtherCount * 2)
     })
   })
 
