@@ -31,7 +31,7 @@ jobs:
         run: bun install
 
       - name: Run tests
-        run: bun test --shard=${{ matrix.shard }}/${{ env.SHARD_TOTAL }}
+        run: bunx vitest run --shard ${{ matrix.shard }}/${{ env.SHARD_TOTAL }}
 
       - name: Upload test results
         if: always()
