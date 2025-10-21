@@ -717,9 +717,10 @@ qs("genBtn").addEventListener("click", async ()=>{
     // Multi-generation with scoring
     const solutions = [];
     let skipped = 0;
+    const baseSeed = Number(qs("seed").value) || 0;
     
     for (let i = 0; i < sampleCount; i++) {
-      cfg.seed = i;
+      cfg.seed = baseSeed + i;
       try {
         const res = solveAndDecode(cfg);
         if (res) {
