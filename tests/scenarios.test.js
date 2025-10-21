@@ -1092,6 +1092,46 @@ describe('S4: Bomb Duo Scenario', () => {
 
 })
 
+describe('Scenario combinations', () => {
+  it('should solve when S1 and S4 run together', () => {
+    const cfg = {
+      rooms: ['Hall', 'Kitchen', 'Library'],
+      edges: [
+        ['Hall', 'Kitchen'],
+        ['Kitchen', 'Library'],
+        ['Library', 'Hall']
+      ],
+      chars: ['Assassin', 'Watcher', 'Guard', 'Scout'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s1: true, s4: true },
+      seed: 910
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const { assassin, victim, poison_room: poisonRoom, poison_time: poisonTime, bomb_duo: bombDuo } = res.priv
+
+      expect(assassin).toBe('Assassin')
+      expect(new Set(bombDuo)).toEqual(new Set([assassin, victim]))
+
+      const poisonIndex = poisonTime - 1
+      const occupants = cfg.chars.filter(c => res.schedule[c][poisonIndex] === poisonRoom)
+      expect(occupants.sort()).toEqual([assassin, victim].sort())
+
+      const bombersSorted = [...bombDuo].sort()
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2) {
+            expect(charsInRoom.sort()).toEqual(bombersSorted)
+          }
+        }
+      }
+    }, 0.5)
+  })
+})
+
 describe('S5: Lovers Scenario', () => {
   it('should have non-lovers share rooms with others', () => {
     const cfg = {
