@@ -573,14 +573,15 @@ export function buildCNF(config){
           for (let cj=ci+1; cj<C.length; cj++){
             if (cj === assassinIdx) continue;
 
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
+            // Tracks the unique S1 triple (assassin plus exactly ci/cj) at this time/room.
+            const s1Triple = vp.get(`s1Triple_${t}_${ri}_${ci}_${cj}`);
 
-            clauses.push([-exactlyTwo, X(assassinIdx, t, ri)]);
-            clauses.push([-exactlyTwo, X(ci, t, ri)]);
-            clauses.push([-exactlyTwo, X(cj, t, ri)]);
+            clauses.push([-s1Triple, X(assassinIdx, t, ri)]);
+            clauses.push([-s1Triple, X(ci, t, ri)]);
+            clauses.push([-s1Triple, X(cj, t, ri)]);
             for (let ck=0; ck<C.length; ck++){
               if (ck === assassinIdx || ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck, t, ri)]);
+              clauses.push([-s1Triple, -X(ck, t, ri)]);
             }
 
             const others = [];
@@ -588,9 +589,9 @@ export function buildCNF(config){
               if (ck === assassinIdx || ck === ci || ck === cj) continue;
               others.push(X(ck, t, ri));
             }
-            clauses.push([exactlyTwo, -X(assassinIdx, t, ri), -X(ci, t, ri), -X(cj, t, ri), ...others]);
+            clauses.push([s1Triple, -X(assassinIdx, t, ri), -X(ci, t, ri), -X(cj, t, ri), ...others]);
 
-            clauses.push([-exactlyTwo, isPoisonMoment]);
+            clauses.push([-s1Triple, isPoisonMoment]);
           }
         }
 
