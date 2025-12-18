@@ -81,7 +81,7 @@ Players must deduce the secret scenario by combining:
 
 **Goal**: Identify which character is the phantom.
 
-**Difficulty Factors**: Characters who are alone frequently (but not at every timestep) are harder to distinguish from the true phantom. The more timesteps a non-phantom spends alone, the harder the puzzle.
+**Difficulty Factors**: Characters who are alone frequently (but not at every timestep) are harder to distinguish from the true phantom. The more timesteps a non-phantom spends alone, the harder the puzzle. Difficulty scoring adds 100 × (alone proportion) for non-phantoms who are alone in at least T−2 timesteps, and 50 × (alone proportion) for anyone alone at least half the time.
 
 ---
 
@@ -114,7 +114,7 @@ Players must deduce the secret scenario by combining:
 
 **Goal**: Identify the two bombers.
 
-**Difficulty Factors**: The constraint is very restrictive. Bombers being in larger groups (camouflage) and groups of exactly 3 people (near-misses) increase difficulty.
+**Difficulty Factors**: The constraint is very restrictive. Bombers being in larger groups (camouflage) and groups of exactly 3 people (near-misses) increase difficulty. Difficulty scoring adds 40 points each time both bombers share a room with extra people and 30 points for every room-time with exactly three occupants.
 
 ---
 
@@ -133,7 +133,7 @@ Players must deduce the secret scenario by combining:
 
 **Goal**: Identify the two lovers.
 
-**Difficulty Factors**: Other character pairs who rarely meet (but do meet at least once) create confusion about who the actual lovers are. Pairs that meet exactly once are strong red herrings.
+**Difficulty Factors**: Other character pairs who rarely meet (but do meet at least once) create confusion about who the actual lovers are. Pairs that meet exactly once are strong red herrings. Difficulty scoring adds 100 points to pairs that never meet, 80 points to pairs that meet exactly once, and 40 points to pairs that meet only twice.
 
 ---
 
