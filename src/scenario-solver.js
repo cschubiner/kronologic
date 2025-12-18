@@ -403,6 +403,21 @@ export function buildCNF(config){
     clauses.push(firstRoomVar);
   }
 
+  // S10: Contagion — alphabetically first room infects entrants
+  if (config.scenarios.s10){
+    if (!R.length) throw new Error('S10 requires at least one room');
+    const contagiousRoom = [...R].sort((a,b)=>a.localeCompare(b))[0];
+    const contagiousIdx = Ridx.get(contagiousRoom);
+    const visitContagious = [];
+    for (let ci=0; ci<C.length; ci++){
+      for (let t=0; t<T; t++){
+        visitContagious.push(X(ci,t,contagiousIdx));
+      }
+    }
+    clauses.push(visitContagious);
+    privKeys.S10 = contagiousRoom;
+  }
+
   // S2: Phantom alone at every time
   let PH = null;
   if (config.scenarios.s2){
@@ -1122,6 +1137,43 @@ export function solveAndDecode(cfg){
     let a1=null, a2=null;
     for (let ci=0; ci<C.length; ci++){ if (val(`A1_${C[ci]}`)) a1=C[ci]; if (val(`A2_${C[ci]}`)) a2=C[ci]; }
     priv.bomb_duo = [a1,a2];
+  }
+  if (cfg.scenarios && cfg.scenarios.s10){
+    const contagiousRoom = [...R].sort((a,b)=>a.localeCompare(b))[0];
+    const infectedAt = {};
+    const infectionLog = [];
+    const infected = new Set();
+    const roomOrder = R.slice();
+
+    for (let t=0; t<T; t++){
+      for (const room of roomOrder){
+        const charsHere = C.filter(c => schedule[c][t] === room);
+        if (!charsHere.length) continue;
+
+        const roomIsInfectious = room === contagiousRoom || charsHere.some(c => infected.has(c));
+        if (!roomIsInfectious) continue;
+
+        const newHere = [];
+        for (const ch of charsHere){
+          if (!infected.has(ch)){
+            infected.add(ch);
+            infectedAt[ch] = t+1;
+            newHere.push(ch);
+          }
+        }
+
+        if (newHere.length){
+          infectionLog.push({ time: t+1, room, infected: newHere });
+        }
+      }
+    }
+
+    priv.contagion = {
+      contagious_room: contagiousRoom,
+      infection_times: infectedAt,
+      infection_log: infectionLog,
+      infected: Array.from(infected)
+    };
   }
   if (privKeys.AGG){
     let agg=null;

@@ -37,6 +37,43 @@ function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
   return { successful, total: results.length, successRate }
 }
 
+function computeContagion(schedule, cfg) {
+  const contagiousRoom = [...cfg.rooms].sort((a, b) => a.localeCompare(b))[0]
+  const infectedAt = {}
+  const infectionLog = []
+  const infected = new Set()
+
+  for (let t = 0; t < cfg.T; t++) {
+    for (const room of cfg.rooms) {
+      const charsHere = cfg.chars.filter(c => schedule[c][t] === room)
+      if (!charsHere.length) continue
+
+      const roomIsInfectious = room === contagiousRoom || charsHere.some(c => infected.has(c))
+      if (!roomIsInfectious) continue
+
+      const newHere = []
+      for (const ch of charsHere) {
+        if (!infected.has(ch)) {
+          infected.add(ch)
+          infectedAt[ch] = t + 1
+          newHere.push(ch)
+        }
+      }
+
+      if (newHere.length) {
+        infectionLog.push({ time: t + 1, room, infected: newHere })
+      }
+    }
+  }
+
+  return {
+    contagiousRoom,
+    infectedAt,
+    infectionLog,
+    infected: Array.from(infected)
+  }
+}
+
 describe('S1: Poison Scenario', () => {
   it('should always make first character the assassin', () => {
     const cfg = {
@@ -2349,6 +2386,76 @@ describe('S9: Doctor freeze scenario', () => {
       const showcase = movedFrozen[0]
       expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1])
       expect(res.schedule[showcase][cfg.T - 1]).not.toBe(res.schedule[showcase][0])
+    })
+  })
+})
+
+describe('S10: Contagion', () => {
+  it('uses the alphabetically earliest room as the contagious source and forces a visit', () => {
+    const cfg = {
+      rooms: ['Workshop', 'Gallery', 'Atrium'],
+      edges: [['Workshop', 'Gallery'], ['Gallery', 'Atrium']],
+      chars: ['A', 'B', 'C'],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s10: true },
+      seed: 5
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res.priv.contagion.contagious_room).toBe('Atrium')
+
+      const visitedAtrium = cfg.chars.some(char =>
+        res.schedule[char].includes('Atrium')
+      )
+      expect(visitedAtrium).toBe(true)
+      expect(Object.keys(res.priv.contagion.infection_times || {}).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('tracks infection times based on room spread and contagious-room exposure', () => {
+    const cfg = {
+      rooms: ['Dungeon', 'Ballroom', 'Conservatory', 'Atrium'],
+      edges: [
+        ['Dungeon', 'Ballroom'],
+        ['Ballroom', 'Conservatory'],
+        ['Conservatory', 'Atrium']
+      ],
+      chars: ['Ivy', 'Quinn', 'Rex', 'Uma'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s10: true },
+      seed: 21
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const derived = computeContagion(res.schedule, cfg)
+
+      expect(res.priv.contagion.contagious_room).toBe(derived.contagiousRoom)
+      expect(res.priv.contagion.infection_times).toEqual(derived.infectedAt)
+      expect(res.priv.contagion.infection_log).toEqual(derived.infectionLog)
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const occupants = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (occupants.length < 2) continue
+
+          const infectedNow = occupants.filter(c =>
+            (res.priv.contagion.infection_times || {})[c] !== undefined &&
+            res.priv.contagion.infection_times[c] <= t + 1
+          )
+
+          if (infectedNow.length > 0) {
+            for (const occ of occupants) {
+              const infectedAt = res.priv.contagion.infection_times[occ]
+              expect(infectedAt).toBeDefined()
+              expect(infectedAt).toBeLessThanOrEqual(t + 1)
+            }
+          }
+        }
+      }
     })
   })
 })
