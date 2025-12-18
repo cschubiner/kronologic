@@ -798,6 +798,11 @@
                             <li>All non-phantom characters must share a room with at least one other character at some point during the timeline</li>
                         </ul>
                         <p><strong>Goal:</strong> Identify which character is the phantom.</p>
+                        <p><strong>Difficulty Factors:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Non-phantoms who are alone in at least <em>T−2</em> timesteps add 100 × their alone proportion to the difficulty score</li>
+                            <li>Non-phantoms who are alone at least half the time add 50 × their alone proportion, creating “almost phantom” red herrings</li>
+                        </ul>
                     </div>
                 </details>
 
@@ -821,6 +826,11 @@
                             <li>But exactly 2 people in a room is ONLY allowed if those 2 are the bombers</li>
                         </ul>
                         <p><strong>Goal:</strong> Identify the two bombers.</p>
+                        <p><strong>Difficulty Factors:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Each timestep where both bombers share a room with anyone else adds 40 points (camouflage moments)</li>
+                            <li>Every room-time with exactly three occupants adds 30 points (near-miss groups that mimic suspicious pairs)</li>
+                        </ul>
                     </div>
                 </details>
 
@@ -846,6 +856,12 @@
                             </li>
                         </ul>
                         <p><strong>Goal:</strong> Identify the two lovers.</p>
+                        <p><strong>Difficulty Factors:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Each non-lover pair that never meets adds 100 points to the difficulty score</li>
+                            <li>Pairs that meet exactly once add 80 points; pairs that meet only twice add 40 points</li>
+                            <li>Rare meetings create strong red herrings that obscure who the real lovers are</li>
+                        </ul>
                     </div>
                 </details>
 
