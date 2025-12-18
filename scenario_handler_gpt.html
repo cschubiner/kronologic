@@ -128,6 +128,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (identify Mr. Freeze and the frozen victims)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s10" value="s10" /> S10: Contagion (alphabetically first room infects entrants; infection spreads to anyone sharing a room with an infected)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -248,7 +251,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S10 (Contagion - track infection spread from the alphabetically earliest room).</div>
 
 <script type="module">
 /* ===========================
@@ -308,6 +311,12 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s8 && res.priv.freeze) {
     scores.freeze = scoreFreeze(res, cfg);
     score += scores.freeze;
+  }
+
+  // S10: Contagion scoring
+  if (cfg.scenarios.s10 && res.priv.contagion) {
+    scores.contagion = scoreContagion(res, cfg);
+    score += scores.contagion;
   }
 
   return { total: score, breakdown: scores };
@@ -537,6 +546,42 @@ function scoreFreeze(res, cfg) {
   return score;
 }
 
+function scoreContagion(res, cfg) {
+  const contagion = res.priv.contagion;
+  if (!contagion) return 0;
+
+  const infectionTimes = contagion.infection_times || {};
+  const infectedChars = Object.keys(infectionTimes);
+  if (!infectedChars.length) return 0;
+
+  const times = infectedChars.map(c => infectionTimes[c]);
+  const distinctTimes = new Set(times);
+  const minTime = Math.min(...times);
+  const maxTime = Math.max(...times);
+  const spread = maxTime - minTime + 1;
+
+  let staggerBonus = 0;
+  const perTime = new Map();
+  for (const t of times) {
+    perTime.set(t, (perTime.get(t) || 0) + 1);
+  }
+  for (const [t, count] of perTime.entries()) {
+    if (count === 1) {
+      staggerBonus += 25; // one new infection this timestep = harder
+    } else {
+      staggerBonus += Math.max(5, 15 - 5 * count); // clustered infections easier
+    }
+  }
+
+  // More infected people and infections spread across more timesteps increase difficulty
+  return (
+    infectedChars.length * 50 +
+    distinctTimes.size * 30 +
+    spread * 10 +
+    staggerBonus
+  );
+}
+
 /* ===========================
    URL State Management (HTML-specific)
    =========================== */
@@ -702,6 +747,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s7: scenarioValue === 's7',
       s8: scenarioValue === 's8',
+      s10: scenarioValue === 's10',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -780,6 +826,18 @@ qs("genBtn").addEventListener("click", async ()=>{
         }
       }
       pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+    }
+    if (res.priv.contagion) {
+      const infections = res.priv.contagion.infection_log || [];
+      const infectionTimes = res.priv.contagion.infection_times || {};
+      const order = Object.entries(infectionTimes)
+        .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+        .map(([ch, time]) => `${ch} (t=${time})`)
+        .join(', ');
+      const logPreview = infections
+        .map(entry => `t=${entry.time} @ ${entry.room}: ${entry.infected.join(', ')}`)
+        .join(' | ');
+      pf.push(`<div>Contagion (room <b>${res.priv.contagion.contagious_room}</b>): ${order || 'no infections recorded'}${logPreview ? ` — ${logPreview}` : ''}</div>`);
     }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");

@@ -222,6 +222,31 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S10: Contagion
+**Mystery**: A pathogen is loose. The alphabetically earliest room in the map is contagious—anyone who steps inside becomes infected and can spread the illness.
+
+**Rules**:
+- The contagious room is automatically the room whose name comes first alphabetically (e.g., among `Gallery`, `Atrium`, `Kitchen`, the `Atrium` is contagious)
+- At least one character must enter the contagious room during the timeline (guaranteeing the outbreak starts)
+- Entering the contagious room immediately infects any character present there at that timestep
+- If any infected character shares a room with others (in the contagious room or elsewhere), **everyone in that room becomes infected at that timestep**
+- Infections persist for the rest of the game; newly infected characters can spread the contagion in later timesteps
+
+**Goal**: Determine the contagious room and the timestamp when each infected character was first infected (the infection order).
+
+**Difficulty Factors**:
+- More infected characters increase complexity
+- Infections spread across many distinct timesteps (rather than all at once) are harder to untangle
+- The hardest puzzles infect everyone with exactly one new infection per timestep
+
+**Scoring**: Difficulty = (infected characters × 50) + (distinct infection timesteps × 30) + (timeline spread × 10) + stagger bonus (solo infection steps add 25 each; clustered infections add a smaller bonus)
+- Higher scores favor many infections, spread across more time, with infections staggered one-per-step
+- Clustered outbreaks are easier and yield smaller bonuses
+
+**Private Data Exposed**: `priv.contagion.contagious_room`, `priv.contagion.infection_times` (character → first infected timestep), `priv.contagion.infection_log` (new infections by time/room), and `priv.contagion.infected` (infected roster).
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -253,6 +278,7 @@ Enable one or more scenarios:
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
 - **S8 (The Freeze)**: No configuration needed
+- **S10 (Contagion)**: No configuration needed (alphabetically first room is always contagious)
 
 ### Difficulty Control
 
