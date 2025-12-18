@@ -961,6 +961,34 @@
                     </div>
                 </details>
 
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S9: Doctor</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> A doctor thaws frozen characters mid-schedule.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Exactly one doctor heals at least one frozen character</li>
+                            <li>Heals happen after t=1 and before the final timestep, in the same room as the frozen patient</li>
+                            <li>Frozen characters stay put until healed, then must move before the finale</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify the doctor, who was frozen, and when/where each heal occurred.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S10: Contagion</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> The alphabetically first room is contagious; trace who caught the infection and when.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Entering the earliest-named room infects a character immediately</li>
+                            <li>Already-infected characters infect everyone sharing a room in later timesteps</li>
+                            <li>At least one visit to the contagious room is guaranteed</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Reconstruct the infection order and first infection time for every infected character.</p>
+                    </div>
+                </details>
+
                 <p style="margin-top: 12px; font-size: 12px; color: #6b7280; font-style: italic;">
                     Note: Only ONE scenario is active per puzzle. Use this guide to understand the rules and constraints for the scenario you're solving.
                 </p>
