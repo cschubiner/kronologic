@@ -1496,6 +1496,49 @@ describe('S5: Lovers Scenario', () => {
   })
 })
 
+describe('Scenario combinations', () => {
+  it('should produce a valid schedule with S1 and S4 enabled together', () => {
+    const cfg = {
+      rooms: ['Atrium', 'Ballroom', 'Cellar'],
+      edges: [['Atrium', 'Ballroom'], ['Ballroom', 'Cellar']],
+      chars: ['Assassin', 'Bravo', 'Charlie', 'Delta'],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s1: true, s4: true },
+      seed: 900
+    }
+
+    testWithThreshold(cfg, (res, cfg) => {
+      expect(res).not.toBeNull()
+
+      const { assassin, victim, poison_time: poisonTime, poison_room: poisonRoom } = res.priv
+      const poisonIndex = poisonTime - 1
+
+      expect(res.schedule[assassin][poisonIndex]).toBe(poisonRoom)
+      expect(res.schedule[victim][poisonIndex]).toBe(poisonRoom)
+
+      const othersInPoisonRoom = cfg.chars.filter(c =>
+        c !== assassin &&
+        c !== victim &&
+        res.schedule[c][poisonIndex] === poisonRoom
+      )
+      expect(othersInPoisonRoom).toHaveLength(0)
+
+      const bombers = res.priv.bomb_duo.slice().sort()
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const charsInRoom = cfg.chars.filter(c => res.schedule[c][t] === room)
+          if (charsInRoom.length === 2) {
+            expect(charsInRoom.slice().sort()).toEqual(bombers)
+          }
+        }
+      }
+    })
+  })
+})
+
 describe('S6: Phantom + Lovers Scenario (S2 + S5)', () => {
   it('should have phantom separate from lovers', () => {
     const cfg = {
