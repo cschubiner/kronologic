@@ -573,14 +573,14 @@ export function buildCNF(config){
           for (let cj=ci+1; cj<C.length; cj++){
             if (cj === assassinIdx) continue;
 
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
+            const s1ExactlyTwo = vp.get(`S1_exactlyTwo_${t}_${ri}_${ci}_${cj}`);
 
-            clauses.push([-exactlyTwo, X(assassinIdx, t, ri)]);
-            clauses.push([-exactlyTwo, X(ci, t, ri)]);
-            clauses.push([-exactlyTwo, X(cj, t, ri)]);
+            clauses.push([-s1ExactlyTwo, X(assassinIdx, t, ri)]);
+            clauses.push([-s1ExactlyTwo, X(ci, t, ri)]);
+            clauses.push([-s1ExactlyTwo, X(cj, t, ri)]);
             for (let ck=0; ck<C.length; ck++){
               if (ck === assassinIdx || ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck, t, ri)]);
+              clauses.push([-s1ExactlyTwo, -X(ck, t, ri)]);
             }
 
             const others = [];
@@ -588,9 +588,9 @@ export function buildCNF(config){
               if (ck === assassinIdx || ck === ci || ck === cj) continue;
               others.push(X(ck, t, ri));
             }
-            clauses.push([exactlyTwo, -X(assassinIdx, t, ri), -X(ci, t, ri), -X(cj, t, ri), ...others]);
+            clauses.push([s1ExactlyTwo, -X(assassinIdx, t, ri), -X(ci, t, ri), -X(cj, t, ri), ...others]);
 
-            clauses.push([-exactlyTwo, isPoisonMoment]);
+            clauses.push([-s1ExactlyTwo, isPoisonMoment]);
           }
         }
 
@@ -991,23 +991,23 @@ export function buildCNF(config){
     for (let ci=0; ci<C.length; ci++){ clauses.push([ -A1[ci], -A2[ci] ]); }
 
     // Bombers are the ONLY pair ever alone together
-    const bomberAloneChoices = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>[]));
+    const s4ExactlyTwoChoices = Array.from({length:C.length}, ()=>Array.from({length:C.length}, ()=>[]));
 
     for (let t=0; t<T; t++){
       for (let ri=0; ri<R.length; ri++){
         for (let ci=0; ci<C.length; ci++){
           for (let cj=ci+1; cj<C.length; cj++){
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
+            const s4ExactlyTwo = vp.get(`S4_exactlyTwo_${t}_${ri}_${ci}_${cj}`);
 
-            bomberAloneChoices[ci][cj].push(exactlyTwo);
-            bomberAloneChoices[cj][ci].push(exactlyTwo);
+            s4ExactlyTwoChoices[ci][cj].push(s4ExactlyTwo);
+            s4ExactlyTwoChoices[cj][ci].push(s4ExactlyTwo);
 
-            clauses.push([-exactlyTwo, X(ci,t,ri)]);
-            clauses.push([-exactlyTwo, X(cj,t,ri)]);
+            clauses.push([-s4ExactlyTwo, X(ci,t,ri)]);
+            clauses.push([-s4ExactlyTwo, X(cj,t,ri)]);
 
             for (let ck=0; ck<C.length; ck++){
               if (ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck,t,ri)]);
+              clauses.push([-s4ExactlyTwo, -X(ck,t,ri)]);
             }
 
             const someoneElse = [];
@@ -1015,7 +1015,7 @@ export function buildCNF(config){
               if (ck === ci || ck === cj) continue;
               someoneElse.push(X(ck,t,ri));
             }
-            clauses.push([exactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
+            clauses.push([s4ExactlyTwo, -X(ci,t,ri), -X(cj,t,ri), ...someoneElse]);
 
             const pair1 = vp.get(`pair1_${ci}_${cj}`);
             const pair2 = vp.get(`pair2_${ci}_${cj}`);
@@ -1028,7 +1028,7 @@ export function buildCNF(config){
             clauses.push([-pair2, A2[ci]]);
             clauses.push([-A1[cj], -A2[ci], pair2]);
 
-            clauses.push([-exactlyTwo, pair1, pair2]);
+            clauses.push([-s4ExactlyTwo, pair1, pair2]);
           }
         }
       }
@@ -1036,7 +1036,7 @@ export function buildCNF(config){
 
     for (let ci=0; ci<C.length; ci++){
       for (let cj=ci+1; cj<C.length; cj++){
-        const choices = bomberAloneChoices[ci][cj];
+        const choices = s4ExactlyTwoChoices[ci][cj];
         if (!choices.length) continue;
         clauses.push([-A1[ci], -A2[cj], ...choices]);
         clauses.push([-A1[cj], -A2[ci], ...choices]);
