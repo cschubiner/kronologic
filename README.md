@@ -222,6 +222,36 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S9: The Doctor's Rounds
+**Mystery**: A doctor thaws out frozen characters mid-schedule.
+
+**Rules**:
+- Exactly one character is the doctor; the doctor is never frozen
+- At least one character starts frozen and must be healed during the timeline (not at the very start or very end)
+- Healing requires the doctor to share a room with the frozen patient at the heal timestep
+- Frozen characters remain stuck until healed, then must move by the final timestep
+
+**Goal**: Identify the doctor, the frozen characters, and when/where each heal occurred.
+
+**Difficulty Factors**: More frozen patients and later heals make it harder to tell who was immobilized versus merely staying put.
+
+---
+
+### S10: Contagion
+**Mystery**: The alphabetically earliest room is contagious. Track who got infected when.
+
+**Rules**:
+- The earliest room name (alphabetically) is the contagious room
+- Anyone who enters that room becomes infected immediately
+- Any already-infected character infects everyone sharing a room with them in later timesteps
+- At least one visit to the contagious room is guaranteed
+
+**Goal**: Deduce the infection order and the first time each infected character caught the bug.
+
+**Difficulty Factors**: More total infections and infections spread across many different timesteps increase challenge. The hardest cases infect everyone with a single new infection each timestep.
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -253,6 +283,8 @@ Enable one or more scenarios:
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
 - **S8 (The Freeze)**: No configuration needed
+- **S9 (Doctor)**: No configuration needed
+- **S10 (Contagion)**: No configuration needed
 
 ### Difficulty Control
 
