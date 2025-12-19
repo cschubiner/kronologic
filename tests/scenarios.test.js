@@ -3172,4 +3172,39 @@ describe("S13: Glue Shoes", () => {
       expect(res.priv.glue_shoes.stuck.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  it("keeps the glue carrier moving when mustMove is enforced", () => {
+    const cfg = {
+      rooms: ["Alpha", "Beta"],
+      edges: [["Alpha", "Beta"]],
+      chars: ["G", "V1", "V2"],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s13: true },
+      seed: 2,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const glueCarrier = res.priv.glue_shoes.glue_person;
+
+      for (let t = 0; t < cfg.T - 1; t++) {
+        const stuckRoom = res.schedule[glueCarrier][t];
+        const nextRoom = res.schedule[glueCarrier][t + 1];
+
+        // Glue carrier should never be forced to stay; mustMove keeps them traveling.
+        expect(nextRoom).not.toBe(stuckRoom);
+      }
+
+      for (const ch of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          if (res.schedule[ch][t] !== res.schedule[ch][t + 1]) continue;
+
+          const glueHere = res.schedule[glueCarrier][t] === res.schedule[ch][t];
+          expect(ch).not.toBe(glueCarrier);
+          expect(glueHere).toBe(true);
+        }
+      }
+    });
+  });
 });
