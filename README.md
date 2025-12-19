@@ -222,6 +222,26 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S9: Doctor's Cure
+**Mystery**: A doctor starts the game with a handful of already-frozen victims. Mid-game house calls thaw them out and send them moving again.
+
+**Rules**:
+- Exactly one doctor exists (randomly chosen)
+- At least one character begins frozen in place for the first timestep
+- The doctor must perform **at least one heal** that is **not** on the first or last timestep
+- Healing happens in-room: a frozen victim must share the room with the doctor when healed
+- Frozen characters thaw mid-game and are required to **leave their starting room** after being healed
+- Frozen characters may still move after thawing, even if `mustMove` was disabled (the scenario enforces post-heal movement)
+
+**Goal**: Identify the doctor, list who started frozen, and note the heal times/rooms when they were thawed.
+
+**Difficulty Factors**:
+- More frozen victims and multiple heal moments increase the amount of timeline bookkeeping
+- Heals clustered in the middle timesteps create overlapping movements that are harder to trace
+- Forced post-heal movement generates extra paths that can mask who was frozen first
+
+---
+
 ### S10: Contagion
 **Mystery**: The alphabetically first room on the map is contagious. Anyone who steps inside becomes infected, and infections spread to everyone who shares a room with an infected character.
 
@@ -272,6 +292,7 @@ Enable one scenario:
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
 - **S8 (The Freeze)**: No configuration needed
+- **S9 (Doctor's Cure)**: No configuration needed
 - **S10 (Contagion)**: No configuration needed
 
 ### Difficulty Control
