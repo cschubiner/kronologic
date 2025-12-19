@@ -1172,6 +1172,49 @@ export function buildCNF(config) {
     if (C.length < 2) throw new Error("S9 requires at least two characters");
     if (R.length < 2) throw new Error("S9 requires at least two rooms");
 
+    const limitAtMostK = (vars, k) => {
+      if (k >= vars.length) return;
+      const combo = (start, chosen) => {
+        if (chosen.length === k + 1) {
+          clauses.push(chosen.map((v) => -v));
+          return;
+        }
+        for (let i = start; i < vars.length; i++) {
+          chosen.push(vars[i]);
+          combo(i + 1, chosen);
+          chosen.pop();
+        }
+      };
+      combo(0, []);
+    };
+
+    const limitAtLeastK = (vars, k) => {
+      if (k <= 0) return;
+      const maxFalse = Math.max(0, vars.length - k);
+      if (maxFalse === 0) {
+        for (const v of vars) clauses.push([v]);
+        return;
+      }
+      limitAtMostK(
+        vars.map((v) => -v),
+        maxFalse,
+      );
+    };
+
+    const targetFrozenRatio = Math.max(
+      0.2,
+      Math.min(0.8, Number(config.scenarios.s9FrozenRatio ?? 0.3) || 0.3),
+    );
+    const targetFrozen = Math.max(
+      1,
+      Math.round(C.length * targetFrozenRatio),
+    );
+    const slack = Math.max(1, Math.round(C.length * 0.15));
+    const minFrozen = Math.max(1, targetFrozen - slack);
+    const maxFrozen = Math.min(C.length - 1, targetFrozen + slack);
+    const frozenMin = Math.min(minFrozen, maxFrozen);
+    const frozenMax = Math.max(minFrozen, maxFrozen);
+
     const DOC = C.map((_, ci) => vp.get(`S9Doctor_${C[ci]}`));
     const FROZ = C.map((_, ci) => vp.get(`S9Frozen_${C[ci]}`));
     const Heal = Array.from({ length: C.length }, () => Array(T).fill(null));
@@ -1187,7 +1230,8 @@ export function buildCNF(config) {
       clauses.push([-DOC[ci], -FROZ[ci]]);
     }
 
-    clauses.push(FROZ.slice());
+    limitAtLeastK(FROZ, frozenMin);
+    limitAtMostK(FROZ, frozenMax);
 
     for (let t = 0; t < T; t++) {
       for (let ri = 0; ri < R.length; ri++) {

@@ -92,7 +92,7 @@
     </div>
     <div class="row">
       <label for="seed">Seed:</label>
-      <input id="seed" class="pill" value="0" />
+      <input id="seed" class="pill" placeholder="(blank = random)" />
       <button class="ghost" id="validateBtn">Validate Map</button>
     </div>
 
@@ -577,8 +577,9 @@ function scoreFreeze(res, cfg) {
 function scoreDoctor(res, cfg) {
   const frozen = res.priv.frozen || [];
   const heals = res.priv.heals || [];
+  const frozenRatio = frozen.length / Math.max(1, cfg.chars.length - 1);
 
-  let score = 50 + frozen.length * 80;
+  let score = 80 + (1 - frozenRatio) * 140;
 
   const healTimes = new Set();
   for (const heal of heals) {
@@ -722,6 +723,84 @@ function scoreGlueShoes(res, cfg) {
   score += Math.max(0, T - 3) * 4;
 
   return score;
+}
+
+function deriveGlueRoomFacts(res, cfg) {
+  if (res.priv.glue_room) return res.priv.glue_room;
+
+  for (const room of cfg.rooms) {
+    const firstEntries = {};
+    let validRoom = false;
+    let violated = false;
+
+    for (const ch of cfg.chars) {
+      let entryTime = null;
+      for (let t = 0; t < cfg.T; t++) {
+        const here = res.schedule[ch][t] === room;
+        const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== room;
+        if (here && cameFromOther) {
+          if (t === cfg.T - 1 || res.schedule[ch][t + 1] !== room) {
+            violated = true;
+            break;
+          }
+          if (t + 2 < cfg.T && res.schedule[ch][t + 2] === room) {
+            violated = true;
+            break;
+          }
+          entryTime ??= t + 1;
+          validRoom = true;
+        }
+      }
+      if (violated) break;
+      firstEntries[ch] = entryTime;
+    }
+
+    if (!violated && validRoom) {
+      return { glue_room: room, first_entries: firstEntries };
+    }
+  }
+
+  return null;
+}
+
+function deriveGlueShoesFacts(res, cfg) {
+  if (res.priv.glue_shoes) return res.priv.glue_shoes;
+
+  for (const glueCandidate of cfg.chars) {
+    const firstStuck = new Map();
+    let violated = false;
+    let sawVictim = false;
+
+    for (let t = 0; t < cfg.T - 1; t++) {
+      const room = res.schedule[glueCandidate][t];
+      const victims = cfg.chars.filter(
+        (ch) => ch !== glueCandidate && res.schedule[ch][t] === room,
+      );
+
+      for (const v of victims) {
+        if (res.schedule[v][t + 1] !== room) {
+          violated = true;
+          break;
+        }
+        if (t + 2 < cfg.T && res.schedule[v][t + 2] === room) {
+          violated = true;
+          break;
+        }
+        if (!firstStuck.has(v)) firstStuck.set(v, { character: v, time: t + 1, room });
+        sawVictim = true;
+      }
+      if (violated) break;
+    }
+
+    if (!violated && sawVictim) {
+      return {
+        glue_person: glueCandidate,
+        stuck: Array.from(firstStuck.values()).sort((a, b) => a.time - b.time),
+      };
+    }
+  }
+
+  return null;
 }
 
 /* ===========================
@@ -903,8 +982,9 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       `<div>Vault: key holder <b>${info.key_holder}</b>; entrants: ${visitors}; vault room: ${info.vault_room}</div>`,
     );
   }
-  if (res.priv.glue_room) {
-    const info = res.priv.glue_room;
+  const glueRoomPriv = res.priv.glue_room || deriveGlueRoomFacts(res, cfg);
+  if (glueRoomPriv) {
+    const info = glueRoomPriv;
     const entries = Object.entries(info.first_entries || {})
       .filter(([, t]) => t !== null)
       .map(([ch, t]) => `${ch} @ t=${t}`);
@@ -913,8 +993,9 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       <div>Glue Room: sticky room <b>${info.glue_room}</b>; first entries: ${entryLabel}</div>
     `);
   }
-  if (res.priv.glue_shoes) {
-    const info = res.priv.glue_shoes;
+  const glueShoesPriv = res.priv.glue_shoes || deriveGlueShoesFacts(res, cfg);
+  if (glueShoesPriv) {
+    const info = glueShoesPriv;
     const stuck = info.stuck || [];
     const stuckLabel = stuck.length
       ? stuck.map((s) => `${s.character} @ t=${s.time}, ${s.room}`).join('; ')
@@ -997,8 +1078,10 @@ qs("validateBtn").addEventListener("click", ()=>{
 });
 
 qs("genBtn").addEventListener("click", async ()=>{
-  const percentile = Number(qs("percentile").value);
+  const percentile = clampPercentile(Number(qs("percentile").value));
   const sampleCount = Number(qs("samples").value) || 100;
+  const difficulty = percentile / 100;
+  const s9FrozenRatio = 0.2 + (1 - difficulty) * 0.5;
 
   qs("status").textContent = `Generating ${sampleCount} scenarios…`;
 
@@ -1031,6 +1114,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s7: scenarioValue === 's7',
       s8: scenarioValue === 's8',
       s9: scenarioValue === 's9',
+      s9FrozenRatio,
       s10: scenarioValue === 's10',
       s11: scenarioValue === 's11',
       s12: scenarioValue === 's12',
@@ -1077,11 +1161,10 @@ qs("genBtn").addEventListener("click", async ()=>{
     lastRun = { solutions, skipped, sampleCount, cfg };
     qs("reuseBtn").disabled = false;
 
-    const pct = clampPercentile(percentile);
-    const targetIdx = Math.floor((pct / 100) * (solutions.length - 1));
+    const targetIdx = Math.floor((percentile / 100) * (solutions.length - 1));
     const res = solutions[targetIdx];
 
-    renderSelectedScenario({ res, cfg, percentile: pct, sampleCount, skipped, solutions, targetIdx, source: 'generate' });
+    renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, solutions, targetIdx, source: 'generate' });
   }catch(e){
     console.error(e);
     qs("status").innerHTML = `<span class="warn">Error: ${e.message}</span>`;
