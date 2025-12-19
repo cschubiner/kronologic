@@ -615,6 +615,9 @@ export function buildCNF(config) {
     clauses.push([GS[glueIdx]]);
 
     const meetVarsByGlue = Array.from({ length: C.length }, () => []);
+    const stuckSupports = Array.from({ length: C.length }, () =>
+      Array.from({ length: T }, () => Array.from({ length: R.length }, () => [])),
+    );
 
     for (let gp = 0; gp < C.length; gp++) {
       for (let vi = 0; vi < C.length; vi++) {
@@ -625,22 +628,31 @@ export function buildCNF(config) {
               `S13Meet_${C[gp]}_${C[vi]}_${t}_${R[ri]}`
             );
             meetVarsByGlue[gp].push(meet);
+            stuckSupports[vi][t + 1][ri].push(meet);
 
             clauses.push([-meet, GS[gp]]);
             clauses.push([-meet, X(gp, t, ri)]);
             clauses.push([-meet, X(vi, t, ri)]);
             clauses.push([-GS[gp], -X(gp, t, ri), -X(vi, t, ri), meet]);
 
-            clauses.push([-GS[gp], -X(gp, t, ri), -X(vi, t, ri), X(vi, t + 1, ri)]);
+            clauses.push([-meet, X(vi, t + 1, ri)]);
 
             if (t < T - 2) {
-              clauses.push([
-                -GS[gp],
-                -X(gp, t, ri),
-                -X(vi, t, ri),
-                -X(vi, t + 2, ri),
-              ]);
+              clauses.push([-meet, -X(vi, t + 2, ri)]);
             }
+          }
+        }
+      }
+    }
+
+    if (config.mustMove && !config.allowStay) {
+      for (let ci = 0; ci < C.length; ci++) {
+        for (let t = 0; t < T - 1; t++) {
+          for (let ri = 0; ri < R.length; ri++) {
+            const clause = [-X(ci, t, ri), -X(ci, t + 1, ri)];
+            const support = stuckSupports[ci][t + 1][ri];
+            if (support.length) clause.push(...support);
+            clauses.push(clause);
           }
         }
       }
