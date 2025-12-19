@@ -100,6 +100,15 @@ function mulberry32(a) {
   };
 }
 
+function s9FrozenRange(charCount, ratio = 0.3) {
+  const targetRatio = Math.max(0.2, Math.min(0.8, ratio));
+  const targetFrozen = Math.max(1, Math.round(charCount * targetRatio));
+  const slack = Math.max(1, Math.round(charCount * 0.15));
+  const minFrozen = Math.max(1, targetFrozen - slack);
+  const maxFrozen = Math.min(charCount - 1, targetFrozen + slack);
+  return [Math.min(minFrozen, maxFrozen), Math.max(minFrozen, maxFrozen)];
+}
+
 describe("S1: Poison Scenario", () => {
   it("should always make first character the assassin", () => {
     const cfg = {
@@ -2682,6 +2691,60 @@ describe("S9: Doctor freeze scenario", () => {
       expect(res.schedule[showcase][cfg.T - 1]).not.toBe(
         res.schedule[showcase][0],
       );
+    });
+  });
+
+  it("keeps multiple characters mobile at the start", () => {
+    const cfg = {
+      rooms: ["Atrium", "Lab", "Ward", "Roof"],
+      edges: [
+        ["Atrium", "Lab"],
+        ["Lab", "Ward"],
+        ["Ward", "Roof"],
+      ],
+      chars: ["Ada", "Bev", "Ciro", "Dev", "Ema", "Finn"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 820,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const frozenCount = res.priv.frozen.length;
+      expect(frozenCount).toBeGreaterThan(0);
+      expect(frozenCount).toBeLessThanOrEqual(
+        Math.ceil(cfg.chars.length * 0.6),
+      );
+      expect(cfg.chars.length - frozenCount).toBeGreaterThan(1);
+    });
+  });
+
+  it("aligns frozen counts with the configured ratio band", () => {
+    const cfg = {
+      rooms: ["North", "South", "East", "West"],
+      edges: [
+        ["North", "South"],
+        ["South", "East"],
+        ["East", "West"],
+      ],
+      chars: ["Doc", "A", "B", "C", "D", "E", "F", "G"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true, s9FrozenRatio: 0.6 },
+      seed: 905,
+    };
+
+    const [minFrozen, maxFrozen] = s9FrozenRange(
+      cfg.chars.length,
+      cfg.scenarios.s9FrozenRatio,
+    );
+
+    testWithThreshold(cfg, (res) => {
+      const frozenCount = res.priv.frozen.length;
+      expect(frozenCount).toBeGreaterThanOrEqual(minFrozen);
+      expect(frozenCount).toBeLessThanOrEqual(maxFrozen);
     });
   });
 });
