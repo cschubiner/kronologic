@@ -134,6 +134,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s10" value="s10" /> S10: Contagion (alphabetically first room infects entrants; track infection order)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s11" value="s11" /> S11: The Vault (only the key holder may enter the earliest room; deduce the holder and all entrants)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -254,7 +257,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder).</div>
 
 <script type="module">
 /* ===========================
@@ -325,6 +328,11 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s10 && res.priv.contagion) {
     scores.contagion = scoreContagion(res, cfg);
     score += scores.contagion;
+  }
+
+  if (cfg.scenarios.s11 && res.priv.vault) {
+    scores.vault = scoreVault(res, cfg);
+    score += scores.vault;
   }
 
   return { total: score, breakdown: scores };
@@ -603,6 +611,38 @@ function scoreContagion(res, cfg) {
   return score;
 }
 
+function scoreVault(res, cfg) {
+  const vault = res.priv.vault;
+  if (!vault) return 0;
+
+  const vaultRoom = vault.vault_room || [...cfg.rooms].sort()[0];
+  const keyHolder = vault.key_holder;
+  const chars = cfg.chars;
+  const T = cfg.T;
+
+  let withOthers = 0;
+  let maxGroup = 0;
+  const companions = new Set();
+
+  for (let t = 0; t < T; t++) {
+    const occupants = chars.filter((c) => res.schedule[c][t] === vaultRoom);
+    if (occupants.includes(keyHolder) && occupants.length > 1) {
+      withOthers++;
+      occupants
+        .filter((c) => c !== keyHolder)
+        .forEach((c) => companions.add(c));
+    }
+    if (occupants.length > maxGroup) maxGroup = occupants.length;
+  }
+
+  let score = 60;
+  score += Math.max(0, companions.size - 2) * 20;
+  score += Math.max(0, withOthers - 2) * 15;
+  if (maxGroup <= 2) score += 10; // smaller vault meetings are trickier
+
+  return score;
+}
+
 /* ===========================
    URL State Management (HTML-specific)
    =========================== */
@@ -770,6 +810,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s8: scenarioValue === 's8',
       s9: scenarioValue === 's9',
       s10: scenarioValue === 's10',
+      s11: scenarioValue === 's11',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
@@ -865,6 +906,13 @@ qs("genBtn").addEventListener("click", async ()=>{
       const neverInfected = (info.never_infected || []).join(', ');
       const neverLabel = neverInfected ? `; never infected: ${neverInfected}` : '';
       pf.push(`<div>Contagion: contagious room <b>${info.contagious_room}</b>; infected: ${infectedLabel}${neverLabel}</div>`);
+    }
+    if (res.priv.vault) {
+      const info = res.priv.vault;
+      const visitors = info.vault_visitors?.length ? info.vault_visitors.join(', ') : 'No entrants';
+      pf.push(
+        `<div>Vault: key holder <b>${info.key_holder}</b>; entrants: ${visitors}; vault room: ${info.vault_room}</div>`,
+      );
     }
     if (pf.length===0) pf.push(`<div class="muted">None</div>`);
     qs("privateFacts").innerHTML = pf.join("");

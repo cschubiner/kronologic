@@ -433,6 +433,114 @@ export function buildCNF(config) {
   // =========== Scenarios ===========
   const privKeys = {};
 
+  // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
+  if (config.scenarios && config.scenarios.s11) {
+    if (!R.length) throw new Error("S11 requires at least one room");
+    if (C.length < 3) throw new Error("S11 requires at least three characters");
+    if (T < 2) throw new Error("S11 requires at least two timesteps");
+    if (config.mustMove && !config.allowStay && T < 3) {
+      throw new Error("S11 requires at least three timesteps when movement is forced");
+    }
+
+    const vaultRoom = [...R].sort()[0];
+    const vr = Ridx.get(vaultRoom);
+    if (vr == null) throw new Error("S11 vault room missing from map");
+
+    const rng = mulberry32(config.seed || 0);
+    const keyHolderIdx = Math.floor(rng() * C.length);
+
+    const KH = C.map((_, ci) => vp.get(`S11_KH_${C[ci]}`));
+    clauses.push(...exactlyOne(KH));
+    clauses.push([KH[keyHolderIdx]]);
+
+    // Only the key holder may be in the vault (others require the key holder present)
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let cj = 0; cj < C.length; cj++) {
+        if (ci === cj) continue;
+        for (let t = 0; t < T; t++) {
+          clauses.push([-KH[ci], -X(cj, t, vr), X(ci, t, vr)]);
+        }
+      }
+    }
+
+    // Track vault co-visits to enforce two distinct companions across two timesteps
+    const withOther = Array.from({ length: C.length }, () => []);
+    const compVars = Array.from({ length: C.length }, () =>
+      Array.from({ length: C.length }, () => null),
+    );
+    const compDetails = Array.from({ length: C.length }, () =>
+      Array.from({ length: C.length }, () => []),
+    );
+
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T; t++) {
+        const otherVars = [];
+        for (let cj = 0; cj < C.length; cj++) {
+          if (ci === cj) continue;
+          otherVars.push(X(cj, t, vr));
+        }
+
+        const someOther = vp.get(`S11_someOther_${C[ci]}_${t}`);
+        if (otherVars.length) {
+          clauses.push([-someOther, ...otherVars]);
+          for (const ov of otherVars) clauses.push([-ov, someOther]);
+        } else {
+          clauses.push([-someOther]);
+        }
+
+        const withO = vp.get(`S11_withOther_${C[ci]}_${t}`);
+        withOther[ci].push(withO);
+        clauses.push([-withO, KH[ci]]);
+        clauses.push([-withO, X(ci, t, vr)]);
+        clauses.push([-withO, someOther]);
+        clauses.push([-KH[ci], -X(ci, t, vr), -someOther, withO]);
+
+        for (let cj = 0; cj < C.length; cj++) {
+          if (ci === cj) continue;
+          const pair = vp.get(`S11_pair_${C[ci]}_${C[cj]}_${t}`);
+          compDetails[ci][cj].push(pair);
+          clauses.push([-pair, KH[ci]]);
+          clauses.push([-pair, X(ci, t, vr)]);
+          clauses.push([-pair, X(cj, t, vr)]);
+          clauses.push([-KH[ci], -X(ci, t, vr), -X(cj, t, vr), pair]);
+        }
+      }
+    }
+
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let cj = 0; cj < C.length; cj++) {
+        if (ci === cj) continue;
+        const comp = vp.get(`S11_comp_${C[ci]}_${C[cj]}`);
+        compVars[ci][cj] = comp;
+        const details = compDetails[ci][cj];
+        clauses.push([-comp, KH[ci]]);
+        if (details.length) {
+          clauses.push([-comp, ...details]);
+          for (const d of details) clauses.push([-d, comp]);
+        } else {
+          clauses.push([-comp]);
+        }
+      }
+
+      if (withOther[ci].length < 2) {
+        clauses.push([-KH[ci]]);
+      } else {
+        const combos = atLeastK(withOther[ci], 2);
+        for (const combo of combos) clauses.push([-KH[ci], ...combo]);
+      }
+
+      const companions = compVars[ci].filter((v, idx) => idx !== ci && v !== null);
+      if (companions.length < 2) {
+        clauses.push([-KH[ci]]);
+      } else {
+        const companionCombos = atLeastK(companions, 2);
+        for (const combo of companionCombos) clauses.push([-KH[ci], ...combo]);
+      }
+    }
+
+    privKeys.S11 = { KH, vaultRoom };
+  }
+
   // S10: Contagion — alphabetically first room infects entrants
   let contagionRoom = null;
   if (config.scenarios && config.scenarios.s10) {
@@ -1395,6 +1503,31 @@ export function solveAndDecode(cfg) {
       infection_timeline: infectionTimeline,
       infected_count: infected.size,
       never_infected: neverInfected,
+    };
+  }
+
+  if (privKeys.S11) {
+    let keyHolder = null;
+    if (privKeys.S11.KH) {
+      for (let ci = 0; ci < C.length; ci++) {
+        if (val(`S11_KH_${C[ci]}`)) {
+          keyHolder = C[ci];
+          break;
+        }
+      }
+    }
+    const vaultRoom = privKeys.S11.vaultRoom || [...R].sort()[0];
+    const visitors = new Set();
+    for (const ch of C) {
+      for (let t = 0; t < T; t++) {
+        if (schedule[ch][t] === vaultRoom) visitors.add(ch);
+      }
+    }
+
+    priv.vault = {
+      key_holder: keyHolder,
+      vault_room: vaultRoom,
+      vault_visitors: Array.from(visitors).sort(),
     };
   }
 
