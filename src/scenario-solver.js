@@ -463,7 +463,7 @@ export function buildCNF(config) {
       }
     }
 
-    // Track vault co-visits to enforce two distinct companions across two timesteps
+    // Track vault co-visits so the key holder shares the vault with others at least once
     const withOther = Array.from({ length: C.length }, () => []);
     const compVars = Array.from({ length: C.length }, () =>
       Array.from({ length: C.length }, () => null),
@@ -522,18 +522,18 @@ export function buildCNF(config) {
         }
       }
 
-      if (withOther[ci].length < 2) {
+      if (withOther[ci].length < 1) {
         clauses.push([-KH[ci]]);
       } else {
-        const combos = atLeastK(withOther[ci], 2);
+        const combos = atLeastK(withOther[ci], 1);
         for (const combo of combos) clauses.push([-KH[ci], ...combo]);
       }
 
       const companions = compVars[ci].filter((v, idx) => idx !== ci && v !== null);
-      if (companions.length < 2) {
+      if (companions.length < 1) {
         clauses.push([-KH[ci]]);
       } else {
-        const companionCombos = atLeastK(companions, 2);
+        const companionCombos = atLeastK(companions, 1);
         for (const combo of companionCombos) clauses.push([-KH[ci], ...combo]);
       }
     }
