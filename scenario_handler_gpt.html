@@ -146,6 +146,7 @@
     </div>
     <div class="row">
       <button class="primary" id="genBtn">Generate</button>
+      <button class="ghost" id="reselectBtn" disabled>Apply Percentile (no regenerate)</button>
       <span id="status" class="hint"></span>
     </div>
   </section>
@@ -186,11 +187,6 @@
             <button class="ghost" id="copyScenarioBtn">📋 Copy String</button>
             <button class="ghost" id="copyURLBtn">🔗 Copy URL</button>
           </div>
-        </div>
-        <div class="card">
-          <h2>Raw JSON</h2>
-          <pre class="mono tiny" id="rawJson"></pre>
-          <button class="ghost" id="downloadBtn">Download JSON</button>
         </div>
       </div>
     </div>
@@ -623,9 +619,11 @@ function scoreVault(res, cfg) {
   let withOthers = 0;
   let maxGroup = 0;
   const companions = new Set();
+  let keyHolderVisits = 0;
 
   for (let t = 0; t < T; t++) {
     const occupants = chars.filter((c) => res.schedule[c][t] === vaultRoom);
+    if (occupants.includes(keyHolder)) keyHolderVisits++;
     if (occupants.includes(keyHolder) && occupants.length > 1) {
       withOthers++;
       occupants
@@ -635,10 +633,14 @@ function scoreVault(res, cfg) {
     if (occupants.length > maxGroup) maxGroup = occupants.length;
   }
 
-  let score = 60;
-  score += Math.max(0, companions.size - 2) * 20;
-  score += Math.max(0, withOthers - 2) * 15;
-  if (maxGroup <= 2) score += 10; // smaller vault meetings are trickier
+  const visitorCount = vault.vault_visitors?.length || 0;
+
+  let score = 30;
+  score += companions.size * 18;
+  score += withOthers * 12;
+  score += Math.max(0, keyHolderVisits - withOthers) * 6;
+  score += Math.max(0, maxGroup - 2) * 8;
+  score += Math.max(0, visitorCount - 1) * 5;
 
   return score;
 }
@@ -737,6 +739,153 @@ function getScenarioFromURL() {
    UI glue
    =========================== */
 function qs(id){ return document.getElementById(id); }
+let cachedRun = null;
+
+function pickSolutionFromCache(percentile, fromCache = false) {
+  if (!cachedRun || !cachedRun.solutions?.length) {
+    qs("status").innerHTML = `<span class="warn">Generate at least once before reapplying the percentile.</span>`;
+    return;
+  }
+
+  const { solutions, cfg, sampleCount, skipped } = cachedRun;
+  const clamped = Math.max(0, Math.min(100, Number(percentile) || 0));
+  const targetIdx = Math.floor((clamped / 100) * (solutions.length - 1));
+  const res = solutions[targetIdx];
+
+  displaySolution(res, cfg, {
+    solutions,
+    sampleCount,
+    skipped,
+    percentile: clamped,
+    fromCache
+  });
+}
+
+function displaySolution(res, cfg, options = {}) {
+  const {
+    solutions = [res],
+    sampleCount = solutions.length,
+    skipped = 0,
+    percentile = 0,
+    fromCache = false
+  } = options;
+
+  const rankIdx = Math.max(0, solutions.indexOf(res));
+  const rank = Math.min(solutions.length, rankIdx + 1);
+  const encoded = encodeScenarioToURL(res, cfg);
+
+  updateURL(encoded);
+
+  const scoreLabel = res.score?.total != null ? res.score.total.toFixed(1) : 'N/A';
+  const cacheNote = fromCache ? ', reused cached scenarios' : '';
+  qs("status").innerHTML = `<span class="ok">Selected ${percentile}th percentile scenario</span> (score: ${scoreLabel}, rank ${rank}/${solutions.length}, ${skipped} skipped${cacheNote})`;
+
+  qs("resultsHint").style.display = "none";
+  qs("results").style.display = "block";
+  qs("toggleResultsBtn").style.display = "inline-block";
+  renderTable("schedule", res.schedule, "Character");
+  renderTable("byTime", res.byTime, "Time");
+  renderTable("visits", res.visits, "Character");
+
+  const pf = [];
+  if (res.priv.phantom) pf.push(`<div>Phantom: <b>${res.priv.phantom}</b></div>`);
+  if (res.priv.lovers) pf.push(`<div>Lovers: <b>${res.priv.lovers[0]}</b> + <b>${res.priv.lovers[1]}</b></div>`);
+  if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
+  if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
+  if (res.priv.aggrosassin) pf.push(`<div>Aggrosassin: <b>${res.priv.aggrosassin}</b> killed <b>${res.priv.victims.length}</b> victim${res.priv.victims.length === 1 ? '' : 's'}: ${res.priv.victims.join(', ')}</div>`);
+  if (res.priv.freeze) {
+    const victims = res.priv.freeze_victims || [];
+    const kills = res.priv.freeze_kills || [];
+    let detail = '';
+    if (victims.length) {
+      const killSummary = kills.map(k => `${k.victim} @ t=${k.time}, ${k.room}`).join('; ');
+      detail = ` froze <b>${victims.length}</b> victim${victims.length === 1 ? '' : 's'}: ${victims.join(', ')}`;
+      if (killSummary) {
+        detail += ` (first freezes: ${killSummary})`;
+      }
+    }
+    pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+  }
+  if (res.priv.doctor) {
+    const frozen = res.priv.frozen || [];
+    const heals = res.priv.heals || [];
+    const frozenLabel = frozen.length ? `; frozen at start: ${frozen.join(', ')}` : '';
+    const healLabel = heals.length
+      ? `; heals: ${heals.map(h => `${h.character} @ t=${h.time}, ${h.room}`).join('; ')}`
+      : '';
+    pf.push(`<div>Doctor: <b>${res.priv.doctor}</b>${frozenLabel}${healLabel}</div>`);
+  }
+  if (res.priv.contagion) {
+    const info = res.priv.contagion;
+    const infectedList = (info.infection_order || []).map(ch => `${ch} (t=${info.infection_times?.[ch]})`);
+    const infectedLabel = infectedList.length ? infectedList.join(', ') : 'No infections recorded';
+    const neverInfected = (info.never_infected || []).join(', ');
+    const neverLabel = neverInfected ? `; never infected: ${neverInfected}` : '';
+    pf.push(`<div>Contagion: contagious room <b>${info.contagious_room}</b>; infected: ${infectedLabel}${neverLabel}</div>`);
+  }
+  if (res.priv.vault) {
+    const info = res.priv.vault;
+    const visitors = info.vault_visitors?.length ? info.vault_visitors.join(', ') : 'No entrants';
+    pf.push(
+      `<div>Vault: key holder <b>${info.key_holder}</b>; entrants: ${visitors}; vault room: ${info.vault_room}</div>`,
+    );
+  }
+  if (pf.length===0) pf.push(`<div class="muted">None</div>`);
+  qs("privateFacts").innerHTML = pf.join("");
+
+  const stats = res.stats || {};
+  const avgSolveTime = solutions.reduce((sum, s) => sum + (s.stats?.solveTimeMs || 0), 0) / solutions.length;
+  const statsHtml = `
+      <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;">
+        <span class="muted">SAT Variables:</span>
+        <span><b>${stats.totalVars}</b></span>
+
+        <span class="muted">SAT Clauses:</span>
+        <span><b>${stats.totalClauses}</b></span>
+
+        <span class="muted">Avg Clause Length:</span>
+        <span><b>${stats.avgClauseLength?.toFixed(2)}</b> literals</span>
+
+        <span class="muted">Solve Time (this):</span>
+        <span><b>${stats.solveTimeMs}</b>ms</span>
+
+        <span class="muted">Avg Solve Time:</span>
+        <span><b>${avgSolveTime.toFixed(1)}</b>ms</span>
+
+        <span class="muted">Valid Solutions:</span>
+        <span><b>${solutions.length}</b> / ${sampleCount} (${((solutions.length/sampleCount)*100).toFixed(1)}%)</span>
+
+        <span class="muted">Difficulty Score:</span>
+        <span><b>${res.score.total.toFixed(1)}</b> (${percentile}th percentile)</span>
+
+        <span class="muted">Score Breakdown:</span>
+        <span>${Object.entries(res.score.breakdown).map(([k,v]) => `${k}: ${v.toFixed(0)}`).join(', ') || 'N/A'}</span>
+      </div>
+    `;
+  qs("genStats").innerHTML = statsHtml;
+
+  qs("scenarioString").value = encoded;
+
+  qs("copyScenarioBtn").onclick = ()=>{
+    navigator.clipboard.writeText(encoded).then(()=>{
+      const btn = qs("copyScenarioBtn");
+      const orig = btn.textContent;
+      btn.textContent = "✓ Copied!";
+      setTimeout(()=> btn.textContent = orig, 2000);
+    });
+  };
+
+  qs("copyURLBtn").onclick = ()=>{
+    navigator.clipboard.writeText(window.location.href).then(()=>{
+      const btn = qs("copyURLBtn");
+      const orig = btn.textContent;
+      btn.textContent = "✓ Copied!";
+      setTimeout(()=> btn.textContent = orig, 2000);
+    });
+  };
+
+  setupQuestionInterface(res, cfg);
+}
 function renderTable(container, obj, headerLeft){
   const el = typeof container==="string"? qs(container) : container;
   let html = "<div class='table-scroll'><table><thead><tr>";
@@ -777,9 +926,12 @@ qs("validateBtn").addEventListener("click", ()=>{
 qs("genBtn").addEventListener("click", async ()=>{
   const percentile = Number(qs("percentile").value);
   const sampleCount = Number(qs("samples").value) || 100;
-  
+
+  cachedRun = null;
+  qs("reselectBtn").disabled = true;
+
   qs("status").textContent = `Generating ${sampleCount} scenarios…`;
-  
+
   const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
   const chars = qs("chars").value.split(",").map(s=>s.trim()).filter(Boolean);
   const T = Math.max(2, Math.min(10, Number(qs("steps").value)||6));
@@ -849,146 +1001,22 @@ qs("genBtn").addEventListener("click", async ()=>{
       qs("status").innerHTML = `<span class="warn">No solutions found (${skipped} samples timed out or failed).</span>`;
       return;
     }
-    
+
     // Sort by score (ascending - lower scores are easier)
     solutions.sort((a, b) => a.score.total - b.score.total);
-    
-    // Select solution at the specified percentile
-    const targetIdx = Math.floor((percentile / 100) * (solutions.length - 1));
-    const res = solutions[targetIdx];
-    
-    // Encode scenario to URL
-    const encoded = encodeScenarioToURL(res, cfg);
-    updateURL(encoded);
-    
-    qs("status").innerHTML = `<span class="ok">Selected ${percentile}th percentile scenario</span> (score: ${res.score.total.toFixed(1)}, rank ${targetIdx+1}/${solutions.length}, ${skipped} skipped)`;
-    // Display selected solution
-    qs("resultsHint").style.display = "none";
-    qs("results").style.display = "block";
-    qs("toggleResultsBtn").style.display = "inline-block";
-    renderTable("schedule", res.schedule, "Character");
-    renderTable("byTime", res.byTime, "Time");
-    renderTable("visits", res.visits, "Character");
 
-    // Private facts
-    const pf = [];
-    if (res.priv.phantom) pf.push(`<div>Phantom: <b>${res.priv.phantom}</b></div>`);
-    if (res.priv.lovers) pf.push(`<div>Lovers: <b>${res.priv.lovers[0]}</b> + <b>${res.priv.lovers[1]}</b></div>`);
-    if (res.priv.assassin) pf.push(`<div>Assassin: <b>${res.priv.assassin}</b> poisoned <b>${res.priv.victim}</b> @ t=${res.priv.poison_time}, room=${res.priv.poison_room}</div>`);
-    if (res.priv.bomb_duo) pf.push(`<div>Bomb duo: <b>${res.priv.bomb_duo[0]}</b> + <b>${res.priv.bomb_duo[1]}</b></div>`);
-    if (res.priv.aggrosassin) pf.push(`<div>Aggrosassin: <b>${res.priv.aggrosassin}</b> killed <b>${res.priv.victims.length}</b> victim${res.priv.victims.length === 1 ? '' : 's'}: ${res.priv.victims.join(', ')}</div>`);
-    if (res.priv.freeze) {
-      const victims = res.priv.freeze_victims || [];
-      const kills = res.priv.freeze_kills || [];
-      let detail = '';
-      if (victims.length) {
-        const killSummary = kills.map(k => `${k.victim} @ t=${k.time}, ${k.room}`).join('; ');
-        detail = ` froze <b>${victims.length}</b> victim${victims.length === 1 ? '' : 's'}: ${victims.join(', ')}`;
-        if (killSummary) {
-          detail += ` (first freezes: ${killSummary})`;
-        }
-      }
-      pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
-    }
-    if (res.priv.doctor) {
-      const frozen = res.priv.frozen || [];
-      const heals = res.priv.heals || [];
-      const frozenLabel = frozen.length ? `; frozen at start: ${frozen.join(', ')}` : '';
-      const healLabel = heals.length
-        ? `; heals: ${heals.map(h => `${h.character} @ t=${h.time}, ${h.room}`).join('; ')}`
-        : '';
-      pf.push(`<div>Doctor: <b>${res.priv.doctor}</b>${frozenLabel}${healLabel}</div>`);
-    }
-    if (res.priv.contagion) {
-      const info = res.priv.contagion;
-      const infectedList = (info.infection_order || []).map(ch => `${ch} (t=${info.infection_times?.[ch]})`);
-      const infectedLabel = infectedList.length ? infectedList.join(', ') : 'No infections recorded';
-      const neverInfected = (info.never_infected || []).join(', ');
-      const neverLabel = neverInfected ? `; never infected: ${neverInfected}` : '';
-      pf.push(`<div>Contagion: contagious room <b>${info.contagious_room}</b>; infected: ${infectedLabel}${neverLabel}</div>`);
-    }
-    if (res.priv.vault) {
-      const info = res.priv.vault;
-      const visitors = info.vault_visitors?.length ? info.vault_visitors.join(', ') : 'No entrants';
-      pf.push(
-        `<div>Vault: key holder <b>${info.key_holder}</b>; entrants: ${visitors}; vault room: ${info.vault_room}</div>`,
-      );
-    }
-    if (pf.length===0) pf.push(`<div class="muted">None</div>`);
-    qs("privateFacts").innerHTML = pf.join("");
+    cachedRun = { solutions, cfg, sampleCount, skipped };
+    qs("reselectBtn").disabled = false;
 
-    // Display generation statistics
-    const stats = res.stats || {};
-    const avgSolveTime = solutions.reduce((sum, s) => sum + (s.stats?.solveTimeMs || 0), 0) / solutions.length;
-    const statsHtml = `
-      <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;">
-        <span class="muted">SAT Variables:</span>
-        <span><b>${stats.totalVars}</b></span>
-
-        <span class="muted">SAT Clauses:</span>
-        <span><b>${stats.totalClauses}</b></span>
-
-        <span class="muted">Avg Clause Length:</span>
-        <span><b>${stats.avgClauseLength?.toFixed(2)}</b> literals</span>
-
-        <span class="muted">Solve Time (this):</span>
-        <span><b>${stats.solveTimeMs}</b>ms</span>
-
-        <span class="muted">Avg Solve Time:</span>
-        <span><b>${avgSolveTime.toFixed(1)}</b>ms</span>
-
-        <span class="muted">Valid Solutions:</span>
-        <span><b>${solutions.length}</b> / ${sampleCount} (${((solutions.length/sampleCount)*100).toFixed(1)}%)</span>
-
-        <span class="muted">Difficulty Score:</span>
-        <span><b>${res.score.total.toFixed(1)}</b> (${percentile}th percentile)</span>
-
-        <span class="muted">Score Breakdown:</span>
-        <span>${Object.entries(res.score.breakdown).map(([k,v]) => `${k}: ${v.toFixed(0)}`).join(', ') || 'N/A'}</span>
-      </div>
-    `;
-    qs("genStats").innerHTML = statsHtml;
-
-    // Display scenario string
-    qs("scenarioString").value = encoded;
-    
-    // Copy buttons
-    qs("copyScenarioBtn").onclick = ()=>{
-      navigator.clipboard.writeText(encoded).then(()=>{
-        const btn = qs("copyScenarioBtn");
-        const orig = btn.textContent;
-        btn.textContent = "✓ Copied!";
-        setTimeout(()=> btn.textContent = orig, 2000);
-      });
-    };
-    
-    qs("copyURLBtn").onclick = ()=>{
-      navigator.clipboard.writeText(window.location.href).then(()=>{
-        const btn = qs("copyURLBtn");
-        const orig = btn.textContent;
-        btn.textContent = "✓ Copied!";
-        setTimeout(()=> btn.textContent = orig, 2000);
-      });
-    };
-
-    const raw = { schedule: res.schedule, by_time: res.byTime, visits: res.visits, private: res.priv, meta: res.meta };
-    qs("rawJson").textContent = JSON.stringify(raw, null, 2);
-
-    qs("downloadBtn").onclick = ()=>{
-      const blob = new Blob([JSON.stringify(raw,null,2)], {type:"application/json"});
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "scenario_solution.json";
-      a.click();
-      URL.revokeObjectURL(a.href);
-    };
-
-    // Setup question interface
-    setupQuestionInterface(res, cfg);
+    pickSolutionFromCache(percentile, false);
   }catch(e){
     console.error(e);
     qs("status").innerHTML = `<span class="warn">Error: ${e.message}</span>`;
   }
+});
+
+qs("reselectBtn").addEventListener("click", ()=>{
+  pickSolutionFromCache(Number(qs("percentile").value), true);
 });
 
 function setupQuestionInterface(res, cfg){
@@ -1216,19 +1244,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
           setTimeout(()=> btn.textContent = orig, 2000);
         });
       };
-      
-      const raw = { schedule: decoded.schedule, by_time: decoded.byTime, visits: decoded.visits, meta: { source: 'url' } };
-      qs("rawJson").textContent = JSON.stringify(raw, null, 2);
-      
-      qs("downloadBtn").onclick = ()=>{
-        const blob = new Blob([JSON.stringify(raw,null,2)], {type:"application/json"});
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "scenario_solution.json";
-        a.click();
-        URL.revokeObjectURL(a.href);
-      };
-      
+
       // Setup question interface with the decoded scenario
       const cfg = {
         rooms: decoded.rooms,
@@ -1237,6 +1253,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
         edges: decoded.edges
       };
       setupQuestionInterface(decoded, cfg);
+      cachedRun = null;
+      qs("reselectBtn").disabled = true;
     } else {
       qs("status").innerHTML = `<span class="warn">Failed to load scenario from URL</span>`;
     }

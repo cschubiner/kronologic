@@ -463,8 +463,9 @@ export function buildCNF(config) {
       }
     }
 
-    // Track vault co-visits to enforce two distinct companions across two timesteps
+    // Track vault co-visits to ensure we can identify the key holder by interactions
     const withOther = Array.from({ length: C.length }, () => []);
+    const khVisits = Array.from({ length: C.length }, () => []);
     const compVars = Array.from({ length: C.length }, () =>
       Array.from({ length: C.length }, () => null),
     );
@@ -495,6 +496,12 @@ export function buildCNF(config) {
         clauses.push([-withO, someOther]);
         clauses.push([-KH[ci], -X(ci, t, vr), -someOther, withO]);
 
+        const visit = vp.get(`S11_visit_${C[ci]}_${t}`);
+        khVisits[ci].push(visit);
+        clauses.push([-visit, KH[ci]]);
+        clauses.push([-visit, X(ci, t, vr)]);
+        clauses.push([-KH[ci], -X(ci, t, vr), visit]);
+
         for (let cj = 0; cj < C.length; cj++) {
           if (ci === cj) continue;
           const pair = vp.get(`S11_pair_${C[ci]}_${C[cj]}_${t}`);
@@ -522,19 +529,27 @@ export function buildCNF(config) {
         }
       }
 
-      if (withOther[ci].length < 2) {
+      if (withOther[ci].length < 1) {
         clauses.push([-KH[ci]]);
       } else {
-        const combos = atLeastK(withOther[ci], 2);
+        const combos = atLeastK(withOther[ci], 1);
         for (const combo of combos) clauses.push([-KH[ci], ...combo]);
       }
 
       const companions = compVars[ci].filter((v, idx) => idx !== ci && v !== null);
-      if (companions.length < 2) {
+      if (companions.length < 1) {
         clauses.push([-KH[ci]]);
       } else {
-        const companionCombos = atLeastK(companions, 2);
+        const companionCombos = atLeastK(companions, 1);
         for (const combo of companionCombos) clauses.push([-KH[ci], ...combo]);
+      }
+
+      const visits = khVisits[ci];
+      if (visits.length < 2) {
+        clauses.push([-KH[ci]]);
+      } else {
+        const visitCombos = atLeastK(visits, 2);
+        for (const combo of visitCombos) clauses.push([-KH[ci], ...combo]);
       }
     }
 
