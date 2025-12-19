@@ -522,19 +522,17 @@ export function buildCNF(config) {
         }
       }
 
-      if (withOther[ci].length < 2) {
+      if (withOther[ci].length === 0) {
         clauses.push([-KH[ci]]);
       } else {
-        const combos = atLeastK(withOther[ci], 2);
-        for (const combo of combos) clauses.push([-KH[ci], ...combo]);
+        clauses.push([-KH[ci], ...withOther[ci]]);
       }
 
       const companions = compVars[ci].filter((v, idx) => idx !== ci && v !== null);
-      if (companions.length < 2) {
+      if (companions.length === 0) {
         clauses.push([-KH[ci]]);
       } else {
-        const companionCombos = atLeastK(companions, 2);
-        for (const combo of companionCombos) clauses.push([-KH[ci], ...combo]);
+        clauses.push([-KH[ci], ...companions]);
       }
     }
 
