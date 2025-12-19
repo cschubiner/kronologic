@@ -137,6 +137,12 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s11" value="s11" /> S11: The Vault (only the key holder may enter the earliest room; deduce the holder and all entrants)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s12" value="s12" /> S12: Glue Room (identify the sticky room and each character's first entry time)</label>
+    </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s13" value="s13" /> S13: Glue Shoes (identify the glue-shoed character and when each victim was first stuck)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -253,7 +259,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder), S12 (Glue Room - sticky room forces two-turn visits), S13 (Glue Shoes - glue carrier makes co-occupants stay an extra turn).</div>
 
 <script type="module">
 /* ===========================
@@ -329,6 +335,16 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s11 && res.priv.vault) {
     scores.vault = scoreVault(res, cfg);
     score += scores.vault;
+  }
+
+  if (cfg.scenarios.s12 && res.priv.glue_room) {
+    scores.glueRoom = scoreGlueRoom(res, cfg);
+    score += scores.glueRoom;
+  }
+
+  if (cfg.scenarios.s13 && res.priv.glue_shoes) {
+    scores.glueShoes = scoreGlueShoes(res, cfg);
+    score += scores.glueShoes;
   }
 
   return { total: score, breakdown: scores };
@@ -651,6 +667,63 @@ function scoreVault(res, cfg) {
   return score;
 }
 
+function scoreGlueRoom(res, cfg) {
+  const info = res.priv.glue_room;
+  if (!info) return 0;
+
+  const glueRoom = info.glue_room;
+  const chars = cfg.chars;
+  const T = cfg.T;
+
+  let entryCount = 0;
+  const distinctVisitors = new Set();
+
+  for (const ch of chars) {
+    for (let t = 0; t < T; t++) {
+      const here = res.schedule[ch][t] === glueRoom;
+      const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== glueRoom;
+      if (here && cameFromOther) {
+        entryCount++;
+        distinctVisitors.add(ch);
+      }
+    }
+  }
+
+  let score = entryCount * 12;
+  score += distinctVisitors.size * 10;
+  score += Math.max(0, T - 2) * 2;
+
+  return score;
+}
+
+function scoreGlueShoes(res, cfg) {
+  const info = res.priv.glue_shoes;
+  if (!info) return 0;
+
+  const gluePerson = info.glue_person;
+  const victims = info.stuck || [];
+  const T = cfg.T;
+
+  let totalStickEvents = 0;
+  if (gluePerson) {
+    for (let t = 0; t < T - 1; t++) {
+      const room = res.schedule[gluePerson][t];
+      const others = cfg.chars.filter(
+        (ch) => ch !== gluePerson && res.schedule[ch][t] === room,
+      );
+      if (others.length) {
+        totalStickEvents += others.length;
+      }
+    }
+  }
+
+  let score = victims.length * 22;
+  score += totalStickEvents * 6;
+  score += Math.max(0, T - 3) * 4;
+
+  return score;
+}
+
 /* ===========================
    URL State Management (HTML-specific)
    =========================== */
@@ -830,6 +903,24 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       `<div>Vault: key holder <b>${info.key_holder}</b>; entrants: ${visitors}; vault room: ${info.vault_room}</div>`,
     );
   }
+  if (res.priv.glue_room) {
+    const info = res.priv.glue_room;
+    const entries = Object.entries(info.first_entries || {})
+      .filter(([, t]) => t !== null)
+      .map(([ch, t]) => `${ch} @ t=${t}`);
+    const entryLabel = entries.length ? entries.join(', ') : 'No recorded entries before final timestep';
+    pf.push(`
+      <div>Glue Room: sticky room <b>${info.glue_room}</b>; first entries: ${entryLabel}</div>
+    `);
+  }
+  if (res.priv.glue_shoes) {
+    const info = res.priv.glue_shoes;
+    const stuck = info.stuck || [];
+    const stuckLabel = stuck.length
+      ? stuck.map((s) => `${s.character} @ t=${s.time}, ${s.room}`).join('; ')
+      : 'No one stuck';
+    pf.push(`Glue Shoes: carrier <b>${info.glue_person}</b>; stuck victims: ${stuckLabel}`);
+  }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);
   qs("privateFacts").innerHTML = pf.join("");
 
@@ -942,6 +1033,8 @@ qs("genBtn").addEventListener("click", async ()=>{
       s9: scenarioValue === 's9',
       s10: scenarioValue === 's10',
       s11: scenarioValue === 's11',
+      s12: scenarioValue === 's12',
+      s13: scenarioValue === 's13',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }

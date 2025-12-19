@@ -279,6 +279,45 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S12: Glue Room
+**Mystery**: One randomly chosen room is covered in glue. Anyone who steps inside is stuck there for one extra turn.
+
+**Rules**:
+- The glue room is selected randomly (seeded) from the map's rooms
+- Whenever a character enters the glue room before the final timestep, they must remain there for the next timestep as well (two turns in a row)
+- After the forced extra turn, they must leave the glue room immediately (no three-turn streaks in the glue room)
+- If the first time a character arrives is the final timestep, they only appear once (no future turn to show they were stuck)
+- The scenario guarantees at least one glue-room entry that is not on the final timestep
+- Movement rules automatically allow sticking in place, even if "must move" is enabled
+
+**Goal**: Identify which room is the glue room and when each character first entered it.
+
+**Difficulty Factors**:
+- More unique entrants increase the bookkeeping required to track first arrivals
+- Short timelines make overlapping two-turn stays harder to separate
+- Multiple characters entering in close succession creates ambiguity about who triggered which stuck window
+
+---
+
+### S13: Glue Shoes
+**Mystery**: One character has glue on their shoes. Anyone who shares a room with them becomes stuck for an extra turn.
+
+**Rules**:
+- The glue carrier is chosen randomly (seeded) from all characters
+- Whenever the glue carrier shares a room with others (before the final timestep), every other occupant must stay in that room for exactly one additional turn and then leave
+- The glue carrier is never stuck by their own glue and may move freely on the next timestep
+- At least one character must get stuck before the final timestep (so the extra-turn effect is visible)
+- Movement constraints allow stuck victims to remain in place even if "must move" is enabled
+
+**Goal**: Identify which character has the glue shoes and when each affected character was first stuck by them.
+
+**Difficulty Factors**:
+- More total victims or multi-person stick events create tangled overlaps
+- Glue encounters early in the timeline obscure later movements if the carrier keeps moving quickly
+- Victims who reappear with the carrier on different turns raise questions about which meeting caused their first stuck moment
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -313,6 +352,8 @@ Enable one scenario:
 - **S9 (Doctor's Cure)**: No configuration needed
 - **S10 (Contagion)**: No configuration needed
 - **S11 (The Vault)**: No configuration needed
+- **S12 (Glue Room)**: No configuration needed
+- **S13 (Glue Shoes)**: No configuration needed
 
 ### Difficulty Control
 
