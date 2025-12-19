@@ -222,6 +222,25 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S10: Contagion
+**Mystery**: The alphabetically first room on the map is contagious. Anyone who steps inside becomes infected, and infections spread to everyone who shares a room with an infected character.
+
+**Rules**:
+- The contagious room is the alphabetically earliest room name in the map
+- Any character present in the contagious room at any timestep becomes infected immediately
+- Infection is permanent; once infected, a character stays infected for all later timesteps
+- Whenever an infected character shares a room with others, every character in that room becomes infected at that timestep (including larger groups)
+- At least one character must enter the contagious room during the scenario (guarantees infections occur)
+
+**Goal**: Determine when each character was first infected and reconstruct the infection order.
+
+**Difficulty Factors**:
+- More total infected characters increase difficulty
+- Infections spread across many different timesteps (especially one new infection per timestep) are hardest to reconstruct
+- Large infection jumps (many people infected at once) lower difficulty, while slow, staggered spread raises it
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -244,7 +263,7 @@ Players must deduce the secret scenario by combining:
 
 ### Scenario Selection
 
-Enable one or more scenarios:
+Enable one scenario:
 - **S1 (Poison)**: Optional fixed room/time
 - **S2 (Phantom)**: No configuration needed
 - **S3 (Singer's Jewels)**: No configuration needed
@@ -253,6 +272,7 @@ Enable one or more scenarios:
 - **S6 (Phantom + Lovers)**: No configuration needed
 - **S7 (Aggrosassin)**: No configuration needed
 - **S8 (The Freeze)**: No configuration needed
+- **S10 (Contagion)**: No configuration needed
 
 ### Difficulty Control
 
