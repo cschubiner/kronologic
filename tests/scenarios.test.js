@@ -28,7 +28,7 @@ function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
   // Run test function on all successful results
   for (const { res, seed } of successful) {
     try {
-      testFn(res, cfg);
+      testFn(res, cfg, seed);
     } catch (e) {
       throw new Error(`Test failed for seed ${seed}: ${e.message}`);
     }
@@ -2893,6 +2893,220 @@ describe("S11: The Vault", () => {
         expectedVisitors.sort(),
       );
       expect(res.priv.vault.vault_room).toBe(vaultRoom);
+    });
+  });
+});
+
+describe("S12: Glue Room", () => {
+  it("forces everyone entering the glue room to stay exactly two turns", () => {
+    const cfg = {
+      rooms: ["Atrium", "Study", "Garden"],
+      edges: [
+        ["Atrium", "Study"],
+        ["Study", "Garden"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s12: true },
+      seed: 4,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const glueRoom = res.priv.glue_room.glue_room;
+      let sawEntry = false;
+
+      for (const ch of cfg.chars) {
+        for (let t = 0; t < cfg.T; t++) {
+          const here = res.schedule[ch][t] === glueRoom;
+          const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== glueRoom;
+
+          if (here && cameFromOther) {
+            sawEntry = true;
+            expect(t).toBeLessThan(cfg.T - 1);
+            expect(res.schedule[ch][t + 1]).toBe(glueRoom);
+            if (t + 2 < cfg.T) {
+              expect(res.schedule[ch][t + 2]).not.toBe(glueRoom);
+            }
+          }
+        }
+      }
+
+      expect(sawEntry).toBe(true);
+    });
+  });
+
+  it("exposes the glue room and first entry times", () => {
+    const cfg = {
+      rooms: ["North", "South"],
+      edges: [["North", "South"]],
+      chars: ["A", "B", "C"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s12: true },
+      seed: 9,
+    };
+
+    testWithThreshold(cfg, (res, cfg, seed) => {
+      const rng = mulberry32(seed);
+      const expectedGlueRoom = cfg.rooms[Math.floor(rng() * cfg.rooms.length)];
+      expect(res.priv.glue_room.glue_room).toBe(expectedGlueRoom);
+
+      for (const ch of cfg.chars) {
+        let firstEntry = null;
+        for (let t = 0; t < cfg.T; t++) {
+          const here = res.schedule[ch][t] === expectedGlueRoom;
+          const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== expectedGlueRoom;
+          if (here && cameFromOther) {
+            firstEntry = t + 1;
+            break;
+          }
+        }
+
+        expect(res.priv.glue_room.first_entries[ch]).toBe(firstEntry);
+      }
+    });
+  });
+
+  it("prevents three-turn streaks inside the glue room", () => {
+    const cfg = {
+      rooms: ["Lab", "Lounge", "Vault"],
+      edges: [
+        ["Lab", "Lounge"],
+        ["Lounge", "Vault"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s12: true },
+      seed: 11,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const glueRoom = res.priv.glue_room.glue_room;
+
+      for (const row of Object.values(res.schedule)) {
+        let streak = 0;
+        for (const room of row) {
+          if (room === glueRoom) {
+            streak++;
+            expect(streak).toBeLessThanOrEqual(2);
+          } else {
+            streak = 0;
+          }
+        }
+      }
+    });
+  });
+});
+
+describe("S13: Glue Shoes", () => {
+  it("sticks co-occupants for exactly one extra turn", () => {
+    const cfg = {
+      rooms: ["Kitchen", "Patio", "Gallery"],
+      edges: [
+        ["Kitchen", "Patio"],
+        ["Patio", "Gallery"],
+      ],
+      chars: ["A", "B", "C", "D"],
+      T: 6,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s13: true },
+      seed: 3,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const glueCarrier = res.priv.glue_shoes.glue_person;
+
+      for (let t = 0; t < cfg.T - 1; t++) {
+        const room = res.schedule[glueCarrier][t];
+        const victims = cfg.chars.filter(
+          (ch) => ch !== glueCarrier && res.schedule[ch][t] === room,
+        );
+
+        for (const v of victims) {
+          expect(res.schedule[v][t + 1]).toBe(room);
+          if (t + 2 < cfg.T) {
+            expect(res.schedule[v][t + 2]).not.toBe(room);
+          }
+        }
+      }
+    });
+  });
+
+  it("selects the glue carrier by seed and records first stuck moments", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["G1", "G2", "G3"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s13: true },
+      seed: 7,
+    };
+
+    testWithThreshold(cfg, (res, cfg, seed) => {
+      const rng = mulberry32(seed);
+      const expectedGlue = cfg.chars[Math.floor(rng() * cfg.chars.length)];
+      expect(res.priv.glue_shoes.glue_person).toBe(expectedGlue);
+
+      const firstStuck = new Map();
+      for (let t = 0; t < cfg.T; t++) {
+        const room = res.schedule[expectedGlue][t];
+        for (const ch of cfg.chars) {
+          if (ch === expectedGlue) continue;
+          if (res.schedule[ch][t] === room && !firstStuck.has(ch)) {
+            firstStuck.set(ch, { character: ch, time: t + 1, room });
+          }
+        }
+      }
+
+      for (const record of res.priv.glue_shoes.stuck) {
+        const expected = firstStuck.get(record.character);
+        expect(record).toEqual(expected);
+      }
+    });
+  });
+
+  it("guarantees at least one non-final stuck victim", () => {
+    const cfg = {
+      rooms: ["Hall", "Den", "Porch"],
+      edges: [
+        ["Hall", "Den"],
+        ["Den", "Porch"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 4,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s13: true },
+      seed: 12,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const glueCarrier = res.priv.glue_shoes.glue_person;
+      let stuckObserved = false;
+
+      for (let t = 0; t < cfg.T - 1; t++) {
+        const room = res.schedule[glueCarrier][t];
+        const victims = cfg.chars.filter(
+          (ch) => ch !== glueCarrier && res.schedule[ch][t] === room,
+        );
+
+        if (victims.length) {
+          stuckObserved = true;
+          expect(t).toBeLessThan(cfg.T - 1);
+          break;
+        }
+      }
+
+      expect(stuckObserved).toBe(true);
+      expect(res.priv.glue_shoes.stuck.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

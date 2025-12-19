@@ -401,11 +401,14 @@ export function buildCNF(config) {
     C = config.chars,
     T = config.T;
   const baseStay = config.allowStay && !config.mustMove;
-  const freezeStay = !!(
+  const stickyStay = !!(
     config.scenarios &&
-    (config.scenarios.s8 || config.scenarios.s9)
+    (config.scenarios.s8 ||
+      config.scenarios.s9 ||
+      config.scenarios.s12 ||
+      config.scenarios.s13)
   );
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || freezeStay);
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || stickyStay);
 
   // Helper to get variable IDs
   const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
@@ -554,6 +557,105 @@ export function buildCNF(config) {
     }
     clauses.push(mustVisitContagious);
     privKeys.S10 = contagionRoom;
+  }
+
+  // S12: Glue Room — randomly chosen room forces entrants to stay one extra turn
+  if (config.scenarios && config.scenarios.s12) {
+    if (!R.length) throw new Error("S12 requires at least one room");
+    if (T < 2) throw new Error("S12 requires at least two timesteps");
+
+    const rng = mulberry32(config.seed || 0);
+    const glueRoom = R[Math.floor(rng() * R.length)];
+    const gr = Ridx.get(glueRoom);
+    if (gr == null) throw new Error("S12 glue room missing from map");
+
+    const entriesBeforeFinal = [];
+
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T; t++) {
+        const entry = vp.get(`S12Entry_${C[ci]}_${t}`);
+
+        clauses.push([-entry, X(ci, t, gr)]);
+        if (t === 0) {
+          clauses.push([-X(ci, t, gr), entry]);
+        } else {
+          clauses.push([-entry, -X(ci, t - 1, gr)]);
+          clauses.push([-X(ci, t, gr), X(ci, t - 1, gr), entry]);
+        }
+
+        if (t < T - 1) {
+          clauses.push([-entry, X(ci, t + 1, gr)]);
+          entriesBeforeFinal.push(entry);
+        }
+        if (t < T - 2) {
+          clauses.push([-entry, -X(ci, t + 2, gr)]);
+        }
+      }
+    }
+
+    if (entriesBeforeFinal.length === 0) {
+      throw new Error("S12 requires at least one possible glue entry before final timestep");
+    }
+    clauses.push(...atLeastOne(entriesBeforeFinal));
+
+    privKeys.S12 = { glueRoom };
+  }
+
+  // S13: Glue Shoes — one character causes others in the room to stay an extra turn
+  if (config.scenarios && config.scenarios.s13) {
+    if (T < 2) throw new Error("S13 requires at least two timesteps");
+    if (C.length < 2)
+      throw new Error("S13 requires at least two characters (glue + victim)");
+
+    const rng = mulberry32(config.seed || 0);
+    const glueIdx = Math.floor(rng() * C.length);
+
+    const GS = C.map((_, ci) => vp.get(`S13_GLUE_${C[ci]}`));
+    clauses.push(...exactlyOne(GS));
+    clauses.push([GS[glueIdx]]);
+
+    const meetVarsByGlue = Array.from({ length: C.length }, () => []);
+
+    for (let gp = 0; gp < C.length; gp++) {
+      for (let vi = 0; vi < C.length; vi++) {
+        if (vi === gp) continue;
+        for (let t = 0; t < T - 1; t++) {
+          for (let ri = 0; ri < R.length; ri++) {
+            const meet = vp.get(
+              `S13Meet_${C[gp]}_${C[vi]}_${t}_${R[ri]}`
+            );
+            meetVarsByGlue[gp].push(meet);
+
+            clauses.push([-meet, GS[gp]]);
+            clauses.push([-meet, X(gp, t, ri)]);
+            clauses.push([-meet, X(vi, t, ri)]);
+            clauses.push([-GS[gp], -X(gp, t, ri), -X(vi, t, ri), meet]);
+
+            clauses.push([-GS[gp], -X(gp, t, ri), -X(vi, t, ri), X(vi, t + 1, ri)]);
+
+            if (t < T - 2) {
+              clauses.push([
+                -GS[gp],
+                -X(gp, t, ri),
+                -X(vi, t, ri),
+                -X(vi, t + 2, ri),
+              ]);
+            }
+          }
+        }
+      }
+    }
+
+    for (let gp = 0; gp < C.length; gp++) {
+      const meets = meetVarsByGlue[gp];
+      if (!meets.length) {
+        clauses.push([-GS[gp]]);
+      } else {
+        clauses.push([-GS[gp], ...meets]);
+      }
+    }
+
+    privKeys.S13 = { GS };
   }
 
   // S3: Ensure first listed room is visited at least once
@@ -1527,6 +1629,55 @@ export function solveAndDecode(cfg) {
       vault_room: vaultRoom,
       vault_visitors: Array.from(visitors).sort(),
     };
+  }
+
+  if (privKeys.S12) {
+    const glueRoom = privKeys.S12.glueRoom;
+    const firstEntries = {};
+
+    for (const ch of C) {
+      let entryTime = null;
+      for (let t = 0; t < T; t++) {
+        const here = schedule[ch][t] === glueRoom;
+        const cameFromOther = t === 0 || schedule[ch][t - 1] !== glueRoom;
+        if (here && cameFromOther) {
+          entryTime = t + 1;
+          break;
+        }
+      }
+      firstEntries[ch] = entryTime;
+    }
+
+    priv.glue_room = { glue_room: glueRoom, first_entries: firstEntries };
+  }
+
+  if (privKeys.S13) {
+    let gluePerson = null;
+    if (privKeys.S13.GS) {
+      for (let ci = 0; ci < C.length; ci++) {
+        if (val(`S13_GLUE_${C[ci]}`)) {
+          gluePerson = C[ci];
+          break;
+        }
+      }
+    }
+
+    const stuckRecords = [];
+    if (gluePerson) {
+      const firstStuck = new Map();
+      for (let t = 0; t < T; t++) {
+        const room = schedule[gluePerson][t];
+        for (const ch of C) {
+          if (ch === gluePerson) continue;
+          if (schedule[ch][t] === room && !firstStuck.has(ch)) {
+            firstStuck.set(ch, { character: ch, time: t + 1, room });
+          }
+        }
+      }
+      stuckRecords.push(...Array.from(firstStuck.values()).sort((a, b) => a.time - b.time));
+    }
+
+    priv.glue_shoes = { glue_person: gluePerson, stuck: stuckRecords };
   }
 
   const stats = {
