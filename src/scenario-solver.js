@@ -619,6 +619,15 @@ export function buildCNF(config) {
       Array.from({ length: T }, () => Array.from({ length: R.length }, () => [])),
     );
 
+    // Glue carrier must always move; they are immune to sticking effects.
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T - 1; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          clauses.push([-GS[ci], -X(ci, t, ri), -X(ci, t + 1, ri)]);
+        }
+      }
+    }
+
     for (let gp = 0; gp < C.length; gp++) {
       for (let vi = 0; vi < C.length; vi++) {
         if (vi === gp) continue;
