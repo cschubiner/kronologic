@@ -91,6 +91,15 @@ function computeInfections(schedule, cfg) {
   return { contagiousRoom, infectionTimes, infectionOrder, timeline };
 }
 
+function mulberry32(a) {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 describe("S1: Poison Scenario", () => {
   it("should always make first character the assassin", () => {
     const cfg = {
@@ -2754,6 +2763,131 @@ describe("S10: Contagion scenario", () => {
           }
         }
       }
+    });
+  });
+});
+
+describe("S11: The Vault", () => {
+  const pickKeyHolder = (chars, seed) => {
+    const rng = mulberry32(seed || 0);
+    const idx = Math.floor(rng() * chars.length);
+    return chars[idx];
+  };
+
+  it("selects the key holder deterministically from the seed", () => {
+    const cfg = {
+      rooms: ["Library", "Vault", "Atrium"],
+      edges: [
+        ["Library", "Vault"],
+        ["Vault", "Atrium"],
+        ["Atrium", "Library"],
+      ],
+      chars: ["Dana", "Inez", "Carl", "Bert"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s11: true },
+      seed: 9,
+    };
+
+    const expectedHolder = pickKeyHolder(cfg.chars, cfg.seed);
+    const res = solveAndDecode(cfg);
+    expect(res).toBeTruthy();
+    expect(res.priv.vault.key_holder).toBe(expectedHolder);
+  });
+
+  it("prevents non-holders from entering the vault alone", () => {
+    const cfg = {
+      rooms: ["Vault", "Garden", "Office"],
+      edges: [
+        ["Vault", "Garden"],
+        ["Garden", "Office"],
+        ["Office", "Vault"],
+      ],
+      chars: ["A", "B", "C", "D"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s11: true },
+      seed: 3,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const vaultRoom = [...cfg.rooms].sort()[0];
+      const keyHolder = res.priv.vault.key_holder;
+
+      for (let t = 0; t < cfg.T; t++) {
+        const occupants = cfg.chars.filter((ch) => res.schedule[ch][t] === vaultRoom);
+        if (occupants.length > 0) {
+          expect(occupants).toContain(keyHolder);
+        }
+      }
+    });
+  });
+
+  it("forces two separate vault visits with different companions", () => {
+    const cfg = {
+      rooms: ["Conservatory", "Vault", "Attic"],
+      edges: [
+        ["Conservatory", "Vault"],
+        ["Vault", "Attic"],
+        ["Attic", "Conservatory"],
+      ],
+      chars: ["Keyer", "Locke", "Nina", "Omar"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s11: true },
+      seed: 15,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const vaultRoom = [...cfg.rooms].sort()[0];
+      const keyHolder = res.priv.vault.key_holder;
+      const sharedVisits = [];
+      const companions = new Set();
+
+      for (let t = 0; t < cfg.T; t++) {
+        const occupants = cfg.chars.filter((ch) => res.schedule[ch][t] === vaultRoom);
+        if (occupants.includes(keyHolder) && occupants.length > 1) {
+          sharedVisits.push(t);
+          occupants
+            .filter((ch) => ch !== keyHolder)
+            .forEach((ch) => companions.add(ch));
+        }
+      }
+
+      expect(sharedVisits.length).toBeGreaterThanOrEqual(2);
+      expect(companions.size).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("records every vault visitor in the private payload", () => {
+    const cfg = {
+      rooms: ["Vault", "Kitchen", "Study"],
+      edges: [
+        ["Vault", "Kitchen"],
+        ["Kitchen", "Study"],
+        ["Study", "Vault"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 5,
+      mustMove: true,
+      allowStay: true,
+      scenarios: { s11: true },
+      seed: 21,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const vaultRoom = [...cfg.rooms].sort()[0];
+      const expectedVisitors = cfg.chars.filter((ch) =>
+        res.schedule[ch].some((room) => room === vaultRoom),
+      );
+
+      expect(res.priv.vault.vault_visitors.sort()).toEqual(
+        expectedVisitors.sort(),
+      );
+      expect(res.priv.vault.vault_room).toBe(vaultRoom);
     });
   });
 });

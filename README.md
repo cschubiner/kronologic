@@ -261,6 +261,24 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S11: The Vault
+**Mystery**: The alphabetically earliest room is designated as The Vault, and only the key holder can unlock it.
+
+**Rules**:
+- The Vault is always the alphabetically first room on the map
+- The key holder is randomly chosen among the characters
+- Nobody may enter The Vault unless the key holder is present at that timestep
+- The key holder must enter The Vault **with company** on at least two different timesteps, and those visits must include at least two distinct companions across the night
+
+**Goal**: Identify the key holder and list everyone who ever entered The Vault.
+
+**Difficulty Factors**:
+- More Vault entrants create more data to track
+- Fewer joint visits (just the minimum two) make the holder harder to confirm
+- Vault meetings that happen in small groups increase ambiguity about who held the key
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -294,6 +312,7 @@ Enable one scenario:
 - **S8 (The Freeze)**: No configuration needed
 - **S9 (Doctor's Cure)**: No configuration needed
 - **S10 (Contagion)**: No configuration needed
+- **S11 (The Vault)**: No configuration needed
 
 ### Difficulty Control
 
