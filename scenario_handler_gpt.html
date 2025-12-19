@@ -129,6 +129,9 @@
       <label><input type="radio" name="scenario" id="s8" value="s8" /> S8: The Freeze (identify Mr. Freeze and the frozen victims)</label>
     </div>
     <div class="row">
+      <label><input type="radio" name="scenario" id="s9" value="s9" /> S9: Doctor's Cure (frozen victims thaw mid-game)</label>
+    </div>
+    <div class="row">
       <label><input type="radio" name="scenario" id="s10" value="s10" /> S10: Contagion (alphabetically first room infects entrants; track infection order)</label>
     </div>
 
@@ -251,7 +254,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S10 (Contagion - infection chain from the first alphabetical room).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room).</div>
 
 <script type="module">
 /* ===========================
@@ -311,6 +314,12 @@ function scoreScenario(res, cfg) {
   if (cfg.scenarios.s8 && res.priv.freeze) {
     scores.freeze = scoreFreeze(res, cfg);
     score += scores.freeze;
+  }
+
+  // S9: Doctor's Cure scoring
+  if (cfg.scenarios.s9 && res.priv.doctor) {
+    scores.doctor = scoreDoctor(res, cfg);
+    score += scores.doctor;
   }
 
   if (cfg.scenarios.s10 && res.priv.contagion) {
@@ -545,6 +554,25 @@ function scoreFreeze(res, cfg) {
   return score;
 }
 
+function scoreDoctor(res, cfg) {
+  const frozen = res.priv.frozen || [];
+  const heals = res.priv.heals || [];
+
+  let score = 50 + frozen.length * 80;
+
+  const healTimes = new Set();
+  for (const heal of heals) {
+    healTimes.add(heal.time);
+    score += 30;
+    if (heal.time > 1 && heal.time < cfg.T) score += 10;
+  }
+
+  if (healTimes.size > 1) score += healTimes.size * 15;
+  if (heals.length && frozen.length > 1) score += 25;
+
+  return score;
+}
+
 function scoreContagion(res, cfg) {
   const contagion = res.priv.contagion;
   if (!contagion) return 0;
@@ -740,6 +768,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s5: scenarioValue === 's5' || scenarioValue === 's6',
       s7: scenarioValue === 's7',
       s8: scenarioValue === 's8',
+      s9: scenarioValue === 's9',
       s10: scenarioValue === 's10',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
@@ -819,6 +848,15 @@ qs("genBtn").addEventListener("click", async ()=>{
         }
       }
       pf.push(`<div>Mr. Freeze: <b>${res.priv.freeze}</b>${detail}</div>`);
+    }
+    if (res.priv.doctor) {
+      const frozen = res.priv.frozen || [];
+      const heals = res.priv.heals || [];
+      const frozenLabel = frozen.length ? `; frozen at start: ${frozen.join(', ')}` : '';
+      const healLabel = heals.length
+        ? `; heals: ${heals.map(h => `${h.character} @ t=${h.time}, ${h.room}`).join('; ')}`
+        : '';
+      pf.push(`<div>Doctor: <b>${res.priv.doctor}</b>${frozenLabel}${healLabel}</div>`);
     }
     if (res.priv.contagion) {
       const info = res.priv.contagion;
