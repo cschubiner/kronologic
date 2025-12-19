@@ -3207,4 +3207,27 @@ describe("S13: Glue Shoes", () => {
       }
     });
   });
+
+  it("keeps the glue carrier moving even when staying is allowed", () => {
+    const cfg = {
+      rooms: ["North", "South"],
+      edges: [["North", "South"]],
+      chars: ["Gluey", "Traveler"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s13: true },
+      seed: 1,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const glueCarrier = res.priv.glue_shoes.glue_person;
+
+      for (let t = 0; t < cfg.T - 1; t++) {
+        expect(res.schedule[glueCarrier][t]).not.toBe(
+          res.schedule[glueCarrier][t + 1],
+        );
+      }
+    });
+  });
 });
