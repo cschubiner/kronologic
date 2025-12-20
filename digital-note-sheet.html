@@ -95,6 +95,35 @@
             background: #047857;
         }
 
+        .controls button.random-structure {
+            background: #8b5cf6;
+        }
+
+        .controls button.random-structure:hover {
+            background: #7c3aed;
+        }
+
+        .controls button.random-structure:active {
+            background: #6d28d9;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .nav-links a {
+            color: #1f2937;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .nav-links a:hover {
+            color: #2563eb;
+        }
+
         /* Time-step maps grid */
         .maps-grid {
             display: grid;
@@ -687,6 +716,10 @@
 <body>
     <div class="container">
         <h1>Digital Note Sheet - Kronologic Generator</h1>
+        <div class="nav-links">
+            <a href="./scenario_handler_gpt.html" target="_blank" rel="noopener">Open Scenario Generator ↗</a>
+            <span style="color: #6b7280; font-size: 13px;">Both tools run from GitHub Actions artifacts.</span>
+        </div>
 
         <!-- Session management -->
         <div class="session-controls" id="sessionControls" style="display: none;">
@@ -723,6 +756,7 @@
             <input type="text" id="characterNames" value="A,B,C,D,S,J" placeholder="Comma-separated names">
 
             <button onclick="initializeSheet()">Initialize Sheet</button>
+            <button class="random-structure" onclick="randomizeGraphStructure()" id="randomGraphBtn" disabled>Randomize Connections</button>
             <button class="generate-graph" onclick="regenerateGraphLayout()" id="generateGraphBtn" disabled>Generate Graph</button>
             <button onclick="undo()" id="undoBtn" disabled>Undo</button>
             <button onclick="redo()" id="redoBtn" disabled>Redo</button>
@@ -1152,6 +1186,7 @@
 
                 // Show session controls
                 document.getElementById('sessionControls').style.display = 'flex';
+                document.getElementById('randomGraphBtn').disabled = false;
                 document.getElementById('generateGraphBtn').disabled = false;
 
                 return true;
@@ -1344,6 +1379,56 @@
             }
         }
 
+        function generateRandomEdges(roomNames) {
+            if (!roomNames || roomNames.length === 0) return [];
+
+            const shuffled = [...roomNames];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            const edgeSet = new Set();
+            const addEdge = (a, b) => {
+                const sorted = [a, b].sort();
+                edgeSet.add(`${sorted[0]}---${sorted[1]}`);
+            };
+
+            for (let i = 1; i < shuffled.length; i++) {
+                const targetIndex = Math.floor(Math.random() * i);
+                addEdge(shuffled[i], shuffled[targetIndex]);
+            }
+
+            const possiblePairs = [];
+            for (let i = 0; i < roomNames.length; i++) {
+                for (let j = i + 1; j < roomNames.length; j++) {
+                    possiblePairs.push([roomNames[i], roomNames[j]]);
+                }
+            }
+
+            const extraEdges = Math.floor(Math.random() * roomNames.length);
+            let attempts = 0;
+            while (edgeSet.size < roomNames.length - 1 + extraEdges && attempts < possiblePairs.length * 2) {
+                const [a, b] = possiblePairs[Math.floor(Math.random() * possiblePairs.length)];
+                addEdge(a, b);
+                attempts++;
+            }
+
+            return Array.from(edgeSet).map(key => key.split('---'));
+        }
+
+        function randomizeGraphStructure() {
+            const graphInput = document.getElementById('graphInput');
+            const parsed = parseMermaidGraph(graphInput.value);
+            if (!parsed) return;
+
+            const edges = generateRandomEdges(parsed.roomNames);
+            const mermaidLines = ['graph TD', ...edges.map(([a, b]) => `  ${a} --- ${b}`)];
+            graphInput.value = mermaidLines.join('\n');
+
+            initializeSheet();
+        }
+
         function initializeSheet() {
             const timestepCount = parseInt(document.getElementById('timestepCount').value);
             const characterInput = document.getElementById('characterNames').value;
@@ -1400,6 +1485,7 @@
             saveState();
 
             // Enable generate graph button
+            document.getElementById('randomGraphBtn').disabled = false;
             document.getElementById('generateGraphBtn').disabled = false;
         }
 
