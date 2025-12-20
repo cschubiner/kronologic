@@ -83,28 +83,40 @@
             cursor: not-allowed;
         }
 
-        .controls button.generate-graph {
+        .controls button.shuffle-layout {
             background: #10b981;
         }
 
-        .controls button.generate-graph:hover {
+        .controls button.shuffle-layout:hover {
             background: #059669;
         }
 
-        .controls button.generate-graph:active {
+        .controls button.shuffle-layout:active {
             background: #047857;
         }
 
-        .controls button.random-structure {
+        .controls button.shuffle-structure {
             background: #8b5cf6;
         }
 
-        .controls button.random-structure:hover {
+        .controls button.shuffle-structure:hover {
             background: #7c3aed;
         }
 
-        .controls button.random-structure:active {
+        .controls button.shuffle-structure:active {
             background: #6d28d9;
+        }
+
+        .controls button.reset-layout {
+            background: #6b7280;
+        }
+
+        .controls button.reset-layout:hover {
+            background: #4b5563;
+        }
+
+        .controls button.reset-layout:active {
+            background: #374151;
         }
 
         .nav-links {
@@ -755,9 +767,10 @@
             <label>Characters:</label>
             <input type="text" id="characterNames" value="A,B,C,D,S,J" placeholder="Comma-separated names">
 
-            <button onclick="initializeSheet()">Initialize Sheet</button>
-            <button class="random-structure" onclick="randomizeGraphStructure()" id="randomGraphBtn" disabled>Randomize Connections</button>
-            <button class="generate-graph" onclick="regenerateGraphLayout()" id="generateGraphBtn" disabled>Generate Graph</button>
+            <button onclick="initializeSheet()">Build/Refresh Sheet</button>
+            <button class="shuffle-structure" onclick="randomizeGraphStructure()" id="shuffleConnectionsBtn" disabled>Shuffle Connections</button>
+            <button class="shuffle-layout" onclick="regenerateGraphLayout()" id="shuffleLayoutBtn" disabled>Shuffle Layout</button>
+            <button class="reset-layout" onclick="resetLayout()" id="resetLayoutBtn" disabled>Reset Default Layout</button>
             <button onclick="undo()" id="undoBtn" disabled>Undo</button>
             <button onclick="redo()" id="redoBtn" disabled>Redo</button>
         </div>
@@ -1186,8 +1199,9 @@
 
                 // Show session controls
                 document.getElementById('sessionControls').style.display = 'flex';
-                document.getElementById('randomGraphBtn').disabled = false;
-                document.getElementById('generateGraphBtn').disabled = false;
+                document.getElementById('shuffleConnectionsBtn').disabled = false;
+                document.getElementById('shuffleLayoutBtn').disabled = false;
+                document.getElementById('resetLayoutBtn').disabled = false;
 
                 return true;
             } catch (error) {
@@ -1484,9 +1498,10 @@
             renderTrackingTable();
             saveState();
 
-            // Enable generate graph button
-            document.getElementById('randomGraphBtn').disabled = false;
-            document.getElementById('generateGraphBtn').disabled = false;
+            // Enable graph buttons
+            document.getElementById('shuffleConnectionsBtn').disabled = false;
+            document.getElementById('shuffleLayoutBtn').disabled = false;
+            document.getElementById('resetLayoutBtn').disabled = false;
         }
 
         function renderMaps() {
@@ -1570,20 +1585,47 @@
                     state.cytoscapeInstances.push(cy);
                 }, 50);
             }
+
+            // Keep layouts consistent across timesteps using the current layout selection
+            setTimeout(() => applyLayoutToAll(state.currentLayoutIndex), 80);
         }
 
         function regenerateGraphLayout() {
-            // Cycle to next layout
-            state.currentLayoutIndex = (state.currentLayoutIndex + 1) % layoutAlgorithms.length;
-            const currentLayout = layoutAlgorithms[state.currentLayoutIndex];
+            applyLayoutToAll(state.currentLayoutIndex + 1);
+        }
 
-            // Apply the new layout to all Cytoscape instances
-            state.cytoscapeInstances.forEach((cy, index) => {
-                if (cy) {
-                    const layout = cy.layout(currentLayout.options);
-                    layout.run();
-                }
+        function resetLayout() {
+            applyLayoutToAll(0);
+        }
+
+        function applyLayoutToAll(layoutIndex) {
+            if (!state.cytoscapeInstances.length) return;
+
+            const normalizedIndex = ((layoutIndex % layoutAlgorithms.length) + layoutAlgorithms.length) % layoutAlgorithms.length;
+            state.currentLayoutIndex = normalizedIndex;
+            const currentLayout = layoutAlgorithms[normalizedIndex];
+
+            const [primaryCy, ...rest] = state.cytoscapeInstances;
+            if (!primaryCy) return;
+
+            const layout = primaryCy.layout(currentLayout.options);
+
+            layout.once('layoutstop', () => {
+                const positions = {};
+                primaryCy.nodes().forEach(node => {
+                    positions[node.id()] = { ...node.position() };
+                });
+
+                // Fit the primary view and mirror positions to every timestep
+                primaryCy.fit(primaryCy.elements(), currentLayout.options.padding || 20);
+
+                rest.forEach(cy => {
+                    cy.nodes().positions(node => positions[node.id()]);
+                    cy.fit(cy.elements(), currentLayout.options.padding || 20);
+                });
             });
+
+            layout.run();
 
             console.log(`Applied layout: ${currentLayout.name}`);
         }
