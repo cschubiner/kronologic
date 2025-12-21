@@ -15,15 +15,53 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
   const rng = mulberry32(randSeed);
   const startTime = Date.now();
-  let assigns = new Array(numVars + 1).fill(0); // 0=unassigned, 1=true, -1=false
-  let occPos = Array.from({ length: numVars + 1 }, () => []);
-  let occNeg = Array.from({ length: numVars + 1 }, () => []);
+  const assigns = new Array(numVars + 1).fill(0); // 0=unassigned, 1=true, -1=false
+  const watchPos = Array.from({ length: numVars + 1 }, () => []);
+  const watchNeg = Array.from({ length: numVars + 1 }, () => []);
+  const watchers = new Array(clauses.length);
+  const activity = new Array(numVars + 1).fill(0);
+  let activityInc = 1;
+  const activityDecay = 0.95;
+
+  function literalIsTrue(lit) {
+    const val = assigns[Math.abs(lit)];
+    return (val === 1 && lit > 0) || (val === -1 && lit < 0);
+  }
+
+  function literalIsFalse(lit) {
+    const val = assigns[Math.abs(lit)];
+    return (val === 1 && lit < 0) || (val === -1 && lit > 0);
+  }
+
+  function addWatch(lit, clauseIndex) {
+    const v = Math.abs(lit);
+    if (lit > 0) watchPos[v].push(clauseIndex);
+    else watchNeg[v].push(clauseIndex);
+  }
+
+  function getWatchList(lit) {
+    const v = Math.abs(lit);
+    return lit > 0 ? watchPos[v] : watchNeg[v];
+  }
+
   for (let i = 0; i < clauses.length; i++) {
-    const c = clauses[i];
-    for (const lit of c) {
-      const v = Math.abs(lit);
-      if (lit > 0) occPos[v].push(i);
-      else occNeg[v].push(i);
+    const clause = clauses[i];
+    if (clause.length === 0) return null;
+    const first = clause[0];
+    const second = clause.length > 1 ? clause[1] : clause[0];
+    watchers[i] = [first, second];
+    addWatch(first, i);
+    addWatch(second, i);
+  }
+
+  function bumpClauseActivity(clause) {
+    for (const lit of clause) {
+      activity[Math.abs(lit)] += activityInc;
+    }
+    activityInc /= activityDecay;
+    if (activityInc > 1e50) {
+      for (let i = 1; i <= numVars; i++) activity[i] *= 1e-50;
+      activityInc *= 1e-50;
     }
   }
 
@@ -43,34 +81,47 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
     while (queue.length) {
       const lit = queue.pop();
       if (!assignLiteral(lit, trail)) return false;
-      const v = Math.abs(lit);
-      const val = lit > 0 ? 1 : -1;
-      const remList = val > 0 ? occNeg[v] : occPos[v];
-      for (const ci of remList) {
+      const falseLit = -lit;
+      const watchList = getWatchList(falseLit);
+      for (let i = 0; i < watchList.length; ) {
+        const ci = watchList[i];
         const clause = clauses[ci];
-        let satisfied = false;
-        let unassigned = 0;
-        let lastUnassigned = 0;
-        for (const lit2 of clause) {
-          const v2 = Math.abs(lit2);
-          const assign = assigns[v2];
-          if (assign === 1 && lit2 > 0) {
-            satisfied = true;
+        const pair = watchers[ci];
+        const firstWatch = pair[0];
+        const secondWatch = pair[1];
+        const other = firstWatch === falseLit ? secondWatch : firstWatch;
+        if (literalIsTrue(other)) {
+          i++;
+          continue;
+        }
+
+        let moved = false;
+        for (const candidate of clause) {
+          if (candidate === other || candidate === falseLit) continue;
+          if (!literalIsFalse(candidate)) {
+            if (firstWatch === falseLit) pair[0] = candidate;
+            else pair[1] = candidate;
+            addWatch(candidate, ci);
+            watchList[i] = watchList[watchList.length - 1];
+            watchList.pop();
+            moved = true;
             break;
-          }
-          if (assign === -1 && lit2 < 0) {
-            satisfied = true;
-            break;
-          }
-          if (assign === 0) {
-            unassigned++;
-            lastUnassigned = lit2;
           }
         }
-        if (satisfied) continue;
-        if (unassigned === 0) return false;
-        if (unassigned === 1) {
-          queue.push(lastUnassigned);
+
+        if (moved) continue;
+
+        const otherAssign = assigns[Math.abs(other)];
+        if (otherAssign === 0) {
+          bumpClauseActivity(clause);
+          if (!assignLiteral(other, trail)) return false;
+          queue.push(other);
+          i++;
+        } else if (literalIsFalse(other)) {
+          bumpClauseActivity(clause);
+          return false;
+        } else {
+          i++;
         }
       }
     }
@@ -78,48 +129,21 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
   }
 
   function chooseLiteral() {
-    const literalScores = new Map();
-    let found = false;
-    for (const clause of clauses) {
-      let satisfied = false;
-      const unassignedLits = [];
-      for (const lit of clause) {
-        const v = Math.abs(lit);
-        const assign = assigns[v];
-        if ((assign === 1 && lit > 0) || (assign === -1 && lit < 0)) {
-          satisfied = true;
-          break;
-        }
-        if (assign === 0) {
-          unassignedLits.push(lit);
-        }
-      }
-      if (satisfied || unassignedLits.length === 0) continue;
-      found = true;
-      const weight = Math.pow(2, -unassignedLits.length);
-      for (const lit of unassignedLits) {
-        literalScores.set(lit, (literalScores.get(lit) || 0) + weight);
-      }
-    }
-    if (found) {
-      const eps = 1e-12;
-      let bestLit = 0;
-      let bestScore = -Infinity;
-      for (const [lit, score] of literalScores.entries()) {
-        if (
-          score > bestScore + eps ||
-          (Math.abs(score - bestScore) <= eps && rng() < 0.5)
-        ) {
-          bestScore = score;
-          bestLit = lit;
-        }
-      }
-      if (bestLit !== 0) return bestLit;
-    }
+    let bestVar = 0;
+    let bestScore = -Infinity;
     for (let v = 1; v <= numVars; v++) {
-      if (assigns[v] === 0) return v;
+      if (assigns[v] !== 0) continue;
+      const score = activity[v];
+      if (
+        score > bestScore ||
+        (Math.abs(score - bestScore) <= 1e-12 && rng() < 0.5)
+      ) {
+        bestScore = score;
+        bestVar = v;
+      }
     }
-    return 0;
+    if (bestVar === 0) return 0;
+    return rng() < 0.5 ? bestVar : -bestVar;
   }
 
   // initial unit clauses
@@ -184,6 +208,17 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
   } catch (e) {
     if (e.message === "SAT_TIMEOUT") return null;
     throw e;
+  }
+
+  for (const clause of clauses) {
+    let clauseSat = false;
+    for (const lit of clause) {
+      if (literalIsTrue(lit)) {
+        clauseSat = true;
+        break;
+      }
+    }
+    if (!clauseSat) return null;
   }
 
   // build boolean array
@@ -594,6 +629,8 @@ export function buildCNF(config) {
         if (t < T - 1) {
           clauses.push([-entry, X(ci, t + 1, gr)]);
           entriesBeforeFinal.push(entry);
+        } else {
+          clauses.push([-entry]);
         }
         if (t < T - 2) {
           clauses.push([-entry, -X(ci, t + 2, gr)]);
