@@ -219,6 +219,7 @@
       <div id="startingInfoAnswer" class="answer-box" style="display:none;">
         <div class="answer-shared" id="startingInfoShared"></div>
       </div>
+      <div id="startingInfoScenarioNote" class="hint tiny" style="display:none; margin-top:8px;"></div>
     </div>
   </section>
 
@@ -945,6 +946,23 @@ function wireCopyButtons(encoded) {
   };
 }
 
+function updateStartingInfoNote(res, cfg) {
+  const noteEl = qs("startingInfoScenarioNote");
+  const curseInfo = res?.priv?.curse_of_amarinta;
+
+  if (noteEl && cfg?.scenarios?.s14 && curseInfo) {
+    const cursedAtSix = curseInfo.final_cursed || [];
+    const cursedLabel = cursedAtSix.length ? cursedAtSix.join(', ') : 'no one';
+    const verb = cursedAtSix.length === 1 ? 'is' : 'are';
+
+    noteEl.innerHTML = `🧿 Scenario 14 clue: <b>${cursedLabel}</b> ${verb} cursed at t=6.`;
+    noteEl.style.display = "block";
+  } else if (noteEl) {
+    noteEl.textContent = "";
+    noteEl.style.display = "none";
+  }
+}
+
 function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, solutions, targetIdx, source }) {
   const encoded = encodeScenarioToURL(res, cfg);
   updateURL(encoded);
@@ -957,6 +975,7 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
   renderTable("schedule", res.schedule, "Character");
   renderTable("byTime", res.byTime, "Time");
   renderTable("visits", res.visits, "Character");
+  updateStartingInfoNote(res, cfg);
 
   const pf = [];
   if (res.priv.phantom) pf.push(`<div>Phantom: <b>${res.priv.phantom}</b></div>`);
