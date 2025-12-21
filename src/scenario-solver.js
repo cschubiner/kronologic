@@ -10,6 +10,17 @@ function mulberry32(a) {
   };
 }
 
+export function resolveSeed(seed) {
+  if (seed == null) {
+    return Math.floor(Math.random() * 0xffffffff);
+  }
+
+  const resolved = Number(seed);
+  return Number.isFinite(resolved)
+    ? resolved
+    : Math.floor(Math.random() * 0xffffffff);
+}
+
 export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
@@ -401,6 +412,7 @@ export function buildCNF(config) {
   const R = config.rooms,
     C = config.chars,
     T = config.T;
+  const resolvedSeed = resolveSeed(config.seed);
   const baseStay = config.allowStay && !config.mustMove;
   const stickyStay = !!(
     config.scenarios &&
@@ -457,7 +469,7 @@ export function buildCNF(config) {
     const vr = Ridx.get(vaultRoom);
     if (vr == null) throw new Error("S11 vault room missing from map");
 
-    const rng = mulberry32(config.seed || 0);
+    const rng = mulberry32(resolvedSeed);
     const keyHolderIdx = Math.floor(rng() * C.length);
 
     const KH = C.map((_, ci) => vp.get(`S11_KH_${C[ci]}`));
@@ -572,7 +584,7 @@ export function buildCNF(config) {
     if (!R.length) throw new Error("S12 requires at least one room");
     if (T < 2) throw new Error("S12 requires at least two timesteps");
 
-    const rng = mulberry32(config.seed || 0);
+    const rng = mulberry32(resolvedSeed);
     const glueRoom = R[Math.floor(rng() * R.length)];
     const gr = Ridx.get(glueRoom);
     if (gr == null) throw new Error("S12 glue room missing from map");
@@ -615,7 +627,7 @@ export function buildCNF(config) {
     if (C.length < 2)
       throw new Error("S13 requires at least two characters (glue + victim)");
 
-    const rng = mulberry32(config.seed || 0);
+    const rng = mulberry32(resolvedSeed);
     const glueIdx = Math.floor(rng() * C.length);
 
     const GS = C.map((_, ci) => vp.get(`S13_GLUE_${C[ci]}`));
@@ -1077,7 +1089,7 @@ export function buildCNF(config) {
     if (C.length < 2) throw new Error("S8 requires at least two characters");
 
     // Randomly choose which character is the freeze based on seed
-    const rng = mulberry32(config.seed || 0);
+    const rng = mulberry32(resolvedSeed);
     const freezeIdx = Math.floor(rng() * C.length);
 
     FRZ = C.map((_, ci) => vp.get(`FRZ_${C[ci]}`));
@@ -1452,7 +1464,8 @@ export function buildCNF(config) {
    =========================== */
 
 export function solveAndDecode(cfg) {
-  const seed = Number(cfg.seed || 0) || 0;
+  const seed = resolveSeed(cfg.seed);
+  cfg = { ...cfg, seed };
   if (Array.isArray(cfg.rooms)) {
     const shuffledRooms = [...cfg.rooms];
     const rng = mulberry32(seed);
