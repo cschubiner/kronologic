@@ -1765,34 +1765,26 @@ export function solveAndDecode(cfg) {
           byRoom.get(room).push(ch);
         }
 
-        const cursedNow = new Set(carriers);
-        const freedNext = new Set();
-        const newlyCursedNext = new Set();
+        const updatedCarriers = new Set(carriers);
 
         for (const room of R) {
           const occupants = byRoom.get(room);
           if (!occupants.length) continue;
           const cursedHere = occupants.filter((ch) => carriers.has(ch));
-          if (!cursedHere.length) continue;
           const uncursedHere = occupants.filter((ch) => !carriers.has(ch));
-          if (!uncursedHere.length) continue;
 
-          for (const ch of occupants) cursedNow.add(ch);
-          cursedHere.forEach((ch) => freedNext.add(ch));
-          uncursedHere.forEach((ch) => newlyCursedNext.add(ch));
+          if (!cursedHere.length || !uncursedHere.length) continue;
+
+          cursedHere.forEach((ch) => updatedCarriers.delete(ch));
+          uncursedHere.forEach((ch) => updatedCarriers.add(ch));
         }
 
-        timeline.push({ time: t + 1, cursed: Array.from(cursedNow).sort() });
-
-        if (t < T - 1) {
-          const nextCarriers = new Set(carriers);
-          for (const ch of freedNext) nextCarriers.delete(ch);
-          for (const ch of newlyCursedNext) nextCarriers.add(ch);
-          carriers = nextCarriers;
-        }
+        timeline.push({ time: t + 1, cursed: Array.from(updatedCarriers).sort() });
+        carriers = updatedCarriers;
       }
 
-      return { timeline, cursedAtSix: timeline[5]?.cursed || [] };
+      const finalCursed = timeline[timeline.length - 1]?.cursed || [];
+      return { timeline, cursedAtSix: timeline[5]?.cursed || finalCursed };
     };
 
     const outcomes = [];
