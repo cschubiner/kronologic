@@ -4,7 +4,7 @@ import { solveAndDecode, neighbors } from "../src/scenario-solver.js";
 // Helper function to run tests with 70% success threshold
 function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
   const results = [];
-  const startSeed = cfg.seed || 0;
+  const startSeed = cfg.seed ?? Math.floor(Math.random() * 1e9);
 
   for (let i = 0; i < 10; i++) {
     const testCfg = { ...cfg, seed: startSeed + i };
