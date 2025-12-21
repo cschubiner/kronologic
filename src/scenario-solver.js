@@ -1789,6 +1789,7 @@ export function solveAndDecode(cfg) {
 
     const outcomes = [];
     const cursedAtTime6ByOrigin = {};
+    const rng = mulberry32(cfg.seed || 0);
 
     for (const ch of C) {
       const sim = simulateCurse(ch);
@@ -1801,14 +1802,11 @@ export function solveAndDecode(cfg) {
       return acc;
     }, {});
 
-    let chosen = null;
-    for (const outcome of outcomes) {
-      if (finalKeyCounts[outcome.finalKey] === 1) {
-        chosen = outcome;
-        break;
-      }
-    }
-    if (!chosen) chosen = outcomes[0];
+    const uniqueOutcomes = outcomes.filter(
+      (outcome) => finalKeyCounts[outcome.finalKey] === 1,
+    );
+    const pool = uniqueOutcomes.length ? uniqueOutcomes : outcomes;
+    const chosen = pool[Math.floor(rng() * pool.length)];
 
     const possibleOrigins = outcomes
       .filter((o) => o.finalKey === chosen.finalKey)
