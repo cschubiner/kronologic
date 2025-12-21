@@ -1044,6 +1044,79 @@
                     </div>
                 </details>
 
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S3: The Singer's Jewels</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> A prized necklace keeps changing hands, starting with whoever first visits the first listed room.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>The first room in the map must be visited at least once.</li>
+                            <li>The first person alone in that room becomes the initial thief; any 1-on-1 meeting passes the jewels.</li>
+                            <li>Other movement is unconstrained, making timeline reconstruction key.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Track who entered the key room first and how the jewels could have passed afterward.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S9: Doctor's Cure</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> A doctor thaws victims who started frozen in place.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>One doctor is chosen at random.</li>
+                            <li>At least one character begins frozen during timestep 1.</li>
+                            <li>The doctor must perform a heal mid-game (not first or last timestep) while sharing the room with the victim.</li>
+                            <li>Healed characters must leave their starting room after thawing.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Identify the doctor, note who started frozen, and log each heal's time and room.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S12: Glue Room</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> One room is sticky—anyone who enters has to stay an extra turn.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>A glue room is randomly selected from the map.</li>
+                            <li>Entering before the final timestep forces the visitor to remain for one more turn, then leave immediately.</li>
+                            <li>At least one non-final entry is guaranteed so the effect is visible.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Determine which room is glued and when each character first entered it.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S13: Glue Shoes</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> One character's shoes make others stick for an extra turn.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>A glue carrier is randomly chosen from the cast.</li>
+                            <li>Anyone sharing a room with the carrier before the final timestep must remain there for exactly one extra turn and then depart.</li>
+                            <li>The carrier is never stuck by their own glue, and at least one sticking event is enforced.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Find the glue carrier and log when each victim was first stuck with them.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S14: The Curse of Amarinta</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> A supernatural curse leaps to uncursed people when they meet the current carrier.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Exactly one character is cursed at time 1.</li>
+                            <li>When cursed and uncursed characters share a room, everyone there is cursed for that timestep; starting next timestep the curse moves to the formerly uncursed attendees.</li>
+                            <li>If only cursed characters meet, the curse doesn't move.</li>
+                            <li>Players get a snapshot of who is cursed at time 6 and must work backward.</li>
+                            <li>Requires at least six timesteps for the time-6 reveal to matter.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Use the time-6 cursed list and meetings to deduce the original carrier at time 1.</p>
+                    </div>
+                </details>
+
                 <p style="margin-top: 12px; font-size: 12px; color: #6b7280; font-style: italic;">
                     Note: Only ONE scenario is active per puzzle. Use this guide to understand the rules and constraints for the scenario you're solving.
                 </p>
