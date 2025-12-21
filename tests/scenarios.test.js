@@ -3046,8 +3046,15 @@ describe("S12: Glue Room", () => {
     };
 
     testWithThreshold(cfg, (res, cfg, seed) => {
+      const shuffledRooms = [...cfg.rooms];
+      const shuffleRng = mulberry32(seed);
+      for (let i = shuffledRooms.length - 1; i > 0; i--) {
+        const j = Math.floor(shuffleRng() * (i + 1));
+        [shuffledRooms[i], shuffledRooms[j]] = [shuffledRooms[j], shuffledRooms[i]];
+      }
+
       const rng = mulberry32(seed);
-      const expectedGlueRoom = cfg.rooms[Math.floor(rng() * cfg.rooms.length)];
+      const expectedGlueRoom = shuffledRooms[Math.floor(rng() * shuffledRooms.length)];
       expect(res.priv.glue_room.glue_room).toBe(expectedGlueRoom);
 
       for (const ch of cfg.chars) {

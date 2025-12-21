@@ -1451,9 +1451,19 @@ export function buildCNF(config) {
    =========================== */
 
 export function solveAndDecode(cfg) {
+  const seed = Number(cfg.seed || 0) || 0;
+  if (Array.isArray(cfg.rooms)) {
+    const shuffledRooms = [...cfg.rooms];
+    const rng = mulberry32(seed);
+    for (let i = shuffledRooms.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffledRooms[i], shuffledRooms[j]] = [shuffledRooms[j], shuffledRooms[i]];
+    }
+    cfg = { ...cfg, rooms: shuffledRooms };
+  }
+
   const { vp, clauses, privKeys } = buildCNF(cfg);
   const numVars = vp.count();
-  const seed = Number(cfg.seed || 0) || 0;
   const solveStartTime = Date.now();
   const sol = satSolve(clauses, numVars, seed);
   const solveTime = Date.now() - solveStartTime;
