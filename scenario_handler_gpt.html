@@ -1178,7 +1178,10 @@ qs("genBtn").addEventListener("click", async ()=>{
     const solutions = [];
     let skipped = 0;
     const seedInput = qs("seed").value.trim();
-    const baseSeed = seedInput === "" ? Math.floor(Math.random() * 10000000) + 1 : Number(seedInput) || 0;
+    const parsedSeed = Number(seedInput);
+    const baseSeed = seedInput === "" || !Number.isFinite(parsedSeed)
+      ? Math.floor(Math.random() * 10000000) + 1
+      : parsedSeed;
 
     for (let i = 0; i < sampleCount; i++) {
       cfg.seed = baseSeed + i;
