@@ -818,9 +818,9 @@ describe("S2: Phantom Scenario", () => {
 });
 
 describe("S3: Singer's Jewels Scenario", () => {
-  it("should ensure the first room is visited at least once", () => {
+  it("should ensure the alphabetically first room is visited at least once", () => {
     const cfg = {
-      rooms: ["Atrium", "Library"],
+      rooms: ["Library", "Atrium"],
       edges: [["Atrium", "Library"]],
       chars: ["A", "B"],
       T: 3,
@@ -833,11 +833,11 @@ describe("S3: Singer's Jewels Scenario", () => {
     const res = solveAndDecode(cfg);
     expect(res).not.toBeNull();
 
-    const firstRoom = cfg.rooms[0];
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
     let visited = false;
     for (const char of cfg.chars) {
       for (let t = 0; t < cfg.T; t++) {
-        if (res.schedule[char][t] === firstRoom) {
+        if (res.schedule[char][t] === alphabeticFirst) {
           visited = true;
           break;
         }
@@ -847,12 +847,13 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(visited).toBe(true);
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should work with mustMove constraint using alphabetic room", () => {
     const cfg = {
-      rooms: ["Hall", "Kitchen", "Study"],
+      rooms: ["Study", "Kitchen", "Hall"],
       edges: [
         ["Hall", "Kitchen"],
         ["Kitchen", "Study"],
+        ["Study", "Hall"],
       ],
       chars: ["A", "B", "C"],
       T: 4,
@@ -865,9 +866,9 @@ describe("S3: Singer's Jewels Scenario", () => {
     const res = solveAndDecode(cfg);
     expect(res).not.toBeNull();
 
-    const firstRoom = cfg.rooms[0];
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
     const visited = cfg.chars.some((char) =>
-      res.schedule[char].includes(firstRoom),
+      res.schedule[char].includes(alphabeticFirst),
     );
     expect(visited).toBe(true);
   });

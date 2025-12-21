@@ -774,13 +774,16 @@ export function buildCNF(config) {
     privKeys.S13 = { GS };
   }
 
-  // S3: Ensure first listed room is visited at least once
+  // S3: Ensure alphabetically first room is visited at least once
   if (config.scenarios.s3) {
     if (!R.length) throw new Error("S3 requires at least one room");
+    const alphabeticRoom = [...R].sort()[0];
+    const ri = Ridx.get(alphabeticRoom);
+    if (ri == null) throw new Error("S3 alphabetic room missing");
     const firstRoomVar = [];
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
-        firstRoomVar.push(X(ci, t, 0));
+        firstRoomVar.push(X(ci, t, ri));
       }
     }
     clauses.push(firstRoomVar);
