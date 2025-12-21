@@ -436,6 +436,13 @@ export function buildCNF(config) {
   // =========== Scenarios ===========
   const privKeys = {};
 
+  if (config.scenarios && config.scenarios.s14) {
+    if (!R.length) throw new Error("S14 requires at least one room");
+    if (C.length < 2) throw new Error("S14 requires at least two characters");
+    if (T < 6) throw new Error("S14 requires at least six timesteps");
+    privKeys.S14 = true;
+  }
+
   // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
   if (config.scenarios && config.scenarios.s11) {
     if (!R.length) throw new Error("S11 requires at least one room");
@@ -1743,6 +1750,86 @@ export function solveAndDecode(cfg) {
     }
 
     priv.glue_shoes = { glue_person: gluePerson, stuck: stuckRecords };
+  }
+
+  if (privKeys.S14) {
+    const simulateCurse = (origin) => {
+      let carriers = new Set([origin]);
+      const timeline = [];
+
+      for (let t = 0; t < T; t++) {
+        const byRoom = new Map();
+        for (const room of R) byRoom.set(room, []);
+        for (const ch of C) {
+          const room = schedule[ch][t];
+          byRoom.get(room).push(ch);
+        }
+
+        const cursedNow = new Set(carriers);
+        const freedNext = new Set();
+        const newlyCursedNext = new Set();
+
+        for (const room of R) {
+          const occupants = byRoom.get(room);
+          if (!occupants.length) continue;
+          const cursedHere = occupants.filter((ch) => carriers.has(ch));
+          if (!cursedHere.length) continue;
+          const uncursedHere = occupants.filter((ch) => !carriers.has(ch));
+          if (!uncursedHere.length) continue;
+
+          for (const ch of occupants) cursedNow.add(ch);
+          cursedHere.forEach((ch) => freedNext.add(ch));
+          uncursedHere.forEach((ch) => newlyCursedNext.add(ch));
+        }
+
+        timeline.push({ time: t + 1, cursed: Array.from(cursedNow).sort() });
+
+        if (t < T - 1) {
+          const nextCarriers = new Set(carriers);
+          for (const ch of freedNext) nextCarriers.delete(ch);
+          for (const ch of newlyCursedNext) nextCarriers.add(ch);
+          carriers = nextCarriers;
+        }
+      }
+
+      return { timeline, cursedAtSix: timeline[5]?.cursed || [] };
+    };
+
+    const outcomes = [];
+    const cursedAtTime6ByOrigin = {};
+
+    for (const ch of C) {
+      const sim = simulateCurse(ch);
+      cursedAtTime6ByOrigin[ch] = sim.cursedAtSix;
+      outcomes.push({ origin: ch, finalKey: sim.cursedAtSix.join("|") || "-", sim });
+    }
+
+    const finalKeyCounts = outcomes.reduce((acc, outcome) => {
+      acc[outcome.finalKey] = (acc[outcome.finalKey] || 0) + 1;
+      return acc;
+    }, {});
+
+    let chosen = null;
+    for (const outcome of outcomes) {
+      if (finalKeyCounts[outcome.finalKey] === 1) {
+        chosen = outcome;
+        break;
+      }
+    }
+    if (!chosen) chosen = outcomes[0];
+
+    const possibleOrigins = outcomes
+      .filter((o) => o.finalKey === chosen.finalKey)
+      .map((o) => o.origin)
+      .sort();
+
+    priv.curse_of_amarinta = {
+      origin: chosen.origin,
+      final_cursed: chosen.sim.cursedAtSix,
+      possible_origins: possibleOrigins,
+      cursed_at_time6_by_origin: cursedAtTime6ByOrigin,
+      timeline: chosen.sim.timeline,
+    };
   }
 
   const stats = {

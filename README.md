@@ -318,6 +318,27 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S14: The Curse of Amarinta
+**Mystery**: A supernatural curse jumps between people whenever the current carrier meets someone who isn't cursed yet.
+
+**Rules**:
+- Exactly one character starts cursed at **Time 1**
+- The curse only changes hands when a cursed and uncursed character share a room in the same timestep
+  - During that meeting, **everyone in the room is cursed** for that time
+  - Starting next timestep, the previously cursed attendees are freed and the previously uncursed attendees now carry the curse
+- If a cursed character is alone or only meets other cursed characters, nothing changes
+- Players learn which characters are cursed at **Time 6** and must work backward to find the original carrier
+- Requires at least six timesteps so the Time 6 snapshot is meaningful
+
+**Goal**: Use the Time 6 cursed list and the meeting pattern to deduce who was cursed in Time 1.
+
+**Difficulty Factors**:
+- Multiple handoff events in quick succession create red herrings about when the curse flipped
+- Rooms hosting mixed groups (cursed and uncursed) make the Time 6 snapshot compatible with fewer origins
+- Long stretches without meetings keep the initial carrier cursed longer, widening the search space
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -354,6 +375,7 @@ Enable one scenario:
 - **S11 (The Vault)**: No configuration needed
 - **S12 (Glue Room)**: No configuration needed
 - **S13 (Glue Shoes)**: No configuration needed
+- **S14 (Curse of Amarinta)**: No configuration needed
 
 ### Difficulty Control
 
