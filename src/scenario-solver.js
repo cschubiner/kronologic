@@ -41,8 +41,12 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
   const watchNeg = Array.from({ length: numVars + 1 }, () => []);
   const watchers = new Array(clauses.length);
   const activity = new Array(numVars + 1).fill(0);
+  const clauseUnassigned = new Array(clauses.length);
+  const clauseSatisfied = new Array(clauses.length).fill(false);
+  const varClauses = Array.from({ length: numVars + 1 }, () => []);
   let activityInc = 1;
   const activityDecay = 0.95;
+  let unresolvedCount = clauses.length;
 
   function literalIsTrue(lit) {
     const val = assigns[Math.abs(lit)];
@@ -73,6 +77,10 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
     watchers[i] = [first, second];
     addWatch(first, i);
     addWatch(second, i);
+    clauseUnassigned[i] = clause.length;
+    for (const lit of clause) {
+      varClauses[Math.abs(lit)].push({ clauseIndex: i, sign: lit });
+    }
   }
 
   function bumpClauseActivity(clause) {
@@ -86,6 +94,43 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
     }
   }
 
+  function applyAssignment(v, val, changes) {
+    for (const { clauseIndex: ci, sign } of varClauses[v]) {
+      const prevSat = clauseSatisfied[ci];
+      const prevUnassigned = clauseUnassigned[ci];
+      let sat = prevSat;
+      let unassigned = prevUnassigned - 1;
+
+      if (
+        !sat &&
+        ((val === 1 && sign > 0) || (val === -1 && sign < 0))
+      ) {
+        sat = true;
+        unresolvedCount--;
+      }
+
+      clauseSatisfied[ci] = sat;
+      clauseUnassigned[ci] = unassigned;
+
+      if (prevSat !== sat || prevUnassigned !== unassigned) {
+        changes.push({ clauseIndex: ci, prevSat, prevUnassigned });
+      }
+    }
+  }
+
+  function revertAssignment(entry) {
+    assigns[entry.var] = 0;
+    for (let i = entry.changes.length - 1; i >= 0; i--) {
+      const change = entry.changes[i];
+      const ci = change.clauseIndex;
+      if (clauseSatisfied[ci] && !change.prevSat) {
+        unresolvedCount++;
+      }
+      clauseSatisfied[ci] = change.prevSat;
+      clauseUnassigned[ci] = change.prevUnassigned;
+    }
+  }
+
   function assignLiteral(lit, trail) {
     const v = Math.abs(lit);
     const val = lit > 0 ? 1 : -1;
@@ -93,8 +138,10 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
     if (current !== 0) {
       return current === val;
     }
+    const entry = { var: v, changes: [] };
+    applyAssignment(v, val, entry.changes);
     assigns[v] = val;
-    trail.push(v);
+    trail.push(entry);
     return true;
   }
 
@@ -181,32 +228,10 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
       throw new Error("SAT_TIMEOUT");
     }
 
-    // check all satisfied?
-    let allSat = true;
-    for (const clause of clauses) {
-      let satisfied = false;
-      let unassigned = false;
-      for (const lit of clause) {
-        const v = Math.abs(lit);
-        const assign = assigns[v];
-        if (assign === 0) {
-          unassigned = true;
-          continue;
-        }
-        if ((assign === 1 && lit > 0) || (assign === -1 && lit < 0)) {
-          satisfied = true;
-          break;
-        }
-      }
-      if (!satisfied) {
-        if (!unassigned) return false;
-        allSat = false;
-      }
-    }
-    if (allSat) return true;
+    if (unresolvedCount === 0) return true;
 
     const lit = chooseLiteral();
-    if (lit === 0) return true; // nothing left
+    if (lit === 0) return false;
     // branch with suggested literal first, then opposite
     for (const tryLit of [lit, -lit]) {
       const trailSize = trail.length;
@@ -218,7 +243,7 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
       }
       while (trail.length > trailSize) {
         const reverted = trail.pop();
-        assigns[reverted] = 0;
+        revertAssignment(reverted);
       }
     }
     return false;
