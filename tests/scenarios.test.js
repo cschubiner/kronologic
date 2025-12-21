@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseMermaid, solveAndDecode, neighbors } from "../src/scenario-solver.js";
+import {
+  parseMermaid,
+  solveAndDecode,
+  neighbors,
+  resolveSeed,
+} from "../src/scenario-solver.js";
 
 // Helper function to run tests with 70% success threshold
 function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
@@ -2884,7 +2889,7 @@ describe("S10: Contagion scenario", () => {
 
 describe("S11: The Vault", () => {
   const pickKeyHolder = (chars, seed) => {
-    const rng = mulberry32(seed || 0);
+    const rng = mulberry32(resolveSeed(seed));
     const idx = Math.floor(rng() * chars.length);
     return chars[idx];
   };
