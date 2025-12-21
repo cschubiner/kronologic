@@ -356,6 +356,11 @@ function scoreScenario(res, cfg) {
     score += scores.glueShoes;
   }
 
+  if (cfg.scenarios.s14 && res.priv.curse_of_amarinta) {
+    scores.curse = scoreCurseOfAmarinta(res, cfg);
+    score += scores.curse;
+  }
+
   return { total: score, breakdown: scores };
 }
 
@@ -730,6 +735,48 @@ function scoreGlueShoes(res, cfg) {
   let score = victims.length * 22;
   score += totalStickEvents * 6;
   score += Math.max(0, T - 3) * 4;
+
+  return score;
+}
+
+function scoreCurseOfAmarinta(res, cfg) {
+  const info = res.priv.curse_of_amarinta;
+  const timeline = info?.timeline || [];
+
+  if (!timeline.length) return 0;
+
+  let handoffs = 0;
+  let totalCursed = 0;
+
+  const symmetricDiffCount = (a, b) => {
+    let count = 0;
+    for (const item of a) {
+      if (!b.has(item)) count++;
+    }
+    for (const item of b) {
+      if (!a.has(item)) count++;
+    }
+    return count;
+  };
+
+  let prevSet = new Set(timeline[0].cursed || []);
+  totalCursed += prevSet.size;
+
+  for (let i = 1; i < timeline.length; i++) {
+    const currentSet = new Set(timeline[i].cursed || []);
+    totalCursed += currentSet.size;
+    handoffs += symmetricDiffCount(prevSet, currentSet);
+    prevSet = currentSet;
+  }
+
+  const cursedAtSix = info.final_cursed?.length
+    ? info.final_cursed
+    : timeline[5]?.cursed || [];
+
+  let score = 0;
+  score += handoffs * 6;
+  score += cursedAtSix.length * 14;
+  score += totalCursed * 3;
 
   return score;
 }
