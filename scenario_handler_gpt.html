@@ -147,6 +147,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s13" value="s13" /> S13: Glue Shoes (identify the glue-shoed character and when each victim was first stuck)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s14" value="s14" /> S14: Curse of Amarinta (trace the original curse carrier)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -264,7 +267,7 @@
   </section>
 </div>
 
-<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder), S12 (Glue Room - sticky room forces two-turn visits), S13 (Glue Shoes - glue carrier makes co-occupants stay an extra turn).</div>
+<div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder), S12 (Glue Room - sticky room forces two-turn visits), S13 (Glue Shoes - glue carrier makes co-occupants stay an extra turn), S14 (Curse of Amarinta - curse handoffs to deduce the origin).</div>
 
 <script type="module">
 /* ===========================
@@ -904,6 +907,9 @@ function getScenarioFromURL() {
 function qs(id){ return document.getElementById(id); }
 let lastRun = null;
 
+// Start with a blank seed so repeated generations default to fresh randomness
+qs("seed").value = "";
+
 function clampPercentile(value) {
   if (Number.isNaN(value)) return 0;
   return Math.min(100, Math.max(0, value));
@@ -1014,6 +1020,14 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       ? stuck.map((s) => `${s.character} @ t=${s.time}, ${s.room}`).join('; ')
       : 'No one stuck';
     pf.push(`Glue Shoes: carrier <b>${info.glue_person}</b>; stuck victims: ${stuckLabel}`);
+  }
+  if (res.priv.curse_of_amarinta) {
+    const info = res.priv.curse_of_amarinta;
+    const finalList = info.final_cursed?.length ? info.final_cursed.join(', ') : 'No one cursed at t=6';
+    const possibles = info.possible_origins?.length ? info.possible_origins.join(', ') : 'n/a';
+    pf.push(
+      `Curse of Amarinta: starting carrier <b>${info.origin}</b>; cursed @ t=6: ${finalList}; possible origins from t=6 state: ${possibles}`,
+    );
   }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);
   qs("privateFacts").innerHTML = pf.join("");
@@ -1135,6 +1149,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s11: scenarioValue === 's11',
       s12: scenarioValue === 's12',
       s13: scenarioValue === 's13',
+      s14: scenarioValue === 's14',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
