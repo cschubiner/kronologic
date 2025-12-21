@@ -339,6 +339,7 @@ export function parseMermaid(txt) {
     if (!line.includes("---")) continue;
 
     // Extract all quoted or unquoted tokens
+    re.lastIndex = 0;
     const tokens = [];
     let match;
     while ((match = re.exec(line)) !== null) {

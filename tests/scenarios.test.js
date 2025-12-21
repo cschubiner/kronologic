@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { solveAndDecode, neighbors } from "../src/scenario-solver.js";
+import { parseMermaid, solveAndDecode, neighbors } from "../src/scenario-solver.js";
 
 // Helper function to run tests with 70% success threshold
 function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
@@ -141,6 +141,25 @@ function s9FrozenRange(charCount, ratio = 0.3) {
   const maxFrozen = Math.min(charCount - 1, targetFrozen + slack);
   return [Math.min(minFrozen, maxFrozen), Math.max(minFrozen, maxFrozen)];
 }
+
+describe("parseMermaid", () => {
+  it("parses successive edge lines without skipping any connections", () => {
+    const diagram = `
+    A---B
+    B---C
+    C---D
+    `;
+
+    const parsed = parseMermaid(diagram);
+
+    expect(parsed.rooms).toEqual(["A", "B", "C", "D"]);
+    expect(parsed.edges).toEqual([
+      ["A", "B"],
+      ["B", "C"],
+      ["C", "D"],
+    ]);
+  });
+});
 
 describe("S1: Poison Scenario", () => {
   it("should always make first character the assassin", () => {
