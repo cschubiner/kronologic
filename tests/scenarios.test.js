@@ -91,6 +91,48 @@ function computeInfections(schedule, cfg) {
   return { contagiousRoom, infectionTimes, infectionOrder, timeline };
 }
 
+function simulateCurse(schedule, cfg, origin) {
+  let carriers = new Set([origin]);
+  const timeline = [];
+
+  for (let t = 0; t < cfg.T; t++) {
+    const byRoom = new Map();
+    for (const room of cfg.rooms) byRoom.set(room, []);
+    for (const ch of cfg.chars) {
+      const room = schedule[ch][t];
+      byRoom.get(room).push(ch);
+    }
+
+    const cursedNow = new Set(carriers);
+    const freedNext = new Set();
+    const newlyCursedNext = new Set();
+
+    for (const room of cfg.rooms) {
+      const occupants = byRoom.get(room);
+      if (!occupants.length) continue;
+      const cursedHere = occupants.filter((ch) => carriers.has(ch));
+      if (!cursedHere.length) continue;
+      const uncursedHere = occupants.filter((ch) => !carriers.has(ch));
+      if (!uncursedHere.length) continue;
+
+      for (const ch of occupants) cursedNow.add(ch);
+      cursedHere.forEach((ch) => freedNext.add(ch));
+      uncursedHere.forEach((ch) => newlyCursedNext.add(ch));
+    }
+
+    timeline.push({ time: t + 1, cursed: Array.from(cursedNow).sort() });
+
+    if (t < cfg.T - 1) {
+      const nextCarriers = new Set(carriers);
+      for (const ch of freedNext) nextCarriers.delete(ch);
+      for (const ch of newlyCursedNext) nextCarriers.add(ch);
+      carriers = nextCarriers;
+    }
+  }
+
+  return timeline;
+}
+
 function mulberry32(a) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -3228,6 +3270,70 @@ describe("S13: Glue Shoes", () => {
           res.schedule[glueCarrier][t + 1],
         );
       }
+    });
+  });
+});
+
+describe("S14: The Curse of Amarinta", () => {
+  it("tracks the curse timeline and final state from a chosen origin", () => {
+    const cfg = {
+      rooms: ["Hall", "Garden"],
+      edges: [["Hall", "Garden"]],
+      chars: ["A", "B", "C"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s14: true },
+      seed: 14,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const curse = res.priv.curse_of_amarinta;
+      expect(curse).toBeTruthy();
+
+      const expectedTimeline = simulateCurse(res.schedule, cfg, curse.origin);
+      expect(curse.timeline.map((entry) => entry.cursed)).toEqual(
+        expectedTimeline.map((entry) => entry.cursed),
+      );
+      expect(curse.timeline).toHaveLength(cfg.T);
+      expect(curse.final_cursed).toEqual(expectedTimeline[5].cursed);
+    });
+  });
+
+  it("maps every possible origin to its cursed set at time 6", () => {
+    const cfg = {
+      rooms: ["Atrium", "Tower", "Vault"],
+      edges: [
+        ["Atrium", "Tower"],
+        ["Tower", "Vault"],
+        ["Vault", "Atrium"],
+      ],
+      chars: ["Inez", "Jade", "Kari", "Lark"],
+      T: 6,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s14: true },
+      seed: 21,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const curse = res.priv.curse_of_amarinta;
+      const finalByOrigin = {};
+
+      for (const ch of cfg.chars) {
+        const sim = simulateCurse(res.schedule, cfg, ch);
+        finalByOrigin[ch] = sim[5].cursed;
+      }
+
+      expect(curse.cursed_at_time6_by_origin).toEqual(finalByOrigin);
+
+      const targetKey = curse.final_cursed.join("|");
+      const expectedOrigins = cfg.chars
+        .filter((ch) => finalByOrigin[ch].join("|") === targetKey)
+        .sort();
+
+      expect(curse.possible_origins).toEqual(expectedOrigins);
+      expect(expectedOrigins).toContain(curse.origin);
     });
   });
 });
