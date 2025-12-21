@@ -1789,7 +1789,7 @@ export function solveAndDecode(cfg) {
 
     const outcomes = [];
     const cursedAtTime6ByOrigin = {};
-    const rng = mulberry32(cfg.seed || 0);
+    const rng = cfg.seed == null ? Math.random : mulberry32(cfg.seed);
 
     for (const ch of C) {
       const sim = simulateCurse(ch);
