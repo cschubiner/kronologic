@@ -1,0 +1,1835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Scenario Handler v2 (Improved UI)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg:#0b0f14;
+    --fg:#e6edf3;
+    --muted:#9fb1c1;
+    --accent:#4da3ff;
+    --bad:#ff6b6b;
+    --good:#42d392;
+    --card:#121821;
+    --row-even:#0e141b;
+    --row-odd:#141c26;
+    /* Character colors */
+    --char-1:#4da3ff;
+    --char-2:#42d392;
+    --char-3:#f59e0b;
+    --char-4:#a855f7;
+    --char-5:#ec4899;
+    --char-6:#14b8a6;
+    --char-7:#f97316;
+    --char-8:#8b5cf6;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; overflow-x:hidden; }
+  header { padding:16px 20px; border-bottom:1px solid #18222f; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:18px; letter-spacing:.5px; color:#cfe6ff; }
+  .link-button { color:var(--fg); border:1px solid #253244; padding:8px 10px; border-radius:10px; text-decoration:none; background:#0e141b; }
+  .link-button:hover { border-color:var(--accent); color:var(--accent); }
+  .wrap { display:grid; grid-template-columns: 1fr; gap:16px; padding:16px; max-width:100vw; }
+  @media (min-width: 1024px) {
+    .wrap { grid-template-columns: 460px 1fr; }
+  }
+  .card { background:var(--card); border:1px solid #18222f; border-radius:12px; padding:16px; max-width:100%; overflow:hidden; }
+  .card h2 { margin:0 0 12px; font-size:14px; color:#cfe6ff; letter-spacing:.4px; display:flex; align-items:center; gap:8px; }
+  .card h2 .help-icon {
+    cursor: help;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    background:#253244;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    color:var(--muted);
+    position: relative;
+  }
+  .card h2 .help-icon:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 8px;
+    background: #1e2936;
+    border: 1px solid #253244;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: normal;
+    white-space: nowrap;
+    z-index: 100;
+    color: var(--fg);
+    max-width: 300px;
+    white-space: normal;
+  }
+  textarea, input, select, button { font: inherit; box-sizing:border-box; }
+  textarea { width:100%; max-width:100%; height:160px; background:#0e141b; color:var(--fg); border:1px solid #253244; border-radius:10px; padding:12px; box-sizing:border-box; font-size:14px; }
+  .row { display:flex; gap:10px; align-items:center; margin:8px 0; flex-wrap:wrap; }
+  .row input[type="text"], .row input[type="number"], .row input[type="range"] { min-width:0; flex:1 1 auto; }
+  #percentileValue { color:var(--muted); font-size:13px; min-width:48px; text-align:right; }
+  .row label { color:var(--muted); font-size:13px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .chip { background:#0e141b; border:1px dashed #31455e; padding:6px 8px; border-radius:999px; }
+  .pill { padding:6px 10px; border-radius:999px; font-size:13px; border:1px solid #253244; color:#d8e6f6; background:#0e141b; min-width:0; max-width:100%; }
+  button.primary { background:var(--accent); color:#001122; border:none; padding:10px 16px; border-radius:10px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  button.primary:hover { background:#5fb3ff; }
+  button.ghost { background:#0e141b; color:var(--fg); border:1px solid #253244; padding:8px 12px; border-radius:10px; cursor:pointer; white-space:nowrap; }
+  button.ghost:hover { border-color:var(--accent); color:var(--accent); }
+  button.preset { background:#1a2433; color:var(--muted); border:1px solid #253244; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:12px; }
+  button.preset:hover { border-color:var(--accent); color:var(--accent); }
+  button.preset.active { border-color:var(--accent); color:var(--accent); background:#1e3a5f; }
+
+  /* Improved table styles */
+  table { width:100%; border-collapse:collapse; white-space:nowrap; font-size:15px; }
+  .table-scroll { overflow-x:auto; max-width:100%; }
+  thead { position:sticky; top:0; z-index:10; }
+  th, td { border-bottom:1px solid #223146; padding:12px 16px; text-align:left; }
+  th { color:#cfe6ff; font-weight:600; font-size:13px; background:var(--card); text-transform:uppercase; letter-spacing:0.5px; }
+  tbody tr:nth-child(odd) { background:var(--row-odd); }
+  tbody tr:nth-child(even) { background:var(--row-even); }
+  tbody tr:hover { background:#1a2636; }
+
+  /* Character color dots */
+  .char-dot {
+    display:inline-block;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    margin-right:8px;
+    vertical-align:middle;
+  }
+  .char-dot-1 { background:var(--char-1); }
+  .char-dot-2 { background:var(--char-2); }
+  .char-dot-3 { background:var(--char-3); }
+  .char-dot-4 { background:var(--char-4); }
+  .char-dot-5 { background:var(--char-5); }
+  .char-dot-6 { background:var(--char-6); }
+  .char-dot-7 { background:var(--char-7); }
+  .char-dot-8 { background:var(--char-8); }
+
+  .muted { color:var(--muted); }
+  .warn { color:var(--bad); }
+  .ok { color:var(--good); }
+  .tiny { font-size:13px; }
+  .grid { display:grid; grid-template-columns: 1fr; gap:16px; }
+  @media (min-width: 768px) {
+    .grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; word-break:break-all; }
+  pre { overflow-x:auto; max-width:100%; }
+  .hint { color:#9fb1c1; font-size:13px; word-break:break-word; }
+  .footer { padding:12px 16px; border-top:1px solid #18222f; color:#7ea2c7; font-size:12px; }
+  @media (max-width: 640px) {
+    header h1 { font-size:16px; }
+    .hint { font-size:12px; }
+    textarea { height:120px; font-size:13px; }
+    button.primary, button.ghost { padding:8px 12px; font-size:13px; }
+  }
+  .question-interface { margin-top:16px; }
+  .question-type { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  .question-type button { flex:1; min-width:140px; }
+  .question-form { display:none; }
+  .question-form.active { display:block; }
+  .answer-box { margin-top:12px; padding:12px; border-radius:8px; background:#0e141b; border:1px solid #253244; }
+  .answer-shared { color:#42d392; font-weight:600; margin-bottom:8px; }
+  .answer-private { color:#9fb1c1; font-size:13px; margin-top:8px; }
+  .answer-private.hidden { filter: blur(8px); user-select: none; }
+  .private-toggle { font-size:12px; padding:6px 12px; cursor:pointer; margin-top:8px; display:inline-block; }
+  select.pill { padding:6px 10px; }
+
+  /* Quick Start Guide */
+  .quick-start {
+    background: linear-gradient(135deg, #1a2636 0%, #121821 100%);
+    border: 1px solid #253244;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .quick-start summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #cfe6ff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    list-style: none;
+  }
+  .quick-start summary::-webkit-details-marker { display: none; }
+  .quick-start summary::before {
+    content: "▶";
+    margin-right: 8px;
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+  .quick-start[open] summary::before { transform: rotate(90deg); }
+  .quick-start-content {
+    margin-top: 16px;
+    display: grid;
+    gap: 16px;
+  }
+  .quick-start-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .step-number {
+    background: var(--accent);
+    color: #001122;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .step-content h3 { margin: 0 0 4px; font-size: 14px; color: var(--fg); }
+  .step-content p { margin: 0; font-size: 13px; color: var(--muted); }
+  .step-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .hide-forever { font-size: 11px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+  .hide-forever:hover { color: var(--accent); }
+
+  /* Scenario cards */
+  .scenario-grid {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .scenario-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #0e141b;
+    border: 1px solid #253244;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .scenario-option:hover { border-color: #3a5068; }
+  .scenario-option.selected { border-color: var(--accent); background: #1e3a5f22; }
+  .scenario-option input[type="radio"] { margin-top: 2px; flex-shrink: 0; }
+  .scenario-label { flex: 1; }
+  .scenario-label .name { font-weight: 600; font-size: 13px; color: var(--fg); }
+  .scenario-label .desc { font-size: 12px; color: var(--muted); margin-top: 2px; font-style: italic; }
+  .scenario-extra { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #253244; }
+  .scenario-option.selected .scenario-extra { display: block; }
+
+  /* Collapsible private facts */
+  .private-facts-container { display: flex; flex-direction: column; gap: 8px; }
+  .private-fact-group {
+    border: 1px solid #253244;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .private-fact-header {
+    background: #0e141b;
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+  .private-fact-header:hover { background: #141c26; }
+  .private-fact-header .arrow {
+    transition: transform 0.2s;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .private-fact-group.open .arrow { transform: rotate(90deg); }
+  .private-fact-header .count {
+    margin-left: auto;
+    background: #253244;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .private-fact-content {
+    display: none;
+    padding: 0 12px 12px;
+    background: #0a0e13;
+  }
+  .private-fact-group.open .private-fact-content { display: block; }
+  .private-fact-item {
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px solid #1a2230;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .private-fact-item:last-child { border-bottom: none; }
+
+  /* Tooltips */
+  .tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .tooltip-icon {
+    cursor: help;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #253244;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .tooltip-icon:hover + .tooltip-content,
+  .tooltip-content:hover {
+    display: block;
+  }
+  .tooltip-content {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 8px;
+    background: #1e2936;
+    border: 1px solid #253244;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: normal;
+    z-index: 100;
+    color: var(--fg);
+    width: 220px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .tooltip-content strong { color: var(--accent); }
+
+  /* Template dropdown */
+  .template-select {
+    margin-bottom: 12px;
+  }
+  .template-select select {
+    width: 100%;
+    padding: 10px 12px;
+    background: #0e141b;
+    border: 1px solid #253244;
+    border-radius: 8px;
+    color: var(--fg);
+    font-size: 14px;
+  }
+
+  /* Difficulty slider styling */
+  .difficulty-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+  .difficulty-row input[type="range"] {
+    flex: 1;
+    min-width: 150px;
+    height: 6px;
+    -webkit-appearance: none;
+    background: linear-gradient(to right, var(--good) 0%, var(--accent) 50%, var(--bad) 100%);
+    border-radius: 3px;
+  }
+  .difficulty-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--fg);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--accent);
+  }
+  .difficulty-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: -4px;
+  }
+
+  /* Expand all button */
+  .expand-all-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    margin-left: auto;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scenario Handler v2</h1>
+  <a class="link-button" href="./digital-note-sheet.html" target="_blank" rel="noopener">Open Digital Note Taker</a>
+</header>
+
+<div class="wrap">
+  <!-- Quick Start Guide -->
+  <section style="grid-column: 1 / -1;">
+    <details class="quick-start" id="quickStart" open>
+      <summary>
+        Quick Start Guide
+        <span class="hide-forever" id="hideForever">Hide forever</span>
+      </summary>
+      <div class="quick-start-content">
+        <div class="quick-start-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Setup Map</h3>
+            <p>Choose a map template or draw your own rooms and connections.</p>
+            <div class="step-buttons">
+              <button class="preset" data-template="mansion">Mansion</button>
+              <button class="preset" data-template="office">Office</button>
+              <button class="preset" data-template="castle">Castle</button>
+              <button class="preset" data-template="island">Island</button>
+            </div>
+          </div>
+        </div>
+        <div class="quick-start-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Add Characters</h3>
+            <p>Enter 3-6 character names (or use default names).</p>
+            <div class="step-buttons">
+              <button class="preset" id="defaultCharsBtn">Use defaults: Alice, Bob, Carol...</button>
+            </div>
+          </div>
+        </div>
+        <div class="quick-start-step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>Generate & Play</h3>
+            <p>Select a scenario type, click Generate, then use the Question Interface to solve the mystery!</p>
+          </div>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>
+      Map Configuration
+      <span class="help-icon" data-tooltip="Define the rooms and connections for your mystery. Rooms are connected by doors (---). Characters can only move between connected rooms.">?</span>
+    </h2>
+
+    <div class="template-select">
+      <select id="mapTemplate">
+        <option value="">-- Select a map template --</option>
+        <option value="small">Small House (4 rooms)</option>
+        <option value="mansion">Mansion (7 rooms)</option>
+        <option value="office">Office Building (6 rooms)</option>
+        <option value="castle">Castle (8 rooms)</option>
+        <option value="island">Island Resort (5 rooms)</option>
+      </select>
+    </div>
+
+    <div class="hint tiny" style="margin-bottom:8px;">Use <span class="mono">---</span> to connect rooms. Edit the text below or pick a template above.</div>
+    <textarea id="mermaidInput">graph TD
+  Foyer --- Stairs
+  Foyer --- Gallery
+  Gallery --- Stairs
+  Gallery --- Masks
+  Masks --- DanceRoom
+  Masks --- MusicRoom
+  MusicRoom --- DanceRoom</textarea>
+
+    <h2 style="margin-top:16px;">
+      Characters
+      <span class="help-icon" data-tooltip="Enter character names separated by commas. Use short names (3-6 characters) for best table display. You need at least 2 characters.">?</span>
+    </h2>
+    <div class="row" style="margin-bottom:8px;">
+      <span class="muted tiny">Quick presets:</span>
+      <button class="preset" data-chars="3">3 chars</button>
+      <button class="preset" data-chars="4">4 chars</button>
+      <button class="preset" data-chars="5">5 chars</button>
+      <button class="preset" data-chars="6">6 chars</button>
+    </div>
+    <input id="chars" class="pill" value="Alice, Bob, Carol, Dave" style="width:100%;" />
+    <div class="hint tiny" style="margin-top:4px;">One name per comma. Short names display best in tables.</div>
+
+    <div class="row" style="margin-top:16px;">
+      <label for="steps" class="tooltip-wrapper">
+        Timesteps:
+        <span class="tooltip-icon">?</span>
+        <span class="tooltip-content">How many time periods in the mystery? <strong>3-5 recommended</strong> for beginners. More timesteps = more complex puzzle.</span>
+      </label>
+      <input id="steps" type="number" min="2" max="10" class="pill" value="6" style="width:80px;" />
+    </div>
+    <div class="row">
+      <label>Movement:</label>
+      <label><input type="checkbox" id="mustMove" checked /> Must move each time</label>
+      <label><input type="checkbox" id="allowStay" /> Allow stay</label>
+    </div>
+    <div class="row">
+      <label for="seed">Seed (optional):</label>
+      <input id="seed" type="text" class="pill" placeholder="blank = random" style="width:120px;" />
+      <button class="ghost" id="validateBtn">Validate Map</button>
+    </div>
+
+    <h2 style="margin-top:20px;">
+      Choose Scenario Type
+      <span class="help-icon" data-tooltip="Each scenario type has different rules for what happened. Pick one that matches the kind of mystery you want to create.">?</span>
+    </h2>
+
+    <div class="scenario-grid" id="scenarioGrid">
+      <!-- Populated by JavaScript -->
+    </div>
+
+    <div id="s1Extra" style="display:none; margin-top:12px; padding:12px; background:#0e141b; border-radius:8px;">
+      <div class="row tiny">
+        <label>Poison room (optional):</label>
+        <input id="s1_room" class="pill" placeholder="e.g., Office" style="width:100px;" />
+        <label>Poison time:</label>
+        <input id="s1_time" class="pill" placeholder="e.g., 3" style="width:60px;" />
+      </div>
+      <div class="hint tiny" style="margin-top:4px;">The assassin is always the first character in your list.</div>
+    </div>
+
+    <h2 style="margin-top:20px;">
+      Difficulty
+      <span class="help-icon" data-tooltip="Higher percentile = harder puzzle with fewer clues. Lower = easier with more obvious solutions.">?</span>
+    </h2>
+    <div class="difficulty-row">
+      <input id="percentile" type="range" min="0" max="100" step="0.1" value="50" />
+      <span id="percentileValue" style="min-width:50px; font-weight:600;">50%</span>
+    </div>
+    <div class="difficulty-labels">
+      <span>Easy (more clues)</span>
+      <span>Hard (fewer clues)</span>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <label>Samples to generate:</label>
+      <input id="samples" type="number" min="10" max="5000" class="pill" value="10" style="width:80px;" />
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button class="primary" id="genBtn">Generate Scenario</button>
+      <button class="ghost" id="reuseBtn" disabled>Pick From Last Run</button>
+    </div>
+    <div id="status" class="hint" style="margin-top:8px;"></div>
+  </section>
+
+  <section class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h2 style="margin:0;">Results</h2>
+      <button class="ghost" id="toggleResultsBtn" style="display:none; font-size:12px;">Collapse</button>
+    </div>
+    <div id="resultsHint" class="hint tiny">No results yet. Configure your scenario and click Generate.</div>
+    <div id="results" style="display:none">
+      <div class="grid">
+        <div class="card">
+          <h2>Schedule (Characters x Time)</h2>
+          <div id="schedule" class="table-scroll"></div>
+        </div>
+        <div class="card">
+          <h2>Counts by Time</h2>
+          <div id="byTime" class="table-scroll"></div>
+        </div>
+        <div class="card">
+          <h2>Character Visits</h2>
+          <div id="visits" class="table-scroll"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0;">Private Facts</h2>
+            <button class="ghost expand-all-btn" id="expandAllFacts">Expand All</button>
+          </div>
+          <div id="privateFacts" class="private-facts-container" style="margin-top:12px;"></div>
+        </div>
+        <div class="card">
+          <h2>Generation Statistics</h2>
+          <div id="genStats" class="tiny"></div>
+        </div>
+        <div class="card">
+          <h2>Scenario String</h2>
+          <div class="hint tiny">Share this string or URL to recreate this exact scenario.</div>
+          <textarea id="scenarioString" class="mono tiny" readonly style="height:80px; font-size:11px; resize:vertical; margin-top:8px;"></textarea>
+          <div class="row" style="margin-top:8px;">
+            <button class="ghost" id="copyScenarioBtn">Copy String</button>
+            <button class="ghost" id="copyURLBtn">Copy URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Starting Information</h2>
+    <div class="starting-info-interface">
+      <div class="row">
+        <label>Timestep:</label>
+        <select id="startingTime" class="pill"></select>
+        <label>Number of characters:</label>
+        <input id="startingCharCount" type="number" min="1" max="10" class="pill" value="3" style="width:80px;" />
+        <button class="primary" id="showStartingInfoBtn">Show Starting Positions</button>
+      </div>
+      <div id="startingInfoAnswer" class="answer-box" style="display:none;">
+        <div class="answer-shared" id="startingInfoShared"></div>
+      </div>
+      <div id="startingInfoScenarioNote" class="hint tiny" style="display:none; margin-top:8px;"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Question Interface</h2>
+    <div class="question-interface">
+      <div class="question-type">
+        <button class="ghost" id="askLocTimeBtn">Location + Time</button>
+        <button class="ghost" id="askLocCharBtn">Location + Character</button>
+      </div>
+
+      <div id="locTimeForm" class="question-form">
+        <div class="row">
+          <label>Location:</label>
+          <select id="locTimeLocation" class="pill"></select>
+          <label>Time:</label>
+          <select id="locTimeTime" class="pill"></select>
+          <button class="primary" id="askLocTimeSubmit">Ask</button>
+        </div>
+        <div id="locTimeAnswer" class="answer-box" style="display:none;">
+          <div class="answer-shared" id="locTimeShared"></div>
+          <div>
+            <button class="ghost private-toggle" id="locTimeToggle">Show Private</button>
+          </div>
+          <div class="answer-private hidden" id="locTimePrivate"></div>
+        </div>
+      </div>
+
+      <div id="locCharForm" class="question-form">
+        <div class="row">
+          <label>Location:</label>
+          <select id="locCharLocation" class="pill"></select>
+          <label>Character:</label>
+          <select id="locCharChar" class="pill"></select>
+          <button class="primary" id="askLocCharSubmit">Ask</button>
+        </div>
+        <div id="locCharAnswer" class="answer-box" style="display:none;">
+          <div class="answer-shared" id="locCharShared"></div>
+          <div>
+            <button class="ghost private-toggle" id="locCharToggle">Show Private</button>
+          </div>
+          <div class="answer-private hidden" id="locCharPrivate"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="footer tiny">SAT core: DPLL + unit propagation. Scenarios: S1-S14 covering poison, phantom, jewels, bomb duo, lovers, freeze, doctor, contagion, vault, glue room, glue shoes, and curse mysteries.</div>
+
+<script type="module">
+import {
+  parseMermaid,
+  neighbors,
+  buildCNF,
+  solveAndDecode
+} from './src/scenario-solver.js';
+
+/* ===========================
+   Scenario Definitions
+   =========================== */
+const SCENARIOS = [
+  { id: 's1', name: 'Poison Mystery', desc: 'Someone did something. Who is the assassin?' },
+  { id: 's2', name: 'Phantom', desc: 'One character is alone at every time. Who?' },
+  { id: 's3', name: "Singer's Jewels", desc: 'Someone must enter the first room. Who took them?' },
+  { id: 's4', name: 'Bomb Duo', desc: 'Two culprits are the only pair ever alone together.' },
+  { id: 's5', name: 'Lovers', desc: 'Two lovers never meet; all other pairs must meet.' },
+  { id: 's6', name: 'Phantom + Lovers', desc: 'One phantom plus two separate lovers.' },
+  { id: 's7', name: 'Aggrosassin', desc: 'Serial poisoner who kills everyone they meet 1-on-1.' },
+  { id: 's8', name: 'The Freeze', desc: 'Mr. Freeze freezes victims in place.' },
+  { id: 's9', name: "Doctor's Cure", desc: 'Frozen victims thaw mid-game.' },
+  { id: 's10', name: 'Contagion', desc: 'First room infects entrants; track infection order.' },
+  { id: 's11', name: 'The Vault', desc: 'Only the key holder may enter the locked room.' },
+  { id: 's12', name: 'Glue Room', desc: 'Sticky room forces two-turn visits.' },
+  { id: 's13', name: 'Glue Shoes', desc: 'Glue carrier makes co-occupants stay an extra turn.' },
+  { id: 's14', name: 'Curse of Amarinta', desc: 'Trace the original curse carrier.' }
+];
+
+/* ===========================
+   Map Templates
+   =========================== */
+const MAP_TEMPLATES = {
+  small: `graph TD
+  Kitchen --- Hall
+  Hall --- Bedroom
+  Bedroom --- Bathroom
+  Hall --- LivingRoom`,
+  mansion: `graph TD
+  Foyer --- Stairs
+  Foyer --- Gallery
+  Gallery --- Stairs
+  Gallery --- Masks
+  Masks --- DanceRoom
+  Masks --- MusicRoom
+  MusicRoom --- DanceRoom`,
+  office: `graph TD
+  Lobby --- Elevator
+  Elevator --- Floor2
+  Floor2 --- ConferenceRoom
+  Floor2 --- OpenOffice
+  OpenOffice --- Kitchen
+  Kitchen --- Breakroom`,
+  castle: `graph TD
+  Gate --- Courtyard
+  Courtyard --- GreatHall
+  GreatHall --- Throne
+  Courtyard --- Tower
+  Tower --- Balcony
+  GreatHall --- Dungeon
+  Dungeon --- SecretPassage
+  SecretPassage --- Throne`,
+  island: `graph TD
+  Beach --- Dock
+  Dock --- Jungle
+  Jungle --- Waterfall
+  Waterfall --- Cave
+  Jungle --- Hut`
+};
+
+/* ===========================
+   Character Colors
+   =========================== */
+const CHAR_COLORS = [
+  '#4da3ff', '#42d392', '#f59e0b', '#a855f7',
+  '#ec4899', '#14b8a6', '#f97316', '#8b5cf6'
+];
+
+const DEFAULT_CHARS = ['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank'];
+
+/* ===========================
+   Scoring Functions
+   =========================== */
+function scoreScenario(res, cfg) {
+  let score = 0;
+  const scores = {};
+
+  if (cfg.scenarios.s2 && res.priv.phantom) {
+    scores.phantom = scorePhantom(res, cfg);
+    score += scores.phantom;
+  }
+  if (cfg.scenarios.s5 && res.priv.lovers) {
+    scores.lovers = scoreLovers(res, cfg);
+    score += scores.lovers;
+  }
+  if (cfg.scenarios.s1 && res.priv.assassin) {
+    scores.poison = scorePoison(res, cfg);
+    score += scores.poison;
+  }
+  if (cfg.scenarios.s4 && res.priv.bomb_duo) {
+    scores.bomb = scoreBomb(res, cfg);
+    score += scores.bomb;
+  }
+  if (cfg.scenarios.s3) {
+    scores.jewels = scoreJewels(res, cfg);
+    score += scores.jewels;
+  }
+  if (cfg.scenarios.s7 && res.priv.aggrosassin) {
+    scores.aggrosassin = scoreAggrosassin(res, cfg);
+    score += scores.aggrosassin;
+  }
+  if (cfg.scenarios.s8 && res.priv.freeze) {
+    scores.freeze = scoreFreeze(res, cfg);
+    score += scores.freeze;
+  }
+  if (cfg.scenarios.s9 && res.priv.doctor) {
+    scores.doctor = scoreDoctor(res, cfg);
+    score += scores.doctor;
+  }
+  if (cfg.scenarios.s10 && res.priv.contagion) {
+    scores.contagion = scoreContagion(res, cfg);
+    score += scores.contagion;
+  }
+  if (cfg.scenarios.s11 && res.priv.vault) {
+    scores.vault = scoreVault(res, cfg);
+    score += scores.vault;
+  }
+  if (cfg.scenarios.s12 && res.priv.glue_room) {
+    scores.glueRoom = scoreGlueRoom(res, cfg);
+    score += scores.glueRoom;
+  }
+  if (cfg.scenarios.s13 && res.priv.glue_shoes) {
+    scores.glueShoes = scoreGlueShoes(res, cfg);
+    score += scores.glueShoes;
+  }
+  if (cfg.scenarios.s14 && res.priv.curse_of_amarinta) {
+    scores.curse = scoreCurseOfAmarinta(res, cfg);
+    score += scores.curse;
+  }
+  return { total: score, breakdown: scores };
+}
+
+function scorePhantom(res, cfg) {
+  const phantom = res.priv.phantom;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  let score = 0;
+  for (const char of chars) {
+    if (char === phantom) continue;
+    let aloneCount = 0;
+    for (let t = 0; t < T; t++) {
+      const room = res.schedule[char][t];
+      const othersInRoom = chars.filter(c => c !== char && res.schedule[c][t] === room).length;
+      if (othersInRoom === 0) aloneCount++;
+    }
+    if (aloneCount >= T - 2) score += 100 * (aloneCount / T);
+    else if (aloneCount >= T / 2) score += 50 * (aloneCount / T);
+  }
+  return score;
+}
+
+function scoreLovers(res, cfg) {
+  const [lover1, lover2] = res.priv.lovers;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  let score = 0;
+  for (let i = 0; i < chars.length; i++) {
+    for (let j = i + 1; j < chars.length; j++) {
+      const c1 = chars[i], c2 = chars[j];
+      if ((c1 === lover1 && c2 === lover2) || (c1 === lover2 && c2 === lover1)) continue;
+      let meetings = 0;
+      for (let t = 0; t < T; t++) {
+        if (res.schedule[c1][t] === res.schedule[c2][t]) meetings++;
+      }
+      if (meetings === 0) score += 100;
+      else if (meetings === 1) score += 80;
+      else if (meetings <= 2) score += 40;
+    }
+  }
+  return score;
+}
+
+function scorePoison(res, cfg) {
+  const assassin = res.priv.assassin;
+  const victim = res.priv.victim;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  let score = 0;
+  for (let i = 0; i < chars.length; i++) {
+    for (let j = i + 1; j < chars.length; j++) {
+      const c1 = chars[i], c2 = chars[j];
+      if ((c1 === assassin && c2 === victim) || (c1 === victim && c2 === assassin)) continue;
+      for (let t = 0; t < T; t++) {
+        const room1 = res.schedule[c1][t];
+        const room2 = res.schedule[c2][t];
+        if (room1 === room2) {
+          const othersInRoom = chars.filter(c => c !== c1 && c !== c2 && res.schedule[c][t] === room1).length;
+          if (othersInRoom === 0) score += 60;
+        }
+      }
+    }
+  }
+  return score;
+}
+
+function scoreJewels(res, cfg) {
+  const T = cfg.T;
+  const rooms = cfg.rooms;
+  const chars = cfg.chars;
+  const jewelRoom = rooms[0];
+  let score = 0;
+  for (let t = 0; t < T; t++) {
+    for (const room of rooms) {
+      let count = 0;
+      for (const char of chars) {
+        if (res.schedule[char][t] === room) count++;
+      }
+      if (count === 2) score += room === jewelRoom ? 80 : 40;
+    }
+  }
+  return score;
+}
+
+function scoreBomb(res, cfg) {
+  const [bomber1, bomber2] = res.priv.bomb_duo;
+  const T = cfg.T;
+  const chars = cfg.chars;
+  let score = 0;
+  for (let t = 0; t < T; t++) {
+    const room1 = res.schedule[bomber1][t];
+    const room2 = res.schedule[bomber2][t];
+    if (room1 === room2) {
+      const othersInRoom = chars.filter(c => c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1).length;
+      if (othersInRoom > 0) score += 40;
+    }
+  }
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 3) score += 30;
+    }
+  }
+  return score;
+}
+
+function scoreAggrosassin(res, cfg) {
+  const T = cfg.T;
+  const chars = cfg.chars;
+  let score = 0;
+  const victimCount = res.priv.victims ? res.priv.victims.length : 0;
+  score += victimCount * 10;
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2) score += 1;
+    }
+  }
+  return score;
+}
+
+function scoreFreeze(res, cfg) {
+  const freeze = res.priv.freeze;
+  if (!freeze) return 0;
+  const kills = res.priv.freeze_kills || [];
+  const T = cfg.T;
+  const chars = cfg.chars;
+  let score = kills.length * 100;
+  let redHerrings = 0;
+  for (let t = 0; t < T; t++) {
+    for (const room of cfg.rooms) {
+      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2 && !charsInRoom.includes(freeze)) redHerrings++;
+    }
+  }
+  score += redHerrings * 5;
+  return score;
+}
+
+function scoreDoctor(res, cfg) {
+  const frozen = res.priv.frozen || [];
+  const heals = res.priv.heals || [];
+  const frozenRatio = frozen.length / Math.max(1, cfg.chars.length - 1);
+  let score = 80 + (1 - frozenRatio) * 140;
+  const healTimes = new Set();
+  for (const heal of heals) {
+    healTimes.add(heal.time);
+    score += 30;
+    if (heal.time > 1 && heal.time < cfg.T) score += 10;
+  }
+  if (healTimes.size > 1) score += healTimes.size * 15;
+  if (heals.length && frozen.length > 1) score += 25;
+  return score;
+}
+
+function scoreContagion(res, cfg) {
+  const contagion = res.priv.contagion;
+  if (!contagion) return 0;
+  const infectedCount = contagion.infected_count || 0;
+  const totalChars = cfg.chars.length || 1;
+  const infectionTimes = contagion.infection_times || {};
+  const timeline = contagion.infection_timeline || [];
+  let score = (infectedCount / totalChars) * 180;
+  const uniqueTimes = new Set(Object.values(infectionTimes).filter(Boolean)).size;
+  score += uniqueTimes * 20;
+  for (const step of timeline) {
+    const newCount = step.characters?.length || 0;
+    if (newCount === 0) continue;
+    score += newCount === 1 ? 25 : Math.max(8, 18 - newCount * 2);
+  }
+  if (timeline.length) {
+    const avgNewPerStep = infectedCount / timeline.length;
+    if (avgNewPerStep <= 1.25) score += 35;
+    else if (avgNewPerStep <= 2.5) score += 18;
+    else score += 8;
+  }
+  return score;
+}
+
+function scoreVault(res, cfg) {
+  const vault = res.priv.vault;
+  if (!vault) return 0;
+  const vaultRoom = vault.vault_room || [...cfg.rooms].sort()[0];
+  const keyHolder = vault.key_holder;
+  const chars = cfg.chars;
+  const T = cfg.T;
+  let withOthers = 0;
+  let maxGroup = 0;
+  let khVisits = 0;
+  let totalVisits = 0;
+  const companions = new Set();
+  const groupPatterns = new Set();
+  for (let t = 0; t < T; t++) {
+    const occupants = chars.filter(c => res.schedule[c][t] === vaultRoom);
+    if (occupants.length) {
+      totalVisits++;
+      groupPatterns.add(occupants.slice().sort().join(','));
+    }
+    if (occupants.includes(keyHolder)) {
+      khVisits++;
+      if (occupants.length > 1) {
+        withOthers++;
+        occupants.filter(c => c !== keyHolder).forEach(c => companions.add(c));
+      }
+    }
+    if (occupants.length > maxGroup) maxGroup = occupants.length;
+  }
+  let score = 30;
+  score += companions.size * 12;
+  score += withOthers * 8;
+  score += Math.max(0, khVisits - withOthers) * 4;
+  score += Math.max(0, maxGroup - 2) * 6;
+  score += Math.min(groupPatterns.size, 6) * 3;
+  return score;
+}
+
+function scoreGlueRoom(res, cfg) {
+  const info = res.priv.glue_room;
+  if (!info) return 0;
+  const glueRoom = info.glue_room;
+  const chars = cfg.chars;
+  const T = cfg.T;
+  let entryCount = 0;
+  const distinctVisitors = new Set();
+  for (const ch of chars) {
+    for (let t = 0; t < T; t++) {
+      const here = res.schedule[ch][t] === glueRoom;
+      const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== glueRoom;
+      if (here && cameFromOther) {
+        entryCount++;
+        distinctVisitors.add(ch);
+      }
+    }
+  }
+  let score = entryCount * 12;
+  score += distinctVisitors.size * 10;
+  score += Math.max(0, T - 2) * 2;
+  return score;
+}
+
+function scoreGlueShoes(res, cfg) {
+  const info = res.priv.glue_shoes;
+  if (!info) return 0;
+  const gluePerson = info.glue_person;
+  const victims = info.stuck || [];
+  const T = cfg.T;
+  let totalStickEvents = 0;
+  if (gluePerson) {
+    for (let t = 0; t < T - 1; t++) {
+      const room = res.schedule[gluePerson][t];
+      const others = cfg.chars.filter(ch => ch !== gluePerson && res.schedule[ch][t] === room);
+      if (others.length) totalStickEvents += others.length;
+    }
+  }
+  let score = victims.length * 22;
+  score += totalStickEvents * 6;
+  score += Math.max(0, T - 3) * 4;
+  return score;
+}
+
+function scoreCurseOfAmarinta(res, cfg) {
+  const info = res.priv.curse_of_amarinta;
+  const timeline = info?.timeline || [];
+  if (!timeline.length) return 0;
+  let handoffs = 0;
+  let totalCursed = 0;
+  const symmetricDiffCount = (a, b) => {
+    let count = 0;
+    for (const item of a) { if (!b.has(item)) count++; }
+    for (const item of b) { if (!a.has(item)) count++; }
+    return count;
+  };
+  let prevSet = new Set(timeline[0].cursed || []);
+  totalCursed += prevSet.size;
+  for (let i = 1; i < timeline.length; i++) {
+    const currentSet = new Set(timeline[i].cursed || []);
+    totalCursed += currentSet.size;
+    handoffs += symmetricDiffCount(prevSet, currentSet);
+    prevSet = currentSet;
+  }
+  const cursedAtSix = info.final_cursed?.length ? info.final_cursed : timeline[5]?.cursed || [];
+  let score = 0;
+  score += handoffs * 6;
+  score += cursedAtSix.length * 14;
+  score += totalCursed * 3;
+  return score;
+}
+
+function deriveGlueRoomFacts(res, cfg) {
+  if (res.priv.glue_room) return res.priv.glue_room;
+  for (const room of cfg.rooms) {
+    const firstEntries = {};
+    let validRoom = false;
+    let violated = false;
+    for (const ch of cfg.chars) {
+      let entryTime = null;
+      for (let t = 0; t < cfg.T; t++) {
+        const here = res.schedule[ch][t] === room;
+        const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== room;
+        if (here && cameFromOther) {
+          if (t === cfg.T - 1 || res.schedule[ch][t + 1] !== room) { violated = true; break; }
+          if (t + 2 < cfg.T && res.schedule[ch][t + 2] === room) { violated = true; break; }
+          entryTime ??= t + 1;
+          validRoom = true;
+        }
+      }
+      if (violated) break;
+      firstEntries[ch] = entryTime;
+    }
+    if (!violated && validRoom) return { glue_room: room, first_entries: firstEntries };
+  }
+  return null;
+}
+
+function deriveGlueShoesFacts(res, cfg) {
+  if (res.priv.glue_shoes) return res.priv.glue_shoes;
+  for (const glueCandidate of cfg.chars) {
+    const firstStuck = new Map();
+    let violated = false;
+    let sawVictim = false;
+    for (let t = 0; t < cfg.T - 1; t++) {
+      const room = res.schedule[glueCandidate][t];
+      const victims = cfg.chars.filter(ch => ch !== glueCandidate && res.schedule[ch][t] === room);
+      for (const v of victims) {
+        if (res.schedule[v][t + 1] !== room) { violated = true; break; }
+        if (t + 2 < cfg.T && res.schedule[v][t + 2] === room) { violated = true; break; }
+        if (!firstStuck.has(v)) firstStuck.set(v, { character: v, time: t + 1, room });
+        sawVictim = true;
+      }
+      if (violated) break;
+    }
+    if (!violated && sawVictim) {
+      return { glue_person: glueCandidate, stuck: Array.from(firstStuck.values()).sort((a, b) => a.time - b.time) };
+    }
+  }
+  return null;
+}
+
+/* ===========================
+   URL State Management
+   =========================== */
+function encodeScenarioToURL(res, cfg) {
+  const state = {
+    v: 1,
+    r: cfg.rooms,
+    c: cfg.chars,
+    t: cfg.T,
+    e: cfg.edges,
+    s: cfg.seed,
+    sch: cfg.chars.map(char => res.schedule[char].map(room => cfg.rooms.indexOf(room)).join(',')).join('|')
+  };
+  const json = JSON.stringify(state);
+  const encoded = btoa(encodeURIComponent(json));
+  return encoded;
+}
+
+function decodeScenarioFromURL(encoded) {
+  try {
+    const json = decodeURIComponent(atob(encoded));
+    const state = JSON.parse(json);
+    if (state.v !== 1) return null;
+    const schedule = {};
+    const schedParts = state.sch.split('|');
+    state.c.forEach((char, ci) => {
+      const roomIndices = schedParts[ci].split(',').map(Number);
+      schedule[char] = roomIndices.map(ri => state.r[ri]);
+    });
+    const byTime = {};
+    for (let t = 0; t < state.t; t++) {
+      const counts = {};
+      state.r.forEach(r => counts[r] = 0);
+      state.c.forEach(char => {
+        const room = schedule[char][t];
+        if (counts[room] != null) counts[room]++;
+      });
+      byTime[t + 1] = counts;
+    }
+    const visits = {};
+    state.c.forEach(char => {
+      const v = {};
+      state.r.forEach(r => v[r] = 0);
+      for (let t = 0; t < state.t; t++) { v[schedule[char][t]]++; }
+      visits[char] = v;
+    });
+    return { schedule, byTime, visits, rooms: state.r, chars: state.c, T: state.t, edges: state.e, seed: state.s };
+  } catch (e) {
+    console.error('Failed to decode scenario from URL:', e);
+    return null;
+  }
+}
+
+function updateURL(encoded) {
+  const url = new URL(window.location);
+  url.searchParams.set('scenario', encoded);
+  window.history.pushState({}, '', url);
+}
+
+function getScenarioFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('scenario');
+}
+
+/* ===========================
+   UI Helpers
+   =========================== */
+function qs(id) { return document.getElementById(id); }
+let lastRun = null;
+let charColorMap = {};
+
+function getCharColor(char, chars) {
+  if (!charColorMap[char]) {
+    const idx = chars.indexOf(char);
+    charColorMap[char] = CHAR_COLORS[idx % CHAR_COLORS.length];
+  }
+  return charColorMap[char];
+}
+
+function getCharDotClass(char, chars) {
+  const idx = chars.indexOf(char);
+  return `char-dot-${(idx % 8) + 1}`;
+}
+
+function clampPercentile(value) {
+  if (Number.isNaN(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+}
+
+function syncPercentileDisplay() {
+  const slider = qs("percentile");
+  const display = qs("percentileValue");
+  const pct = clampPercentile(Number(slider.value));
+  slider.value = pct;
+  if (display) display.textContent = pct.toFixed(0) + '%';
+}
+
+/* ===========================
+   Render Functions (Improved)
+   =========================== */
+function renderTable(container, obj, headerLeft, chars) {
+  const el = typeof container === "string" ? qs(container) : container;
+  let html = "<div class='table-scroll'><table><thead><tr>";
+  if (headerLeft) html += `<th>${headerLeft}</th>`;
+  const keys = Object.keys(obj);
+  const isArrayRows = Array.isArray(obj[keys[0]]);
+  const cols = isArrayRows ? obj[keys[0]].length : Object.keys(obj[keys[0]] || {}).length;
+
+  if (isArrayRows) {
+    for (let i = 0; i < cols; i++) html += `<th>t=${i+1}</th>`;
+    html += "</tr></thead><tbody>";
+    for (const rowKey of keys) {
+      const dotClass = chars ? getCharDotClass(rowKey, chars) : '';
+      html += `<tr><th><span class="char-dot ${dotClass}"></span>${rowKey}</th>`;
+      for (const val of obj[rowKey]) html += `<td>${val}</td>`;
+      html += `</tr>`;
+    }
+  } else {
+    const subkeys = Object.keys(obj[keys[0]] || {});
+    for (const sk of subkeys) html += `<th>${sk}</th>`;
+    html += "</tr></thead><tbody>";
+    for (const rowKey of keys) {
+      const dotClass = chars ? getCharDotClass(rowKey, chars) : '';
+      const showDot = headerLeft === 'Character' || headerLeft === 'Time';
+      html += `<tr><th>${showDot && chars ? `<span class="char-dot ${dotClass}"></span>` : ''}${rowKey}</th>`;
+      for (const sk of subkeys) html += `<td>${obj[rowKey][sk]}</td>`;
+      html += `</tr>`;
+    }
+  }
+  html += "</tbody></table></div>";
+  el.innerHTML = html;
+}
+
+function renderPrivateFacts(res, cfg) {
+  const container = qs("privateFacts");
+  const facts = [];
+
+  // Collect all facts
+  if (res.priv.phantom) facts.push({ type: 'phantom', char: res.priv.phantom, text: `Phantom (alone at every time)` });
+  if (res.priv.lovers) facts.push({ type: 'lovers', chars: res.priv.lovers, text: `Lovers: ${res.priv.lovers[0]} + ${res.priv.lovers[1]}` });
+  if (res.priv.assassin) facts.push({ type: 'assassin', char: res.priv.assassin, text: `Poisoned ${res.priv.victim} @ t=${res.priv.poison_time}, ${res.priv.poison_room}` });
+  if (res.priv.bomb_duo) facts.push({ type: 'bomb', chars: res.priv.bomb_duo, text: `Bomb duo: ${res.priv.bomb_duo[0]} + ${res.priv.bomb_duo[1]}` });
+  if (res.priv.aggrosassin) facts.push({ type: 'aggro', char: res.priv.aggrosassin, text: `Killed ${res.priv.victims.length} victim(s): ${res.priv.victims.join(', ')}` });
+  if (res.priv.freeze) {
+    const kills = res.priv.freeze_kills || [];
+    const killText = kills.map(k => `${k.victim} @ t=${k.time}`).join('; ');
+    facts.push({ type: 'freeze', char: res.priv.freeze, text: `Froze: ${killText || 'none'}` });
+  }
+  if (res.priv.doctor) {
+    const heals = res.priv.heals || [];
+    const healText = heals.map(h => `${h.character} @ t=${h.time}`).join('; ');
+    facts.push({ type: 'doctor', char: res.priv.doctor, text: `Healed: ${healText || 'none'}` });
+  }
+  if (res.priv.contagion) {
+    const info = res.priv.contagion;
+    facts.push({ type: 'contagion', text: `Contagious room: ${info.contagious_room}; Infected: ${info.infection_order?.join(', ') || 'none'}` });
+  }
+  if (res.priv.vault) {
+    const info = res.priv.vault;
+    facts.push({ type: 'vault', char: info.key_holder, text: `Vault room: ${info.vault_room}; Entrants: ${info.vault_visitors?.join(', ') || 'none'}` });
+  }
+
+  const glueRoomPriv = res.priv.glue_room || deriveGlueRoomFacts(res, cfg);
+  if (glueRoomPriv) {
+    const entries = Object.entries(glueRoomPriv.first_entries || {}).filter(([, t]) => t !== null).map(([ch, t]) => `${ch} @ t=${t}`);
+    facts.push({ type: 'glueRoom', text: `Glue room: ${glueRoomPriv.glue_room}; First entries: ${entries.join(', ') || 'none'}` });
+  }
+
+  const glueShoesPriv = res.priv.glue_shoes || deriveGlueShoesFacts(res, cfg);
+  if (glueShoesPriv) {
+    const stuck = glueShoesPriv.stuck || [];
+    const stuckText = stuck.map(s => `${s.character} @ t=${s.time}`).join('; ');
+    facts.push({ type: 'glueShoes', char: glueShoesPriv.glue_person, text: `Stuck: ${stuckText || 'none'}` });
+  }
+
+  if (res.priv.curse_of_amarinta) {
+    const info = res.priv.curse_of_amarinta;
+    facts.push({ type: 'curse', char: info.origin, text: `Origin; Cursed @ t=6: ${info.final_cursed?.join(', ') || 'none'}` });
+  }
+
+  if (facts.length === 0) {
+    container.innerHTML = `<div class="muted">No private facts available</div>`;
+    return;
+  }
+
+  // Group facts by character (or type if no character)
+  const groups = {};
+  for (const fact of facts) {
+    const key = fact.char || fact.chars?.[0] || fact.type;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(fact);
+  }
+
+  let html = '';
+  for (const [key, groupFacts] of Object.entries(groups)) {
+    const isChar = cfg.chars.includes(key);
+    const dotClass = isChar ? getCharDotClass(key, cfg.chars) : '';
+    const label = isChar ? `${key}'s secrets` : key;
+
+    html += `<div class="private-fact-group">
+      <div class="private-fact-header">
+        <span class="arrow">▶</span>
+        ${isChar ? `<span class="char-dot ${dotClass}"></span>` : ''}
+        <span>${label}</span>
+        <span class="count">${groupFacts.length}</span>
+      </div>
+      <div class="private-fact-content">`;
+
+    for (const fact of groupFacts) {
+      html += `<div class="private-fact-item">${fact.text}</div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  container.innerHTML = html;
+
+  // Add click handlers
+  container.querySelectorAll('.private-fact-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.parentElement.classList.toggle('open');
+    });
+  });
+}
+
+function wireCopyButtons(encoded) {
+  qs("scenarioString").value = encoded;
+  qs("copyScenarioBtn").onclick = () => {
+    navigator.clipboard.writeText(encoded).then(() => {
+      const btn = qs("copyScenarioBtn");
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = orig, 2000);
+    });
+  };
+  qs("copyURLBtn").onclick = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      const btn = qs("copyURLBtn");
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = orig, 2000);
+    });
+  };
+}
+
+function updateStartingInfoNote(res, cfg) {
+  const noteEl = qs("startingInfoScenarioNote");
+  const curseInfo = res?.priv?.curse_of_amarinta;
+  if (noteEl && cfg?.scenarios?.s14 && curseInfo) {
+    const cursedAtSix = curseInfo.final_cursed || [];
+    const cursedLabel = cursedAtSix.length ? cursedAtSix.join(', ') : 'no one';
+    const verb = cursedAtSix.length === 1 ? 'is' : 'are';
+    noteEl.innerHTML = `Scenario 14 clue: <b>${cursedLabel}</b> ${verb} cursed at t=6.`;
+    noteEl.style.display = "block";
+  } else if (noteEl) {
+    noteEl.textContent = "";
+    noteEl.style.display = "none";
+  }
+}
+
+function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, solutions, targetIdx, source }) {
+  const encoded = encodeScenarioToURL(res, cfg);
+  updateURL(encoded);
+
+  // Update character color map
+  charColorMap = {};
+  cfg.chars.forEach((char, idx) => {
+    charColorMap[char] = CHAR_COLORS[idx % CHAR_COLORS.length];
+  });
+
+  const label = source === 'reuse' ? 'Reused' : 'Selected';
+  qs("status").innerHTML = `<span class="ok">${label} ${percentile}th percentile scenario</span> (score: ${res.score.total.toFixed(1)}, rank ${targetIdx+1}/${solutions.length})`;
+  qs("resultsHint").style.display = "none";
+  qs("results").style.display = "block";
+  qs("toggleResultsBtn").style.display = "inline-block";
+
+  renderTable("schedule", res.schedule, "Character", cfg.chars);
+  renderTable("byTime", res.byTime, "Time", cfg.chars);
+  renderTable("visits", res.visits, "Character", cfg.chars);
+  renderPrivateFacts(res, cfg);
+  updateStartingInfoNote(res, cfg);
+
+  const stats = res.stats || {};
+  const avgSolveTime = solutions.reduce((sum, s) => sum + (s.stats?.solveTimeMs || 0), 0) / solutions.length;
+  const statsHtml = `
+    <div style="display: grid; grid-template-columns: auto 1fr; gap: 6px 16px;">
+      <span class="muted">SAT Variables:</span><span><b>${stats.totalVars}</b></span>
+      <span class="muted">SAT Clauses:</span><span><b>${stats.totalClauses}</b></span>
+      <span class="muted">Solve Time:</span><span><b>${stats.solveTimeMs}</b>ms (avg: ${avgSolveTime.toFixed(1)}ms)</span>
+      <span class="muted">Valid Solutions:</span><span><b>${solutions.length}</b> / ${sampleCount}</span>
+      <span class="muted">Difficulty Score:</span><span><b>${res.score.total.toFixed(1)}</b></span>
+      <span class="muted">Score Breakdown:</span><span>${Object.entries(res.score.breakdown).map(([k,v]) => `${k}: ${v.toFixed(0)}`).join(', ') || 'N/A'}</span>
+    </div>
+  `;
+  qs("genStats").innerHTML = statsHtml;
+  wireCopyButtons(encoded);
+  setupQuestionInterface(res, cfg);
+}
+
+/* ===========================
+   Scenario Grid Setup
+   =========================== */
+function setupScenarioGrid() {
+  const grid = qs("scenarioGrid");
+  let html = '';
+
+  for (const scenario of SCENARIOS) {
+    html += `
+      <div class="scenario-option" data-scenario="${scenario.id}">
+        <input type="radio" name="scenario" id="${scenario.id}" value="${scenario.id}" />
+        <div class="scenario-label">
+          <div class="name">${scenario.id.toUpperCase()}: ${scenario.name}</div>
+          <div class="desc">"${scenario.desc}"</div>
+        </div>
+      </div>
+    `;
+  }
+
+  grid.innerHTML = html;
+
+  // Add click handlers
+  grid.querySelectorAll('.scenario-option').forEach(option => {
+    option.addEventListener('click', () => {
+      // Deselect all
+      grid.querySelectorAll('.scenario-option').forEach(o => o.classList.remove('selected'));
+      // Select this one
+      option.classList.add('selected');
+      option.querySelector('input').checked = true;
+
+      // Show/hide S1 extra options
+      const s1Extra = qs("s1Extra");
+      if (option.dataset.scenario === 's1') {
+        s1Extra.style.display = 'block';
+      } else {
+        s1Extra.style.display = 'none';
+      }
+    });
+  });
+
+  // Select S1 by default
+  const s1Option = grid.querySelector('[data-scenario="s1"]');
+  if (s1Option) {
+    s1Option.classList.add('selected');
+    s1Option.querySelector('input').checked = true;
+  }
+}
+
+/* ===========================
+   Question Interface
+   =========================== */
+function setupQuestionInterface(res, cfg) {
+  const rooms = cfg.rooms;
+  const chars = cfg.chars;
+  const T = cfg.T;
+
+  const locTimeLocation = qs("locTimeLocation");
+  const locCharLocation = qs("locCharLocation");
+  const locCharChar = qs("locCharChar");
+  const locTimeTime = qs("locTimeTime");
+  const startingTime = qs("startingTime");
+
+  locTimeLocation.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join("");
+  locCharLocation.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join("");
+  locCharChar.innerHTML = chars.map(c => `<option value="${c}">${c}</option>`).join("");
+  locTimeTime.innerHTML = Array.from({length:T}, (_,i) => `<option value="${i+1}">t=${i+1}</option>`).join("");
+  startingTime.innerHTML = Array.from({length:T}, (_,i) => `<option value="${i+1}"${i===0?' selected':''}>t=${i+1}</option>`).join("");
+
+  qs("askLocTimeBtn").onclick = () => {
+    qs("locTimeForm").classList.add("active");
+    qs("locCharForm").classList.remove("active");
+    qs("askLocTimeBtn").classList.add("primary");
+    qs("askLocTimeBtn").classList.remove("ghost");
+    qs("askLocCharBtn").classList.add("ghost");
+    qs("askLocCharBtn").classList.remove("primary");
+    qs("locTimeAnswer").style.display = "none";
+  };
+  qs("askLocCharBtn").onclick = () => {
+    qs("locCharForm").classList.add("active");
+    qs("locTimeForm").classList.remove("active");
+    qs("askLocCharBtn").classList.add("primary");
+    qs("askLocCharBtn").classList.remove("ghost");
+    qs("askLocTimeBtn").classList.add("ghost");
+    qs("askLocTimeBtn").classList.remove("primary");
+    qs("locCharAnswer").style.display = "none";
+  };
+
+  qs("askLocTimeSubmit").onclick = () => {
+    const location = locTimeLocation.value;
+    const time = Number(locTimeTime.value);
+    const charsAtLocation = chars.filter(char => res.schedule[char][time-1] === location);
+    const count = charsAtLocation.length;
+    let revealedChar = "none";
+    if (count > 0) {
+      let hash = time;
+      for (let i = 0; i < location.length; i++) { hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff; }
+      const idx = hash % charsAtLocation.length;
+      revealedChar = charsAtLocation[idx];
+    }
+    qs("locTimeShared").innerHTML = `<b>${count}</b> character${count===1?'':'s'} ${count===1?'was':'were'} in ${location} at t=${time}`;
+    qs("locTimePrivate").innerHTML = `One character present: <b>${revealedChar}</b>`;
+    qs("locTimePrivate").classList.add("hidden");
+    qs("locTimeToggle").textContent = "Show Private";
+    qs("locTimeAnswer").style.display = "block";
+    qs("locTimeToggle").onclick = () => {
+      const privateEl = qs("locTimePrivate");
+      const btn = qs("locTimeToggle");
+      if (privateEl.classList.contains("hidden")) {
+        privateEl.classList.remove("hidden");
+        btn.textContent = "Hide Private";
+      } else {
+        privateEl.classList.add("hidden");
+        btn.textContent = "Show Private";
+      }
+    };
+  };
+
+  qs("askLocCharSubmit").onclick = () => {
+    const location = locCharLocation.value;
+    const character = locCharChar.value;
+    const visitCount = res.visits[character][location] || 0;
+    const times = [];
+    for (let t = 0; t < T; t++) {
+      if (res.schedule[character][t] === location) times.push(t+1);
+    }
+    let revealedTime = "never";
+    if (times.length > 0) {
+      let hash = 0;
+      for (let i = 0; i < location.length; i++) { hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff; }
+      for (let i = 0; i < character.length; i++) { hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff; }
+      const idx = hash % times.length;
+      revealedTime = `t=${times[idx]}`;
+    }
+    qs("locCharShared").innerHTML = `<b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
+    qs("locCharPrivate").innerHTML = `One time visited: <b>${revealedTime}</b>`;
+    qs("locCharPrivate").classList.add("hidden");
+    qs("locCharToggle").textContent = "Show Private";
+    qs("locCharAnswer").style.display = "block";
+    qs("locCharToggle").onclick = () => {
+      const privateEl = qs("locCharPrivate");
+      const btn = qs("locCharToggle");
+      if (privateEl.classList.contains("hidden")) {
+        privateEl.classList.remove("hidden");
+        btn.textContent = "Hide Private";
+      } else {
+        privateEl.classList.add("hidden");
+        btn.textContent = "Show Private";
+      }
+    };
+  };
+
+  qs("showStartingInfoBtn").onclick = () => {
+    const time = Number(startingTime.value);
+    const charCount = Math.min(chars.length, Math.max(1, Number(qs("startingCharCount").value) || 3));
+    let hash = time * 7919;
+    const selectedChars = [];
+    const availableChars = [...chars];
+    for (let i = 0; i < charCount && availableChars.length > 0; i++) {
+      hash = (hash * 31 + i) & 0x7fffffff;
+      const idx = hash % availableChars.length;
+      selectedChars.push(availableChars[idx]);
+      availableChars.splice(idx, 1);
+    }
+    const locations = selectedChars.map(char => {
+      const location = res.schedule[char][time-1];
+      const dotClass = getCharDotClass(char, chars);
+      return `<span class="char-dot ${dotClass}"></span><b>${char}</b>: ${location}`;
+    });
+    qs("startingInfoShared").innerHTML = `At t=${time}, the following locations are revealed:<br/><br/>` + locations.join('<br/>');
+    qs("startingInfoAnswer").style.display = "block";
+  };
+
+  qs("askLocTimeBtn").click();
+}
+
+/* ===========================
+   Event Handlers
+   =========================== */
+
+// Map template selection
+qs("mapTemplate").addEventListener("change", (e) => {
+  const template = e.target.value;
+  if (template && MAP_TEMPLATES[template]) {
+    qs("mermaidInput").value = MAP_TEMPLATES[template];
+  }
+});
+
+// Quick Start template buttons
+document.querySelectorAll('[data-template]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const template = btn.dataset.template;
+    if (MAP_TEMPLATES[template]) {
+      qs("mermaidInput").value = MAP_TEMPLATES[template];
+      qs("mapTemplate").value = template;
+    }
+  });
+});
+
+// Character preset buttons
+document.querySelectorAll('[data-chars]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const count = Number(btn.dataset.chars);
+    qs("chars").value = DEFAULT_CHARS.slice(0, count).join(', ');
+  });
+});
+
+// Default chars button in quick start
+qs("defaultCharsBtn")?.addEventListener('click', () => {
+  qs("chars").value = DEFAULT_CHARS.slice(0, 4).join(', ');
+});
+
+// Hide forever
+qs("hideForever")?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  qs("quickStart").style.display = 'none';
+  localStorage.setItem('hideQuickStart', 'true');
+});
+
+// Check localStorage on load
+if (localStorage.getItem('hideQuickStart') === 'true') {
+  qs("quickStart").open = false;
+}
+
+// Expand all facts
+qs("expandAllFacts")?.addEventListener('click', () => {
+  const groups = document.querySelectorAll('.private-fact-group');
+  const allOpen = Array.from(groups).every(g => g.classList.contains('open'));
+  groups.forEach(g => {
+    if (allOpen) {
+      g.classList.remove('open');
+    } else {
+      g.classList.add('open');
+    }
+  });
+  qs("expandAllFacts").textContent = allOpen ? 'Expand All' : 'Collapse All';
+});
+
+// Validate map
+qs("validateBtn").addEventListener("click", () => {
+  const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
+  const msg = (rooms.length >= 2 && edges.length >= 1)
+    ? `<span class="ok">Valid:</span> ${rooms.length} rooms, ${edges.length} connections`
+    : `<span class="warn">Need at least 2 rooms and 1 connection.</span>`;
+  qs("status").innerHTML = msg;
+});
+
+// Percentile sync
+qs("percentile").addEventListener("input", syncPercentileDisplay);
+syncPercentileDisplay();
+
+// Generate
+qs("genBtn").addEventListener("click", async () => {
+  const percentile = clampPercentile(Number(qs("percentile").value));
+  const sampleCount = Number(qs("samples").value) || 100;
+  const difficulty = percentile / 100;
+  const s9FrozenRatio = 0.2 + (1 - difficulty) * 0.5;
+
+  qs("status").textContent = `Generating ${sampleCount} scenarios...`;
+
+  const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
+  const chars = qs("chars").value.split(",").map(s => s.trim()).filter(Boolean);
+  const T = Math.max(2, Math.min(10, Number(qs("steps").value) || 6));
+  const mustMove = qs("mustMove").checked;
+  const allowStay = qs("allowStay").checked;
+
+  if (rooms.length < 2 || edges.length < 1) { qs("status").innerHTML = `<span class="warn">Map too small.</span>`; return; }
+  if (chars.length < 2) { qs("status").innerHTML = `<span class="warn">Add at least 2 characters.</span>`; return; }
+
+  const selectedScenario = document.querySelector('input[name="scenario"]:checked');
+  const scenarioValue = selectedScenario ? selectedScenario.value : null;
+
+  if (!scenarioValue) {
+    qs("status").innerHTML = `<span class="warn">Please select a scenario type.</span>`;
+    return;
+  }
+
+  const cfg = {
+    rooms, edges, chars, T, mustMove, allowStay,
+    scenarios: {
+      s1: scenarioValue === 's1',
+      s2: scenarioValue === 's2' || scenarioValue === 's6',
+      s3: scenarioValue === 's3',
+      s4: scenarioValue === 's4',
+      s5: scenarioValue === 's5' || scenarioValue === 's6',
+      s7: scenarioValue === 's7',
+      s8: scenarioValue === 's8',
+      s9: scenarioValue === 's9',
+      s9FrozenRatio,
+      s10: scenarioValue === 's10',
+      s11: scenarioValue === 's11',
+      s12: scenarioValue === 's12',
+      s13: scenarioValue === 's13',
+      s14: scenarioValue === 's14',
+      s1_room: qs("s1_room").value.trim() || null,
+      s1_time: qs("s1_time").value.trim() || null
+    }
+  };
+
+  try {
+    const solutions = [];
+    let skipped = 0;
+    const randomSeed = () => {
+      if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+        return crypto.getRandomValues(new Uint32Array(1))[0];
+      }
+      return Math.floor(Math.random() * 0xffffffff) >>> 0;
+    };
+
+    const seedInput = qs("seed").value.trim();
+    const parsedSeed = Number(seedInput);
+    const fixedSeed = seedInput === "" || !Number.isFinite(parsedSeed) ? null : parsedSeed;
+
+    for (let i = 0; i < sampleCount; i++) {
+      cfg.seed = fixedSeed === null ? randomSeed() : fixedSeed + i;
+      try {
+        const res = solveAndDecode(cfg);
+        if (res) {
+          const scored = { ...res, score: scoreScenario(res, cfg) };
+          solutions.push(scored);
+        } else {
+          skipped++;
+        }
+      } catch (e) {
+        skipped++;
+        console.warn(`Sample ${i} failed:`, e.message);
+      }
+
+      if (i % 10 === 0) {
+        qs("status").textContent = `Generated ${i}/${sampleCount} (${solutions.length} valid)...`;
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    if (solutions.length === 0) {
+      qs("status").innerHTML = `<span class="warn">No solutions found (${skipped} samples failed).</span>`;
+      return;
+    }
+
+    solutions.sort((a, b) => a.score.total - b.score.total);
+
+    lastRun = { solutions, skipped, sampleCount, cfg };
+    qs("reuseBtn").disabled = false;
+
+    const targetIdx = Math.floor((percentile / 100) * (solutions.length - 1));
+    const res = solutions[targetIdx];
+
+    renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, solutions, targetIdx, source: 'generate' });
+  } catch(e) {
+    console.error(e);
+    qs("status").innerHTML = `<span class="warn">Error: ${e.message}</span>`;
+  }
+});
+
+// Reuse
+qs("reuseBtn").addEventListener("click", () => {
+  if (!lastRun) {
+    qs("status").innerHTML = `<span class="warn">Generate at least once before reusing.</span>`;
+    return;
+  }
+  const pct = clampPercentile(Number(qs("percentile").value));
+  const { solutions, skipped, sampleCount, cfg } = lastRun;
+  const targetIdx = Math.floor((pct / 100) * (solutions.length - 1));
+  const res = solutions[targetIdx];
+  renderSelectedScenario({ res, cfg, percentile: pct, sampleCount, skipped, solutions, targetIdx, source: 'reuse' });
+});
+
+// Toggle results
+qs("toggleResultsBtn").addEventListener("click", () => {
+  const resultsDiv = qs("results");
+  const btn = qs("toggleResultsBtn");
+  if (resultsDiv.style.display === "none") {
+    resultsDiv.style.display = "block";
+    btn.textContent = "Collapse";
+  } else {
+    resultsDiv.style.display = "none";
+    btn.textContent = "Expand";
+  }
+});
+
+// Initialize
+window.addEventListener('DOMContentLoaded', () => {
+  setupScenarioGrid();
+
+  const encoded = getScenarioFromURL();
+  if (encoded) {
+    const decoded = decodeScenarioFromURL(encoded);
+    if (decoded) {
+      const mermaidLines = ['graph TD'];
+      decoded.edges.forEach(([a, b]) => {
+        const aQuoted = a.includes(' ') ? `"${a}"` : a;
+        const bQuoted = b.includes(' ') ? `"${b}"` : b;
+        mermaidLines.push(`  ${aQuoted} --- ${bQuoted}`);
+      });
+      qs("mermaidInput").value = mermaidLines.join('\n');
+      qs("chars").value = decoded.chars.join(', ');
+      qs("steps").value = decoded.T;
+      qs("seed").value = decoded.seed;
+
+      qs("status").innerHTML = `<span class="ok">Loaded scenario from URL</span>`;
+      qs("resultsHint").style.display = "none";
+      qs("results").style.display = "block";
+      qs("toggleResultsBtn").style.display = "inline-block";
+
+      charColorMap = {};
+      decoded.chars.forEach((char, idx) => {
+        charColorMap[char] = CHAR_COLORS[idx % CHAR_COLORS.length];
+      });
+
+      renderTable("schedule", decoded.schedule, "Character", decoded.chars);
+      renderTable("byTime", decoded.byTime, "Time", decoded.chars);
+      renderTable("visits", decoded.visits, "Character", decoded.chars);
+
+      qs("privateFacts").innerHTML = `<div class="muted">Private facts not included in URL (generate to see them)</div>`;
+
+      wireCopyButtons(encoded);
+
+      const cfg = { rooms: decoded.rooms, chars: decoded.chars, T: decoded.T, edges: decoded.edges };
+      setupQuestionInterface(decoded, cfg);
+    } else {
+      qs("status").innerHTML = `<span class="warn">Failed to load scenario from URL</span>`;
+    }
+  }
+});
+
+// Clear seed on load
+qs("seed").value = "";
+</script>
+</body>
+</html>
