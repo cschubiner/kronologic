@@ -21,6 +21,16 @@ export function resolveSeed(seed) {
     : Math.floor(Math.random() * 0xffffffff);
 }
 
+function shuffleWithSeed(list, seed) {
+  const out = [...list];
+  const rng = mulberry32(seed);
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
   // Clauses: array of arrays of ints, var IDs are 1..numVars, negative = negated
   // Returns: assignment array with 1..numVars: true/false, or null if UNSAT/timeout
@@ -441,13 +451,16 @@ export function neighbors(rooms, edges, includeSelf) {
    =========================== */
 export function buildCNF(config) {
   // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5}, seed}
+  const resolvedSeed = resolveSeed(config.seed);
+  const shuffledRooms = Array.isArray(config.rooms)
+    ? shuffleWithSeed(config.rooms, resolvedSeed)
+    : [];
   const vp = varPool();
   const clauses = [];
 
-  const R = config.rooms,
+  const R = shuffledRooms,
     C = config.chars,
     T = config.T;
-  const resolvedSeed = resolveSeed(config.seed);
   const baseStay = config.allowStay && !config.mustMove;
   const stickyStay = !!(
     config.scenarios &&
@@ -1503,15 +1516,6 @@ export function buildCNF(config) {
 export function solveAndDecode(cfg) {
   const seed = resolveSeed(cfg.seed);
   cfg = { ...cfg, seed };
-  if (Array.isArray(cfg.rooms)) {
-    const shuffledRooms = [...cfg.rooms];
-    const rng = mulberry32(seed);
-    for (let i = shuffledRooms.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [shuffledRooms[i], shuffledRooms[j]] = [shuffledRooms[j], shuffledRooms[i]];
-    }
-    cfg = { ...cfg, rooms: shuffledRooms };
-  }
 
   const { vp, clauses, privKeys } = buildCNF(cfg);
   const numVars = vp.count();
