@@ -4126,6 +4126,36 @@ describe("S16: Homebodies", () => {
     });
   });
 
+  it("should still solve when there are more characters than timesteps", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E", "F"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "F"],
+        ["F", "A"],
+      ],
+      chars: ["L", "M", "N", "O", "P", "Q"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 16001,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      expect(hb.visit_count_targets).toEqual([5, 4, 3, 2, 1, 1]);
+      for (const ch of cfg.chars) {
+        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
+      }
+      expect(Object.values(hb.actual_visit_counts)).toContain(1);
+    });
+  });
+
   it("should have homebody stay in same room all timesteps", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
