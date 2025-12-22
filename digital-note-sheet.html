@@ -260,7 +260,9 @@
 
         .character-grid {
             display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 6px;
+            margin-top: 10px;
         }
 
         .character-option {
@@ -365,13 +367,19 @@
             border-collapse: collapse;
             font-size: 13px;
             min-width: 600px;
+            table-layout: fixed;
         }
 
         .tracking-table th,
         .tracking-table td {
             border: 1px solid #e5e7eb;
-            padding: 4px 6px;
+            padding: 0;
             text-align: center;
+        }
+
+        .tracking-table th.room-header {
+            white-space: normal;
+            line-height: 1.1;
         }
 
         .tracking-table th {
@@ -380,20 +388,19 @@
         }
 
         .tracking-table td.character-name {
-            text-align: left;
             font-weight: 500;
             background: #fafafa;
-            padding: 4px 8px;
+            padding: 0;
         }
 
         .tracking-table input {
-            width: 45px;
-            padding: 4px;
+            width: 40px;
+            padding: 0;
             text-align: center;
             border: 1px solid #d1d5db;
             border-radius: 3px;
-            font-size: 14px;
-            min-height: 32px;
+            font-size: 13px;
+            min-height: 26px;
             touch-action: manipulation;
         }
 
@@ -688,14 +695,18 @@
 
             .tracking-table th,
             .tracking-table td {
-                padding: 6px 4px;
+                padding: 0;
                 white-space: nowrap;
             }
 
+            .tracking-table th.room-header {
+                white-space: normal;
+            }
+
             .tracking-table input {
-                width: 40px;
-                font-size: 14px;
-                padding: 6px 4px;
+                width: 36px;
+                font-size: 12px;
+                padding: 0;
             }
         }
 
@@ -859,8 +870,8 @@
     <div id="characterSelector" class="character-selector hidden">
         <div class="header" id="selectorHeader">Add Character</div>
         <div class="room-count" id="roomCount"></div>
-        <div class="character-grid" id="characterGrid"></div>
         <div class="existing-chips" id="existingChips"></div>
+        <div class="character-grid" id="characterGrid"></div>
     </div>
 
     <!-- Floating action buttons for mobile -->
@@ -1681,6 +1692,21 @@
             });
         }
 
+        function removeCharacterFromRoomAllTimesteps(charName, roomName) {
+            let removed = false;
+            for (let t = 1; t <= state.timesteps; t++) {
+                if (!state.placements[t] || !state.placements[t][roomName]) continue;
+                const before = state.placements[t][roomName].length;
+                if (before === 0) continue;
+                const filtered = state.placements[t][roomName].filter(p => p.char !== charName);
+                if (filtered.length !== before) {
+                    state.placements[t][roomName] = filtered;
+                    removed = true;
+                }
+            }
+            return removed;
+        }
+
         function removeCharacterChip(timestep, roomName, charName, event) {
             if (event) event.stopPropagation();
             state.placements[timestep][roomName] = state.placements[timestep][roomName].filter(p => p.char !== charName);
@@ -1826,16 +1852,16 @@
         function renderTrackingTable() {
             const table = document.getElementById('trackingTable');
 
-            let html = '<thead><tr><th>Character</th>';
+            let html = '<thead><tr><th>Char</th>';
             state.rooms.forEach(room => {
-                html += `<th>${room}</th>`;
+                html += `<th class="room-header">${formatRoomHeaderLabel(room)}</th>`;
             });
             html += '</tr></thead><tbody>';
 
             state.characters.forEach(char => {
                 html += `<tr><td class="character-name">${char.name}</td>`;
                 state.rooms.forEach(room => {
-                    html += `<td><input type="number" min="0" max="${state.timesteps}" placeholder="0" data-char="${char.name}" data-room="${room}"></td>`;
+                    html += `<td><input type="number" min="0" max="${state.timesteps}" data-char="${char.name}" data-room="${room}"></td>`;
                 });
                 html += '</tr>';
             });
@@ -1849,7 +1875,38 @@
                 input.addEventListener('input', () => {
                     saveToLocalStorage();
                 });
+                input.addEventListener('blur', () => {
+                    handleTrackingZeroBlur(input);
+                });
             });
+        }
+
+        function formatRoomHeaderLabel(roomName) {
+            if (!roomName) return '';
+            return roomName
+                .replace(/([a-z])([A-Z])/g, '$1<br>$2')
+                .replace(/\s+/g, '<br>');
+        }
+
+        function handleTrackingZeroBlur(input) {
+            const rawValue = input.value.trim();
+            if (!rawValue) return;
+            const numeric = Number(rawValue);
+            if (!Number.isFinite(numeric) || numeric !== 0) return;
+            const charName = input.dataset.char;
+            const roomName = input.dataset.room;
+            if (!charName || !roomName) return;
+            const shouldRemove = confirm(`Remove ${charName} from ${roomName} for all timesteps?`);
+            if (!shouldRemove) return;
+            const removed = removeCharacterFromRoomAllTimesteps(charName, roomName);
+            if (!removed) return;
+            for (let t = 1; t <= state.timesteps; t++) {
+                updateMiniMapVisuals(t);
+            }
+            saveState();
+            if (state.currentSelector && state.currentSelector.roomName === roomName) {
+                refreshExistingChips(state.currentSelector.timestep, roomName);
+            }
         }
 
         // Undo/Redo functionality
@@ -1979,3 +2036,10 @@
     </script>
 </body>
 </html>
+        .tracking-table th:first-child,
+        .tracking-table td.character-name {
+            width: 24px;
+            min-width: 24px;
+            max-width: 24px;
+            text-align: center;
+        }
