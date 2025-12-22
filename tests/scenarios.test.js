@@ -4034,7 +4034,7 @@ describe("S15: World Travelers", () => {
 });
 
 describe("S16: Homebodies", () => {
-  it("should assign each character a unique visit count", () => {
+  it("should assign tapering visit counts and repeat the minimum when needed", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -4043,7 +4043,7 @@ describe("S16: Homebodies", () => {
         ["C", "D"],
         ["D", "A"],
       ],
-      chars: ["X", "Y", "Z"],
+      chars: ["W", "X", "Y", "Z", "Q"],
       T: 6,
       mustMove: false,
       allowStay: true,
@@ -4054,11 +4054,25 @@ describe("S16: Homebodies", () => {
     testWithThreshold(cfg, (res, cfg) => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
-      const counts = Object.values(hb.actual_visit_counts);
-      const uniqueCounts = new Set(counts);
-      expect(uniqueCounts.size).toBe(cfg.chars.length);
-      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
-      expect(Math.min(...counts)).toBe(1);
+      const expectedTargets = [
+        Math.min(cfg.rooms.length, cfg.T),
+        Math.min(cfg.rooms.length, cfg.T) - 1,
+        Math.min(cfg.rooms.length, cfg.T) - 2,
+        1,
+        1,
+      ];
+      expect(hb.visit_count_targets).toEqual(expectedTargets);
+      for (const ch of cfg.chars) {
+        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
+      }
+      const sortedActual = Object.values(hb.actual_visit_counts).sort((a, b) => a - b);
+      const sortedTargets = Object.values(hb.visit_count_assignments).sort(
+        (a, b) => a - b,
+      );
+      expect(sortedActual).toEqual(sortedTargets);
+      expect(Math.min(...hb.visit_count_targets)).toBe(
+        hb.actual_visit_counts[hb.homebody],
+      );
     });
   });
 
@@ -4200,7 +4214,7 @@ describe("S16: Homebodies", () => {
     });
   });
 
-  it("should reject configs with more characters than rooms", () => {
+  it("should allow repeated minimum counts when rooms are scarce", () => {
     const cfg = {
       rooms: ["A", "B"],
       edges: [["A", "B"]],
@@ -4211,9 +4225,16 @@ describe("S16: Homebodies", () => {
       scenarios: { s16: true },
       seed: 1605,
     };
-    expect(() => solveAndDecode(cfg)).toThrow(
-      "S16 requires unique visit counts but only min(rooms, timesteps) are available",
-    );
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const targets = hb.visit_count_targets;
+      expect(targets).toEqual([2, 1, 1]);
+      for (const ch of cfg.chars) {
+        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
+      }
+    });
   });
 
   it("should reject configs with fewer than 2 characters", () => {
@@ -4255,8 +4276,7 @@ describe("S16: Homebodies", () => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
       const counts = Object.values(hb.actual_visit_counts);
-      expect(new Set(counts).size).toBe(cfg.chars.length);
-      expect(counts).toContain(1);
+      expect(counts).toContain(Math.min(...hb.visit_count_targets));
       expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
     });
   });
@@ -4322,7 +4342,7 @@ describe("S16: Homebodies", () => {
     });
   });
 
-  it("should fail gracefully when timesteps limit unique visit counts", () => {
+  it("should reuse the minimum count when timesteps limit distinct visits", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D", "E"],
       edges: [
@@ -4339,9 +4359,14 @@ describe("S16: Homebodies", () => {
       seed: 1611,
     };
 
-    expect(() => solveAndDecode(cfg)).toThrow(
-      "S16 requires unique visit counts but only min(rooms, timesteps) are available",
-    );
+    testWithThreshold(cfg, (res) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      expect(hb.visit_count_targets).toEqual([2, 1, 1]);
+      for (const ch of cfg.chars) {
+        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
+      }
+    });
   });
 
   it("should honor visit caps when timesteps are tight but sufficient", () => {

@@ -502,12 +502,6 @@ export function buildCNF(config) {
     }
 
     const maxDistinctVisits = Math.min(R.length, T);
-    if (C.length > maxDistinctVisits) {
-      throw new Error(
-        "S16 requires unique visit counts but only min(rooms, timesteps) are available",
-      );
-    }
-
     const rng = mulberry32(resolvedSeed);
 
     const shuffled = [...C];
@@ -517,24 +511,36 @@ export function buildCNF(config) {
     }
 
     const visitCountAssignments = {};
-    const countsPool = [1];
+    const visitCountTargets = [];
+    const minReachableCount = Math.max(1, Math.min(maxDistinctVisits, 1));
     for (
       let count = maxDistinctVisits;
-      count > 1 && countsPool.length < shuffled.length;
+      visitCountTargets.length < shuffled.length && count >= minReachableCount;
       count--
     ) {
-      countsPool.push(count);
+      visitCountTargets.push(count);
     }
-
-    if (countsPool.length < shuffled.length) {
-      throw new Error("S16 could not assign distinct visit counts to characters");
+    if (!visitCountTargets.includes(minReachableCount)) {
+      visitCountTargets[visitCountTargets.length - 1] = minReachableCount;
+    }
+    while (visitCountTargets.length < shuffled.length) {
+      visitCountTargets.push(minReachableCount);
     }
 
     for (let i = 0; i < shuffled.length; i++) {
-      visitCountAssignments[shuffled[i]] = countsPool[i];
+      visitCountAssignments[shuffled[i]] = visitCountTargets[i];
     }
 
-    s16Setup = { visitCountAssignments, homebody: shuffled[0] };
+    const homebodyIndex = visitCountTargets.indexOf(minReachableCount);
+    const homebody = shuffled[Math.max(0, homebodyIndex)];
+    const minVisitCount = Math.min(...visitCountTargets);
+
+    s16Setup = {
+      visitCountAssignments,
+      visitCountTargets,
+      minVisitCount,
+      homebody,
+    };
   }
 
   const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || stickyStay);
@@ -556,7 +562,12 @@ export function buildCNF(config) {
     for (let t = 0; t < T - 1; t++) {
       for (let ri = 0; ri < R.length; ri++) {
         let allowed = nbr[ri];
-        if (s16Setup && C[ci] === s16Setup.homebody && !allowed.includes(ri)) {
+        const targetCount = s16Setup?.visitCountAssignments?.[C[ci]];
+        if (
+          s16Setup &&
+          targetCount === s16Setup.minVisitCount &&
+          !allowed.includes(ri)
+        ) {
           allowed = [...allowed, ri];
         }
         const rhs = allowed.map((r2) => X(ci, t + 1, r2));
@@ -692,8 +703,9 @@ export function buildCNF(config) {
   // S16: Homebodies — each character visits a unique number of rooms (1, 2, 3, ...)
   // Only the character visiting exactly 1 room may stay in place; all others must move
   if (config.scenarios && config.scenarios.s16) {
-    const { visitCountAssignments, homebody } = s16Setup || {};
-    if (!visitCountAssignments || !homebody) {
+    const { visitCountAssignments, visitCountTargets, minVisitCount, homebody } =
+      s16Setup || {};
+    if (!visitCountAssignments || !homebody || !visitCountTargets) {
       throw new Error("S16 setup missing visit assignments");
     }
 
@@ -731,12 +743,12 @@ export function buildCNF(config) {
       }
     }
 
-    // Movement constraints: homebody can stay, all others must move each turn
+    // Movement constraints: characters at the minimum count can stay, others must move
     for (let ci = 0; ci < C.length; ci++) {
       const ch = C[ci];
-      if (ch === homebody) {
-        // Homebody stays in same room always (visits exactly 1 room, so all timesteps same room)
-        // This is already enforced by the exactlyK(1) constraint above
+      const targetCount = visitCountAssignments[ch];
+      if (targetCount <= minVisitCount) {
+        // Minimum-count visitors may stay put to meet their quota
         continue;
       }
       // Others must move: X[ci][t][ri] => NOT X[ci][t+1][ri] for all t, ri
@@ -747,7 +759,7 @@ export function buildCNF(config) {
       }
     }
 
-    privKeys.S16 = { visitCountAssignments, homebody };
+    privKeys.S16 = { visitCountAssignments, visitCountTargets, minVisitCount, homebody };
   }
 
   // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
@@ -2264,6 +2276,8 @@ export function solveAndDecode(cfg) {
     priv.homebodies = {
       homebody: privKeys.S16.homebody,
       visit_count_assignments: privKeys.S16.visitCountAssignments,
+      visit_count_targets: privKeys.S16.visitCountTargets,
+      min_visit_count: privKeys.S16.minVisitCount,
       actual_visit_counts: visitCounts,
       rooms_visited: roomsVisitedByChar,
       ranking, // sorted from fewest to most rooms visited
