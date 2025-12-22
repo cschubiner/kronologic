@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Digital Note Sheet - Kronologic Generator</title>
     <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/elkjs/lib/elk.bundled.js"></script>
+    <script src="https://unpkg.com/cytoscape-elk/dist/cytoscape-elk.js"></script>
     <style>
         * {
             margin: 0;
@@ -788,7 +790,7 @@
             <button onclick="initializeSheet()">Build/Refresh Sheet</button>
             <button class="shuffle-structure" onclick="randomizeGraphStructure()" id="shuffleConnectionsBtn" disabled>Shuffle Connections</button>
             <button class="shuffle-layout" onclick="regenerateGraphLayout()" id="shuffleLayoutBtn" disabled>Shuffle Layout</button>
-            <button class="reset-layout" onclick="resetLayout()" id="resetLayoutBtn" disabled>Reset Default Layout</button>
+            <button class="reset-layout" onclick="cycleElkAlgorithm()" id="elkAlgorithmBtn" disabled>ELK: Layered</button>
             <button onclick="undo()" id="undoBtn" disabled>Undo</button>
             <button onclick="redo()" id="redoBtn" disabled>Redo</button>
         </div>
@@ -902,6 +904,7 @@
             historyIndex: -1,
             currentSelector: null,
             currentLayoutIndex: 0,
+            currentElkAlgorithmIndex: 0,
             counts: {}
         };
 
@@ -930,7 +933,8 @@
                         characters: state.characters,
                         rooms: state.rooms,
                         graphDefinition: document.getElementById('graphInput').value,
-                        layoutIndex: state.currentLayoutIndex
+                        layoutIndex: state.currentLayoutIndex,
+                        elkAlgorithmIndex: state.currentElkAlgorithmIndex
                     },
                     placements: state.placements,
                     counts: state.counts,
@@ -968,6 +972,7 @@
                 state.characters = sessionData.config.characters;
                 state.rooms = sessionData.config.rooms;
                 state.currentLayoutIndex = sessionData.config.layoutIndex || 0;
+                state.currentElkAlgorithmIndex = sessionData.config.elkAlgorithmIndex || 0;
 
                 document.getElementById('timestepCount').value = state.timesteps;
                 document.getElementById('characterNames').value = state.characters.map(c => c.name).join(',');
@@ -992,6 +997,8 @@
                 state.history = sessionData.history || [];
                 state.historyIndex = sessionData.historyIndex || -1;
 
+                setElkAlgorithmIndex(state.currentElkAlgorithmIndex);
+
                 // Render everything
                 renderMaps();
                 renderTrackingTable();
@@ -1007,7 +1014,7 @@
                 document.getElementById('sessionControls').style.display = 'flex';
                 document.getElementById('shuffleConnectionsBtn').disabled = false;
                 document.getElementById('shuffleLayoutBtn').disabled = false;
-                document.getElementById('resetLayoutBtn').disabled = false;
+                updateElkAlgorithmButton();
 
                 return true;
             } catch (error) {
@@ -1083,8 +1090,60 @@
             });
         }
 
+        const hasElkLayout = typeof window.cytoscapeElk !== 'undefined';
+        if (hasElkLayout) {
+            cytoscape.use(cytoscapeElk);
+        } else {
+            console.warn('cytoscape-elk not available, falling back to core layouts.');
+        }
+
+        const elkAlgorithms = [
+            {
+                label: 'Layered',
+                elk: {
+                    algorithm: 'layered',
+                    'elk.edgeRouting': 'ORTHOGONAL',
+                    'elk.spacing.nodeNode': 50,
+                    'elk.layered.spacing.nodeNodeBetweenLayers': 50,
+                    'elk.spacing.edgeNode': 20
+                }
+            },
+            {
+                label: 'Tree',
+                elk: {
+                    algorithm: 'mrtree',
+                    'elk.edgeRouting': 'ORTHOGONAL',
+                    'elk.spacing.nodeNode': 60,
+                    'elk.spacing.edgeNode': 20
+                }
+            },
+            {
+                label: 'Radial',
+                elk: {
+                    algorithm: 'radial',
+                    'elk.edgeRouting': 'ORTHOGONAL',
+                    'elk.spacing.nodeNode': 60,
+                    'elk.spacing.edgeNode': 20
+                }
+            }
+        ];
+
+        function buildElkLayoutOptions(algorithmIndex) {
+            const elkConfig = elkAlgorithms[algorithmIndex] || elkAlgorithms[0];
+            return {
+                name: 'elk',
+                fit: true,
+                padding: 20,
+                elk: { ...elkConfig.elk }
+            };
+        }
+
         // Available layout algorithms
         const layoutAlgorithms = [
+            ...(hasElkLayout ? [{
+                name: 'elk',
+                options: buildElkLayoutOptions(state.currentElkAlgorithmIndex)
+            }] : []),
             {
                 name: 'cose',
                 options: {
@@ -1148,6 +1207,35 @@
                 }
             }
         ];
+
+        function updateElkAlgorithmButton() {
+            const btn = document.getElementById('elkAlgorithmBtn');
+            if (!btn) return;
+            if (!hasElkLayout || elkAlgorithms.length === 0) {
+                btn.textContent = 'ELK unavailable';
+                btn.disabled = true;
+                return;
+            }
+            const label = elkAlgorithms[state.currentElkAlgorithmIndex]?.label || 'ELK';
+            btn.textContent = `ELK: ${label}`;
+            btn.disabled = false;
+        }
+
+        function setElkAlgorithmIndex(index) {
+            if (!hasElkLayout || elkAlgorithms.length === 0) return;
+            const normalized = ((index % elkAlgorithms.length) + elkAlgorithms.length) % elkAlgorithms.length;
+            state.currentElkAlgorithmIndex = normalized;
+            if (layoutAlgorithms.length && layoutAlgorithms[0].name === 'elk') {
+                layoutAlgorithms[0].options = buildElkLayoutOptions(normalized);
+            }
+            updateElkAlgorithmButton();
+        }
+
+        function cycleElkAlgorithm() {
+            if (!hasElkLayout || elkAlgorithms.length === 0) return;
+            setElkAlgorithmIndex(state.currentElkAlgorithmIndex + 1);
+            applyLayoutToAll(0);
+        }
 
         // Parse Mermaid graph syntax
         function parseMermaidGraph(mermaidText) {
@@ -1318,6 +1406,8 @@
 
             // Reset layout index
             state.currentLayoutIndex = 0;
+            state.currentElkAlgorithmIndex = 0;
+            setElkAlgorithmIndex(state.currentElkAlgorithmIndex);
 
             // Render
             renderMaps();
@@ -1327,7 +1417,7 @@
             // Enable graph buttons
             document.getElementById('shuffleConnectionsBtn').disabled = false;
             document.getElementById('shuffleLayoutBtn').disabled = false;
-            document.getElementById('resetLayoutBtn').disabled = false;
+            updateElkAlgorithmButton();
         }
 
         function renderMaps() {
@@ -1388,7 +1478,7 @@
                                 style: {
                                     'width': 2,
                                     'line-color': '#d1d5db',
-                                    'curve-style': 'bezier'
+                                    'curve-style': 'segments'
                                 }
                             }
                         ],
@@ -1420,16 +1510,36 @@
             applyLayoutToAll(state.currentLayoutIndex + 1);
         }
 
-        function resetLayout() {
-            applyLayoutToAll(0);
-        }
-
         function applyLayoutToAll(layoutIndex) {
             if (!state.cytoscapeInstances.length) return;
 
             const normalizedIndex = ((layoutIndex % layoutAlgorithms.length) + layoutAlgorithms.length) % layoutAlgorithms.length;
             state.currentLayoutIndex = normalizedIndex;
             const currentLayout = layoutAlgorithms[normalizedIndex];
+
+            if (currentLayout.name === 'elk') {
+                const [primaryCy, ...rest] = state.cytoscapeInstances;
+                if (!primaryCy) return;
+
+                const layout = primaryCy.layout(currentLayout.options);
+                layout.once('layoutstop', () => {
+                    const positions = {};
+                    primaryCy.nodes().forEach(node => {
+                        positions[node.id()] = { ...node.position() };
+                    });
+
+                    primaryCy.fit(primaryCy.elements(), currentLayout.options.padding || 20);
+
+                    rest.forEach(cy => {
+                        cy.nodes().positions(node => positions[node.id()]);
+                        cy.fit(cy.elements(), currentLayout.options.padding || 20);
+                    });
+                });
+
+                layout.run();
+                console.log(`Applied layout: ${currentLayout.name}`);
+                return;
+            }
 
             const [primaryCy, ...rest] = state.cytoscapeInstances;
             if (!primaryCy) return;
