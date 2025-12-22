@@ -588,9 +588,16 @@ export function buildCNF(config) {
       const j = Math.floor(rng() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    const first = shuffled[0];   // visits all R rooms
-    const second = shuffled[1];  // visits R-1 rooms
-    const third = shuffled[2];   // visits R-2 rooms
+    const first = shuffled[0]; // visits the most rooms
+    const second = shuffled[1];
+    const third = shuffled[2];
+
+    const maxUniqueVisits = Math.min(R.length, T);
+    const podiumTargets = [
+      maxUniqueVisits,
+      Math.max(1, maxUniqueVisits - 1),
+      Math.max(1, maxUniqueVisits - 2),
+    ];
 
     // Create "visited" helper variables: V_{char}_{room} = true if char visits room at any time
     const S15V = (ci, ri) => vp.get(`S15_V_${C[ci]}_${R[ri]}`);
@@ -611,48 +618,75 @@ export function buildCNF(config) {
       }
     }
 
-    // 1st place: visits ALL rooms
-    const firstIdx = C.indexOf(first);
-    for (let ri = 0; ri < R.length; ri++) {
-      clauses.push([S15V(firstIdx, ri)]); // Must visit every room
-    }
-
-    // 2nd place: visits exactly R-1 rooms (using totalizer for cardinality)
-    const secondIdx = C.indexOf(second);
-    const secondVars = R.map((_, ri) => S15V(secondIdx, ri));
-    const secondTotalizer = buildTotalizer(secondVars, vp, clauses, `S15_2nd_${C[secondIdx]}`);
-    // Exactly R-1: at least R-1 AND at most R-1
-    if (R.length - 1 > 0 && secondTotalizer.length >= R.length - 1) {
-      clauses.push([secondTotalizer[R.length - 2]]); // At least R-1 (0-indexed)
-    }
-    if (R.length - 1 < R.length && secondTotalizer.length >= R.length) {
-      clauses.push([-secondTotalizer[R.length - 1]]); // At most R-1 (not R)
-    }
-
-    // 3rd place: visits exactly R-2 rooms
-    const thirdIdx = C.indexOf(third);
-    const thirdVars = R.map((_, ri) => S15V(thirdIdx, ri));
-    const thirdTotalizer = buildTotalizer(thirdVars, vp, clauses, `S15_3rd_${C[thirdIdx]}`);
-    // Exactly R-2: at least R-2 AND at most R-2
-    if (R.length - 2 > 0 && thirdTotalizer.length >= R.length - 2) {
-      clauses.push([thirdTotalizer[R.length - 3]]); // At least R-2 (0-indexed)
-    }
-    if (R.length - 2 < R.length && thirdTotalizer.length >= R.length - 1) {
-      clauses.push([-thirdTotalizer[R.length - 2]]); // At most R-2 (not R-1)
-    }
-
-    // Others (4th+): visit at most R-3 rooms
-    for (let ci = 0; ci < C.length; ci++) {
-      if (C[ci] === first || C[ci] === second || C[ci] === third) continue;
-      const otherVars = R.map((_, ri) => S15V(ci, ri));
-      const otherTotalizer = buildTotalizer(otherVars, vp, clauses, `S15_other_${C[ci]}`);
-      // At most R-3: totalizer[R-3] must be false (if R-3 >= 0)
-      if (R.length - 3 >= 0 && otherTotalizer.length >= R.length - 2) {
-        clauses.push([-otherTotalizer[R.length - 3]]); // At most R-3
+    // Helper to enforce exact visit counts using totalizer output
+    function enforceExactVisits(totalizer, targetCount) {
+      if (targetCount > 0 && totalizer.length >= targetCount) {
+        clauses.push([totalizer[targetCount - 1]]);
+      }
+      if (targetCount < totalizer.length) {
+        clauses.push([-totalizer[targetCount]]);
       }
     }
 
-    privKeys.S15 = { first, second, third };
+    // 1st place: visits the maximum feasible distinct rooms
+    const firstIdx = C.indexOf(first);
+    const firstVars = R.map((_, ri) => S15V(firstIdx, ri));
+    const firstTotalizer = buildTotalizer(
+      firstVars,
+      vp,
+      clauses,
+      `S15_1st_${C[firstIdx]}`,
+    );
+    enforceExactVisits(firstTotalizer, podiumTargets[0]);
+
+    // 2nd place: visits the next highest feasible count
+    const secondIdx = C.indexOf(second);
+    const secondVars = R.map((_, ri) => S15V(secondIdx, ri));
+    const secondTotalizer = buildTotalizer(
+      secondVars,
+      vp,
+      clauses,
+      `S15_2nd_${C[secondIdx]}`,
+    );
+    enforceExactVisits(secondTotalizer, podiumTargets[1]);
+
+    // 3rd place: visits the third highest feasible count
+    const thirdIdx = C.indexOf(third);
+    const thirdVars = R.map((_, ri) => S15V(thirdIdx, ri));
+    const thirdTotalizer = buildTotalizer(
+      thirdVars,
+      vp,
+      clauses,
+      `S15_3rd_${C[thirdIdx]}`,
+    );
+    enforceExactVisits(thirdTotalizer, podiumTargets[2]);
+
+    // Others (4th+): visit fewer rooms than third place where possible
+    const othersMax = Math.max(1, podiumTargets[2] - 1);
+    for (let ci = 0; ci < C.length; ci++) {
+      if (C[ci] === first || C[ci] === second || C[ci] === third) continue;
+      const otherVars = R.map((_, ri) => S15V(ci, ri));
+      const otherTotalizer = buildTotalizer(
+        otherVars,
+        vp,
+        clauses,
+        `S15_other_${C[ci]}`,
+      );
+      if (othersMax < otherTotalizer.length) {
+        clauses.push([-otherTotalizer[othersMax]]);
+      }
+    }
+
+    privKeys.S15 = {
+      first,
+      second,
+      third,
+      targets: {
+        first: podiumTargets[0],
+        second: podiumTargets[1],
+        third: podiumTargets[2],
+      },
+    };
   }
 
   // S16: Homebodies — each character visits a unique number of rooms (1, 2, 3, ...)
@@ -2188,18 +2222,23 @@ export function solveAndDecode(cfg) {
       roomsVisitedByChar[ch] = Array.from(roomsVisited).sort();
     }
 
-    // Calculate rooms missed by 2nd and 3rd place
-    const secondMissed = R.filter(room => !roomsVisitedByChar[privKeys.S15.second].includes(room));
-    const thirdMissed = R.filter(room => !roomsVisitedByChar[privKeys.S15.third].includes(room));
+    // Calculate rooms missed by podium finishers relative to map
+    const secondMissed = R.filter(
+      (room) => !roomsVisitedByChar[privKeys.S15.second].includes(room),
+    );
+    const thirdMissed = R.filter(
+      (room) => !roomsVisitedByChar[privKeys.S15.third].includes(room),
+    );
 
     priv.world_travelers = {
       first: privKeys.S15.first,
       second: privKeys.S15.second,
       third: privKeys.S15.third,
+      targets: privKeys.S15.targets,
       visit_counts: visitCounts,
       rooms_visited: roomsVisitedByChar,
       rooms_missed: {
-        first: [], // 1st visits all rooms
+        first: R.filter((room) => !roomsVisitedByChar[privKeys.S15.first].includes(room)),
         second: secondMissed,
         third: thirdMissed,
       },
