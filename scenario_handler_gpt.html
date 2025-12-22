@@ -62,6 +62,45 @@
   .answer-private.hidden { filter: blur(8px); user-select: none; }
   .private-toggle { font-size:11px; padding:6px 12px; cursor:pointer; margin-top:8px; display:inline-block; }
   select.pill { padding:6px 10px; }
+  /* TV Display Mode Styles */
+  .tv-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .tv-controls { margin-bottom: 16px; }
+  .tv-display {
+    background: #000;
+    border-radius: 12px;
+    padding: 40px;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .tv-display.fullscreen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9999;
+    border-radius: 0;
+    min-height: 100vh;
+  }
+  .tv-status-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 600px; margin-bottom: 20px; gap: 16px; }
+  .tv-question-count { font-size: 16px; color: var(--muted); }
+  .tv-timer { font-size: 16px; color: var(--accent); font-weight: 600; flex: 1; text-align: center; }
+  .tv-exit-fs { font-size: 14px; }
+  .tv-question-type { font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+  .tv-question-text { font-size: 48px; font-weight: 700; color: var(--fg); margin-bottom: 40px; line-height: 1.2; }
+  .tv-public { font-size: 36px; color: var(--good); font-weight: 600; margin-bottom: 16px; }
+  .tv-private { font-size: 28px; color: #9fb1c1; opacity: 0; transition: opacity 0.5s; }
+  .tv-private.visible { opacity: 1; }
+  .tv-history { margin-top: 40px; width: 100%; max-width: 800px; text-align: left; }
+  .tv-history h3 { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+  #historyList { max-height: 200px; overflow-y: auto; }
+  .tv-display.fullscreen #historyList { max-height: 30vh; }
+  .history-item { padding: 8px 12px; background: #0e141b; border-radius: 6px; margin-bottom: 6px; font-size: 14px; }
+  .history-item .time { color: var(--accent); font-size: 11px; margin-bottom: 4px; }
+  .history-item .q { color: var(--fg); }
+  .history-item .a { color: var(--good); margin-left: 12px; }
+  .history-item .priv { color: var(--muted); margin-left: 12px; }
 </style>
 </head>
 <body>
@@ -279,6 +318,60 @@
             <button class="ghost private-toggle" id="locCharToggle">👁️ Show</button>
           </div>
           <div class="answer-private hidden" id="locCharPrivate"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="tvModeSection" style="display:none;">
+    <div class="tv-header">
+      <h2 style="margin:0;">TV Display Mode</h2>
+      <button class="ghost" id="toggleTvPanel">▶ Show TV Panel</button>
+    </div>
+
+    <!-- TV Panel (collapsible) -->
+    <div id="tvPanel" style="display:none;">
+      <p class="hint">Auto-play mode for TV display. Questions are asked automatically at the configured interval.</p>
+
+      <!-- Controls -->
+      <div class="tv-controls" id="tvControls">
+        <div class="row">
+          <label>Question Interval:</label>
+          <input type="range" id="questionInterval" min="30" max="240" value="60" />
+          <span id="intervalValue">60s</span>
+        </div>
+        <div class="row">
+          <label>Private Info Chance:</label>
+          <input type="range" id="privateChance" min="0" max="100" value="20" />
+          <span id="privateChanceValue">20%</span>
+        </div>
+        <div class="row">
+          <button class="primary" id="startTvMode">▶ Start TV Mode</button>
+          <button class="ghost" id="pauseTvMode" disabled>⏸ Pause</button>
+          <button class="ghost" id="stopTvMode" disabled>⏹ Stop</button>
+          <button class="ghost" id="askNowBtn">⚡ Ask Now</button>
+          <button class="ghost" id="fullscreenBtn">⛶ Fullscreen</button>
+        </div>
+      </div>
+
+      <!-- TV Display (shown during active mode) -->
+      <div id="tvDisplay" class="tv-display" style="display:none;">
+        <div class="tv-status-bar">
+          <span class="tv-question-count" id="tvQuestionCount">Question 0</span>
+          <span class="tv-timer" id="tvTimer"></span>
+          <button class="ghost tv-exit-fs" id="exitFullscreenBtn" style="display:none;">✕ Exit Fullscreen</button>
+        </div>
+        <div class="tv-question">
+          <div class="tv-question-type" id="tvQuestionType"></div>
+          <div class="tv-question-text" id="tvQuestionText"></div>
+        </div>
+        <div class="tv-answer">
+          <div class="tv-public" id="tvPublic"></div>
+          <div class="tv-private" id="tvPrivate"></div>
+        </div>
+        <div class="tv-history">
+          <h3>Question History</h3>
+          <div id="historyList"></div>
         </div>
       </div>
     </div>
@@ -536,6 +629,7 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
   wireCopyButtons(encoded);
 
   setupQuestionInterface(res, cfg);
+  setupTvMode(res, cfg);
 }
 function renderTable(container, obj, headerLeft){
   const el = typeof container==="string"? qs(container) : container;
@@ -713,6 +807,69 @@ qs("reuseBtn").addEventListener("click", ()=>{
   renderSelectedScenario({ res, cfg, percentile: pct, sampleCount, skipped, solutions, targetIdx, source: 'reuse' });
 });
 
+// ============ Shared Question Helpers ============
+
+function buildLocTimeAnswer(res, cfg, location, time) {
+  const charsAtLocation = [];
+  for (const char of cfg.chars) {
+    if (res.schedule[char][time - 1] === location) {
+      charsAtLocation.push(char);
+    }
+  }
+
+  const count = charsAtLocation.length;
+  let revealedChar = null;
+  if (count > 0) {
+    let hash = time;
+    for (let i = 0; i < location.length; i++) {
+      hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+    }
+    revealedChar = charsAtLocation[hash % charsAtLocation.length];
+  }
+
+  const privateText = count > 0
+    ? `⚪ Private: One character present: <b>${revealedChar}</b>`
+    : `⚪ Private: The room was empty`;
+
+  return {
+    question: `Who was in ${location} at t=${time}?`,
+    shared: `🟢 Shared: <b>${count}</b> character${count === 1 ? '' : 's'} ${count === 1 ? 'was' : 'were'} in ${location} at t=${time}`,
+    private: privateText
+  };
+}
+
+function buildLocCharAnswer(res, cfg, location, character) {
+  const visitCount = res.visits[character][location] || 0;
+  const times = [];
+  for (let t = 0; t < cfg.T; t++) {
+    if (res.schedule[character][t] === location) {
+      times.push(t + 1);
+    }
+  }
+
+  let revealedTime = null;
+  if (times.length > 0) {
+    let hash = 0;
+    for (let i = 0; i < location.length; i++) {
+      hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+    }
+    for (let i = 0; i < character.length; i++) {
+      hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
+    }
+    revealedTime = `t=${times[hash % times.length]}`;
+  }
+
+  const privateText = visitCount > 0
+    ? `⚪ Private: One time visited: <b>${revealedTime}</b>`
+    : `⚪ Private: ${character} never visited ${location}`;
+
+  return {
+    question: `How many times did ${character} visit ${location}?`,
+    shared: `🟢 Shared: <b>${visitCount}</b> visit${visitCount === 1 ? '' : 's'} by ${character} to ${location}`,
+    private: privateText
+  };
+}
+
 function setupQuestionInterface(res, cfg){
   const rooms = cfg.rooms;
   const chars = cfg.chars;
@@ -747,35 +904,14 @@ function setupQuestionInterface(res, cfg){
   qs("askLocTimeSubmit").onclick = ()=>{
     const location = locTimeLocation.value;
     const time = Number(locTimeTime.value);
-    
-    // Count how many characters were in this location at this time
-    const charsAtLocation = [];
-    for (const char of chars){
-      if (res.schedule[char][time-1] === location){
-        charsAtLocation.push(char);
-      }
-    }
-    
-    const count = charsAtLocation.length;
-    
-    // Deterministically pick one character to reveal (based on location + time hash)
-    let revealedChar = "none";
-    if (count > 0) {
-      // Simple hash: sum char codes of location + time
-      let hash = time;
-      for (let i = 0; i < location.length; i++) {
-        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
-      }
-      const idx = hash % charsAtLocation.length;
-      revealedChar = charsAtLocation[idx];
-    }
-    
-    qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} ${count===1?'was':'were'} in ${location} at t=${time}`;
-    qs("locTimePrivate").innerHTML = `⚪ Private: One character present: <b>${revealedChar}</b>`;
+    const answer = buildLocTimeAnswer(res, cfg, location, time);
+
+    qs("locTimeShared").innerHTML = answer.shared;
+    qs("locTimePrivate").innerHTML = answer.private;
     qs("locTimePrivate").classList.add("hidden");
     qs("locTimeToggle").textContent = "👁️ Show";
     qs("locTimeAnswer").style.display = "block";
-    
+
     // Setup toggle handler
     qs("locTimeToggle").onclick = ()=>{
       const privateEl = qs("locTimePrivate");
@@ -794,39 +930,14 @@ function setupQuestionInterface(res, cfg){
   qs("askLocCharSubmit").onclick = ()=>{
     const location = locCharLocation.value;
     const character = locCharChar.value;
-    
-    // Count how many times this character visited this location
-    const visitCount = res.visits[character][location] || 0;
-    
-    // Find which times they visited
-    const times = [];
-    for (let t=0; t<T; t++){
-      if (res.schedule[character][t] === location){
-        times.push(t+1);
-      }
-    }
-    
-    // Deterministically pick one time to reveal (based on location + character hash)
-    let revealedTime = "never";
-    if (times.length > 0) {
-      // Simple hash: sum char codes of location + character
-      let hash = 0;
-      for (let i = 0; i < location.length; i++) {
-        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
-      }
-      for (let i = 0; i < character.length; i++) {
-        hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
-      }
-      const idx = hash % times.length;
-      revealedTime = `t=${times[idx]}`;
-    }
-    
-    qs("locCharShared").innerHTML = `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
-    qs("locCharPrivate").innerHTML = `⚪ Private: One time visited: <b>${revealedTime}</b>`;
+    const answer = buildLocCharAnswer(res, cfg, location, character);
+
+    qs("locCharShared").innerHTML = answer.shared;
+    qs("locCharPrivate").innerHTML = answer.private;
     qs("locCharPrivate").classList.add("hidden");
     qs("locCharToggle").textContent = "👁️ Show";
     qs("locCharAnswer").style.display = "block";
-    
+
     // Setup toggle handler
     qs("locCharToggle").onclick = ()=>{
       const privateEl = qs("locCharPrivate");
@@ -872,6 +983,276 @@ function setupQuestionInterface(res, cfg){
   // Default to Location + Time
   qs("askLocTimeBtn").click();
 }
+
+// ============ TV Display Mode ============
+
+let tvModeState = {
+  active: false,
+  paused: false,
+  countdownId: null,
+  countdown: 0,
+  history: [],
+  askedQuestions: new Set(),
+  allQuestions: [],
+  res: null,
+  cfg: null
+};
+
+function formatTimestamp() {
+  const now = new Date();
+  return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function setupTvMode(res, cfg) {
+  tvModeState.res = res;
+  tvModeState.cfg = cfg;
+  tvModeState.history = [];
+
+  qs("tvModeSection").style.display = "block";
+
+  // Slider value displays
+  qs("questionInterval").oninput = () => {
+    qs("intervalValue").textContent = qs("questionInterval").value + "s";
+  };
+  qs("privateChance").oninput = () => {
+    qs("privateChanceValue").textContent = qs("privateChance").value + "%";
+  };
+
+  // Button handlers
+  qs("startTvMode").onclick = startTvMode;
+  qs("pauseTvMode").onclick = pauseTvMode;
+  qs("stopTvMode").onclick = stopTvMode;
+  qs("askNowBtn").onclick = askNow;
+  qs("fullscreenBtn").onclick = toggleFullscreen;
+  qs("exitFullscreenBtn").onclick = toggleFullscreen;
+
+  // Toggle panel visibility
+  qs("toggleTvPanel").onclick = () => {
+    const panel = qs("tvPanel");
+    const btn = qs("toggleTvPanel");
+    if (panel.style.display === "none") {
+      panel.style.display = "block";
+      btn.textContent = "▼ Hide TV Panel";
+    } else {
+      panel.style.display = "none";
+      btn.textContent = "▶ Show TV Panel";
+      // Stop autoplay when panel is hidden
+      if (tvModeState.active) {
+        stopTvMode();
+      }
+    }
+  };
+}
+
+function startTvMode() {
+  const { res, cfg } = tvModeState;
+  if (!res || !cfg) return;
+
+  tvModeState.active = true;
+  tvModeState.paused = false;
+  tvModeState.history = [];
+  tvModeState.askedQuestions = new Set();
+  tvModeState.allQuestions = generateAllQuestions(cfg);
+
+  qs("startTvMode").disabled = true;
+  qs("pauseTvMode").disabled = false;
+  qs("stopTvMode").disabled = false;
+  qs("tvDisplay").style.display = "flex";
+  qs("historyList").innerHTML = '';
+
+  askRandomQuestion();
+  scheduleNextQuestion();
+}
+
+function generateAllQuestions(cfg) {
+  const questions = [];
+  const { rooms, chars, T } = cfg;
+
+  for (const room of rooms) {
+    for (let t = 1; t <= T; t++) {
+      questions.push({ type: 'locTime', room, time: t });
+    }
+  }
+
+  for (const room of rooms) {
+    for (const char of chars) {
+      questions.push({ type: 'locChar', room, char });
+    }
+  }
+
+  return questions;
+}
+
+function pauseTvMode() {
+  if (tvModeState.paused) {
+    tvModeState.paused = false;
+    qs("pauseTvMode").textContent = "⏸ Pause";
+    scheduleNextQuestion();
+  } else {
+    tvModeState.paused = true;
+    qs("pauseTvMode").textContent = "▶ Resume";
+    clearInterval(tvModeState.countdownId);
+    qs("tvTimer").textContent = "Paused";
+  }
+}
+
+function stopTvMode() {
+  tvModeState.active = false;
+  tvModeState.paused = false;
+  clearInterval(tvModeState.countdownId);
+
+  qs("startTvMode").disabled = false;
+  qs("pauseTvMode").disabled = true;
+  qs("pauseTvMode").textContent = "⏸ Pause";
+  qs("stopTvMode").disabled = true;
+  qs("tvDisplay").style.display = "none";
+
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  }
+}
+
+function askNow() {
+  if (!tvModeState.res || !tvModeState.cfg) return;
+
+  // If not active, start in single-question mode
+  if (!tvModeState.active) {
+    tvModeState.history = [];
+    tvModeState.askedQuestions = new Set();
+    tvModeState.allQuestions = generateAllQuestions(tvModeState.cfg);
+    qs("tvDisplay").style.display = "flex";
+    qs("historyList").innerHTML = '';
+  }
+
+  askRandomQuestion();
+
+  // Reset countdown if active
+  if (tvModeState.active && !tvModeState.paused) {
+    const intervalSec = Number(qs("questionInterval").value);
+    tvModeState.countdown = intervalSec;
+  }
+}
+
+function scheduleNextQuestion() {
+  const intervalSec = Number(qs("questionInterval").value);
+  tvModeState.countdown = intervalSec;
+  updateStatusBar();
+
+  clearInterval(tvModeState.countdownId);
+  tvModeState.countdownId = setInterval(() => {
+    if (!tvModeState.active || tvModeState.paused) return;
+
+    tvModeState.countdown--;
+    updateStatusBar();
+
+    if (tvModeState.countdown <= 0) {
+      askRandomQuestion();
+      tvModeState.countdown = intervalSec;
+    }
+  }, 1000);
+}
+
+function askRandomQuestion() {
+  const { res, cfg, allQuestions, askedQuestions } = tvModeState;
+
+  const unasked = allQuestions.filter((_, i) => !askedQuestions.has(i));
+
+  if (unasked.length === 0) {
+    qs("tvQuestionType").textContent = "COMPLETE";
+    qs("tvQuestionText").textContent = "All questions asked!";
+    qs("tvPublic").textContent = `${allQuestions.length} total questions`;
+    qs("tvPrivate").textContent = "";
+    qs("tvPrivate").classList.remove("visible");
+    clearInterval(tvModeState.countdownId);
+    qs("tvTimer").textContent = "Game complete";
+    return;
+  }
+
+  const randomIdx = Math.floor(Math.random() * unasked.length);
+  const actualIdx = allQuestions.indexOf(unasked[randomIdx]);
+  askedQuestions.add(actualIdx);
+
+  const q = unasked[randomIdx];
+  let answer;
+
+  if (q.type === 'locTime') {
+    answer = buildLocTimeAnswer(res, cfg, q.room, q.time);
+    qs("tvQuestionType").textContent = "Location + Time";
+  } else {
+    answer = buildLocCharAnswer(res, cfg, q.room, q.char);
+    qs("tvQuestionType").textContent = "Location + Character";
+  }
+
+  // Display question using natural phrasing from helper
+  qs("tvQuestionText").textContent = answer.question;
+  qs("tvPublic").innerHTML = answer.shared;
+  qs("tvPrivate").innerHTML = answer.private;
+
+  const showPrivate = Math.random() * 100 < Number(qs("privateChance").value);
+  if (showPrivate) {
+    qs("tvPrivate").classList.add("visible");
+  } else {
+    qs("tvPrivate").classList.remove("visible");
+  }
+
+  // Add to history with timestamp
+  const historyEntry = {
+    time: formatTimestamp(),
+    q: answer.question,
+    pub: answer.shared,
+    priv: answer.private,
+    showedPrivate: showPrivate
+  };
+  tvModeState.history.unshift(historyEntry);
+  updateTvHistory();
+  updateStatusBar();
+}
+
+function updateStatusBar() {
+  const asked = tvModeState.askedQuestions.size;
+  qs("tvQuestionCount").textContent = `Question ${asked}`;
+
+  if (tvModeState.active && !tvModeState.paused && tvModeState.countdown > 0) {
+    qs("tvTimer").textContent = `Next in ${tvModeState.countdown}s`;
+  }
+}
+
+function updateTvHistory() {
+  qs("historyList").innerHTML = tvModeState.history.map(h => `
+    <div class="history-item">
+      <div class="time">${h.time}</div>
+      <span class="q">${h.q}</span>
+      <span class="a">${h.pub}</span>
+      ${h.showedPrivate ? `<span class="priv">${h.priv}</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function toggleFullscreen() {
+  const display = qs("tvDisplay");
+  const exitBtn = qs("exitFullscreenBtn");
+
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+    display.classList.remove("fullscreen");
+    exitBtn.style.display = "none";
+  } else {
+    display.requestFullscreen().then(() => {
+      display.classList.add("fullscreen");
+      exitBtn.style.display = "block";
+    }).catch(() => {});
+  }
+}
+
+// Listen for fullscreen change (e.g., user presses Escape)
+document.addEventListener('fullscreenchange', () => {
+  const display = qs("tvDisplay");
+  const exitBtn = qs("exitFullscreenBtn");
+  if (!document.fullscreenElement) {
+    display.classList.remove("fullscreen");
+    if (exitBtn) exitBtn.style.display = "none";
+  }
+});
 
 // Toggle results collapse/expand
 qs("toggleResultsBtn").addEventListener("click", ()=>{
