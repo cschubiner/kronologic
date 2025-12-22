@@ -158,6 +158,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s16" value="s16" /> S16: Homebodies (each character visits a unique number of rooms)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s17" value="s17" /> S17: Triple Alibi (identify the trio that meets together)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -474,6 +477,15 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
     pf.push(
       `Singer's Jewels: room <b>${info.jewel_room}</b>; first thief <b>${info.first_thief}</b> @ t=${info.first_thief_time}; ` +
       `passes: ${passes || 'none'}; final holder: <b>${info.final_holder}</b>`,
+    );
+  }
+  if (res.priv.triple_alibi) {
+    const info = res.priv.triple_alibi;
+    const meetingsStr = info.meetings
+      .map(m => `${m.room} (t=${m.time})`)
+      .join(', ');
+    pf.push(
+      `Triple Alibi: trio <b>${info.trio.join(', ')}</b>; met ${info.total_meetings} time(s) at: ${meetingsStr || 'none'}`,
     );
   }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);

@@ -4425,3 +4425,154 @@ describe("S16: Homebodies", () => {
     });
   });
 });
+
+describe("S17: Triple Alibi", () => {
+  it("should have the trio meet at least once", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1700,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const ta = res.priv.triple_alibi;
+      expect(ta).toBeTruthy();
+      expect(ta.trio.length).toBe(3);
+      expect(ta.total_meetings).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("should forbid non-trio trios from meeting", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1701,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      const schedule = res.schedule;
+      const trioSet = new Set(ta.trio);
+
+      // Check all timesteps - if exactly 3 people in a room, must be the trio
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const inRoom = cfg.chars.filter((ch) => schedule[ch][t] === room);
+          if (inRoom.length === 3) {
+            // All 3 must be trio members
+            expect(inRoom.every((ch) => trioSet.has(ch))).toBe(true);
+          }
+        }
+      }
+    });
+  });
+
+  it("should work with exactly 3 characters", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      scenarios: { s17: true },
+      seed: 1702,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      expect(ta).toBeTruthy();
+      // All 3 characters ARE the trio
+      expect(new Set(ta.trio)).toEqual(new Set(cfg.chars));
+    });
+  });
+
+  it("should work with mustMove constraint", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 6,
+      mustMove: true,
+      scenarios: { s17: true },
+      seed: 1703,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const ta = res.priv.triple_alibi;
+      expect(ta).toBeTruthy();
+      expect(ta.total_meetings).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("should reject scenarios with fewer than 3 characters", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X", "Y"],
+      T: 3,
+      scenarios: { s17: true },
+    };
+    expect(() => solveAndDecode(cfg)).toThrow("S17 requires at least 3 characters");
+  });
+
+  it("should count trio meetings correctly", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1704,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      // Verify meeting count matches actual schedule
+      let actualMeetings = 0;
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const inRoom = cfg.chars.filter((ch) => res.schedule[ch][t] === room);
+          if (ta.trio.every((ch) => inRoom.includes(ch))) {
+            actualMeetings++;
+          }
+        }
+      }
+      expect(ta.total_meetings).toBe(actualMeetings);
+    });
+  });
+});

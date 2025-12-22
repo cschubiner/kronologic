@@ -758,6 +758,83 @@ export function buildCNF(config) {
     privKeys.S16 = { visitCountAssignments, visitCountTargets, minVisitCount, homebody };
   }
 
+  // S17: Triple Alibi — three specific characters must meet as a trio at least once,
+  // and no other trio of 3 characters may meet in the same room at the same time
+  if (config.scenarios && config.scenarios.s17) {
+    if (C.length < 3) throw new Error("S17 requires at least 3 characters");
+
+    const rng = mulberry32(resolvedSeed);
+
+    // Randomly select 3 characters to form the alibi trio
+    const shuffled = [...C];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const trio = [shuffled[0], shuffled[1], shuffled[2]].sort();
+    const trioIndices = trio.map((ch) => C.indexOf(ch));
+    const trioKey = trioIndices
+      .slice()
+      .sort((a, b) => a - b)
+      .join(",");
+
+    // Generate all 3-combinations of character indices
+    const allTrios = [];
+    for (let i = 0; i < C.length; i++) {
+      for (let j = i + 1; j < C.length; j++) {
+        for (let k = j + 1; k < C.length; k++) {
+          allTrios.push([i, j, k]);
+        }
+      }
+    }
+
+    // Forbid each non-trio combination from meeting in any room at any time
+    for (const [ci1, ci2, ci3] of allTrios) {
+      const key = [ci1, ci2, ci3].sort((a, b) => a - b).join(",");
+      if (key === trioKey) continue; // Skip the special trio
+
+      for (let t = 0; t < T; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          // NOT (X[ci1][t][ri] AND X[ci2][t][ri] AND X[ci3][t][ri])
+          // = (-X[ci1][t][ri] OR -X[ci2][t][ri] OR -X[ci3][t][ri])
+          clauses.push([-X(ci1, t, ri), -X(ci2, t, ri), -X(ci3, t, ri)]);
+        }
+      }
+    }
+
+    // The special trio must meet at least once
+    // Create helper variable M_t_r = trio meets in room r at time t
+    const M = (t, ri) => vp.get(`S17_M_${t}_${ri}`);
+    const [ti0, ti1, ti2] = trioIndices;
+
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const x0 = X(ti0, t, ri);
+        const x1 = X(ti1, t, ri);
+        const x2 = X(ti2, t, ri);
+
+        // M => X[0], M => X[1], M => X[2]
+        clauses.push([-M(t, ri), x0]);
+        clauses.push([-M(t, ri), x1]);
+        clauses.push([-M(t, ri), x2]);
+
+        // (X[0] AND X[1] AND X[2]) => M
+        clauses.push([-x0, -x1, -x2, M(t, ri)]);
+      }
+    }
+
+    // At least one M must be true (trio meets at least once)
+    const allMeetings = [];
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        allMeetings.push(M(t, ri));
+      }
+    }
+    clauses.push(allMeetings); // At least one is true
+
+    privKeys.S17 = { trio };
+  }
+
   // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
   if (config.scenarios && config.scenarios.s11) {
     if (!R.length) throw new Error("S11 requires at least one room");
@@ -2274,6 +2351,29 @@ export function solveAndDecode(cfg) {
       actual_visit_counts: visitCounts,
       rooms_visited: roomsVisitedByChar,
       ranking, // sorted from fewest to most rooms visited
+    };
+  }
+
+  // S17: Triple Alibi decoding
+  if (privKeys.S17) {
+    const trio = privKeys.S17.trio;
+
+    // Find all meetings of the trio
+    const meetings = [];
+    for (let t = 0; t < T; t++) {
+      for (const room of R) {
+        const inRoom = C.filter((ch) => schedule[ch][t] === room);
+        // Check if all trio members are in this room
+        if (trio.every((ch) => inRoom.includes(ch))) {
+          meetings.push({ time: t + 1, room, attendees: [...inRoom].sort() });
+        }
+      }
+    }
+
+    priv.triple_alibi = {
+      trio: trio,
+      meetings: meetings,
+      total_meetings: meetings.length,
     };
   }
 

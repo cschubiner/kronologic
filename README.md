@@ -375,6 +375,22 @@ Players must deduce the secret scenario by combining:
 - More characters create more rankings to deduce
 - The homebody is easy to spot if alone, but harder if others visit their room
 
+### S17: Triple Alibi
+**Mystery**: Three specific characters have a secret pact—they must meet together as a trio at least once during the night. No other group of exactly three can ever share the same room at the same time.
+
+**Rules**:
+- Three specific characters (the "alibi trio") must meet as a trio at least once
+- **No other trio** of exactly 3 characters may occupy the same room at any timestep
+- Pairs (2 people) and groups of 4+ are allowed
+- Requires at least 3 characters
+
+**Goal**: Identify which three characters form the alibi trio.
+
+**Difficulty Factors**:
+- More trio meetings make the puzzle harder (more evidence to sift through)
+- More characters = more possible trios to consider (C choose 3)
+- Movement patterns may reveal the trio based on where they converge
+
 ---
 
 ## Using the Generator
@@ -416,6 +432,7 @@ Enable one scenario:
 - **S14 (Curse of Amarinta)**: No configuration needed
 - **S15 (World Travelers)**: No configuration needed (requires 4+ rooms, 3+ characters)
 - **S16 (Homebodies)**: No configuration needed (requires rooms ≥ characters)
+- **S17 (Triple Alibi)**: No configuration needed (requires at least 3 characters)
 
 ### Difficulty Control
 

@@ -669,7 +669,8 @@ const SCENARIOS = [
   { id: 's13', name: 'Glue Shoes', desc: 'Glue carrier makes co-occupants stay an extra turn.' },
   { id: 's14', name: 'Curse of Amarinta', desc: 'Trace the original curse carrier.' },
   { id: 's15', name: 'World Travelers', desc: 'Rank top 3 travelers by rooms visited.' },
-  { id: 's16', name: 'Homebodies', desc: 'Each character visits a unique number of rooms.' }
+  { id: 's16', name: 'Homebodies', desc: 'Each character visits a unique number of rooms.' },
+  { id: 's17', name: 'Triple Alibi', desc: 'Which three characters always meet together?' }
 ];
 
 /* ===========================
@@ -867,6 +868,22 @@ function renderPrivateFacts(res, cfg) {
         text: `Final holder (${info.total_passes} pass${info.total_passes !== 1 ? 'es' : ''})`
       });
     }
+  }
+
+  if (res.priv.triple_alibi) {
+    const info = res.priv.triple_alibi;
+    const meetingsStr = info.meetings.map(m => `${m.room}@t${m.time}`).join(', ');
+    for (const ch of info.trio) {
+      facts.push({
+        type: 'trio',
+        char: ch,
+        text: `Alibi trio member`
+      });
+    }
+    facts.push({
+      type: 'trio',
+      text: `Trio met ${info.total_meetings} time(s): ${meetingsStr || 'none'}`
+    });
   }
 
   if (facts.length === 0) {

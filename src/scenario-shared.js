@@ -64,6 +64,10 @@ export function scoreScenario(res, cfg) {
     scores.homebodies = scoreHomebodies(res, cfg);
     score += scores.homebodies;
   }
+  if (cfg.scenarios.s17 && res.priv.triple_alibi) {
+    scores.tripleAlibi = scoreTripleAlibi(res, cfg);
+    score += scores.tripleAlibi;
+  }
   return { total: score, breakdown: scores };
 }
 
@@ -397,6 +401,29 @@ function scoreHomebodies(res, cfg) {
       score += 5; // Adjacent counts add complexity
     }
   }
+
+  return score;
+}
+
+function scoreTripleAlibi(res, cfg) {
+  const info = res.priv.triple_alibi;
+  if (!info) return 0;
+
+  let score = 0;
+
+  // More trio meetings = harder puzzle (more evidence to analyze)
+  score += info.total_meetings * 50;
+
+  // More characters = more potential trios to consider (C choose 3)
+  const numChars = cfg.chars.length;
+  const numPossibleTrios = (numChars * (numChars - 1) * (numChars - 2)) / 6;
+  score += numPossibleTrios * 10;
+
+  // More timesteps = more opportunities for meetings
+  score += cfg.T * 5;
+
+  // More rooms = more places to check
+  score += cfg.rooms.length * 5;
 
   return score;
 }
