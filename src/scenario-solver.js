@@ -778,30 +778,6 @@ export function buildCNF(config) {
       .sort((a, b) => a - b)
       .join(",");
 
-    // Generate all 3-combinations of character indices
-    const allTrios = [];
-    for (let i = 0; i < C.length; i++) {
-      for (let j = i + 1; j < C.length; j++) {
-        for (let k = j + 1; k < C.length; k++) {
-          allTrios.push([i, j, k]);
-        }
-      }
-    }
-
-    // Forbid each non-trio combination from meeting in any room at any time
-    for (const [ci1, ci2, ci3] of allTrios) {
-      const key = [ci1, ci2, ci3].sort((a, b) => a - b).join(",");
-      if (key === trioKey) continue; // Skip the special trio
-
-      for (let t = 0; t < T; t++) {
-        for (let ri = 0; ri < R.length; ri++) {
-          // NOT (X[ci1][t][ri] AND X[ci2][t][ri] AND X[ci3][t][ri])
-          // = (-X[ci1][t][ri] OR -X[ci2][t][ri] OR -X[ci3][t][ri])
-          clauses.push([-X(ci1, t, ri), -X(ci2, t, ri), -X(ci3, t, ri)]);
-        }
-      }
-    }
-
     // The special trio must meet at least once
     // Create helper variable M_t_r = trio meets in room r at time t
     const M = (t, ri) => vp.get(`S17_M_${t}_${ri}`);
@@ -831,6 +807,38 @@ export function buildCNF(config) {
       }
     }
     clauses.push(allMeetings); // At least one is true
+
+    // Detect rooms with exactly three people: only the trio is allowed
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const occupants = C.map((_, ci) => X(ci, t, ri));
+        const occTotalizer = buildTotalizer(
+          occupants,
+          vp,
+          clauses,
+          `S17_OCC_${t}_${ri}`,
+        );
+        const eq3 = vp.get(`S17_EQ3_${t}_${ri}`);
+
+        // eq3 <-> exactly three occupants in the room
+        clauses.push([-eq3, occTotalizer[2]]);
+        if (occTotalizer.length > 3) {
+          clauses.push([-eq3, -occTotalizer[3]]);
+          clauses.push([-occTotalizer[2], occTotalizer[3], eq3]);
+        } else {
+          clauses.push([-occTotalizer[2], eq3]);
+        }
+
+        // If exactly three, they must be the trio and no one else
+        for (const ti of trioIndices) {
+          clauses.push([-eq3, X(ti, t, ri)]);
+        }
+        for (let ci = 0; ci < C.length; ci++) {
+          if (trioIndices.includes(ci)) continue;
+          clauses.push([-eq3, -X(ci, t, ri)]);
+        }
+      }
+    }
 
     privKeys.S17 = { trio };
   }
@@ -2360,9 +2368,13 @@ export function solveAndDecode(cfg) {
 
     // Find all meetings of the trio
     const meetings = [];
+    const threePersonRooms = [];
     for (let t = 0; t < T; t++) {
       for (const room of R) {
         const inRoom = C.filter((ch) => schedule[ch][t] === room);
+        if (inRoom.length === 3) {
+          threePersonRooms.push({ time: t + 1, room, attendees: [...inRoom].sort() });
+        }
         // Check if all trio members are in this room
         if (trio.every((ch) => inRoom.includes(ch))) {
           meetings.push({ time: t + 1, room, attendees: [...inRoom].sort() });
@@ -2370,10 +2382,17 @@ export function solveAndDecode(cfg) {
       }
     }
 
+    const exclusiveTrioMeetings = meetings.filter(
+      (m) => m.attendees.length === 3 && trio.every((ch) => m.attendees.includes(ch)),
+    );
+
     priv.triple_alibi = {
       trio: trio,
       meetings: meetings,
       total_meetings: meetings.length,
+      three_person_rooms: threePersonRooms,
+      exclusive_trio_meetings: exclusiveTrioMeetings,
+      exclusive_trio_count: exclusiveTrioMeetings.length,
     };
   }
 

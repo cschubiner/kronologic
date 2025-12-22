@@ -4575,4 +4575,48 @@ describe("S17: Triple Alibi", () => {
       expect(ta.total_meetings).toBe(actualMeetings);
     });
   });
+
+  it("should surface three-person room details in private facts", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1705,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      expect(Array.isArray(ta.three_person_rooms)).toBe(true);
+      expect(Array.isArray(ta.exclusive_trio_meetings)).toBe(true);
+
+      const expectedThreePersonRooms = [];
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const inRoom = cfg.chars.filter((ch) => res.schedule[ch][t] === room);
+          if (inRoom.length === 3) {
+            expectedThreePersonRooms.push({
+              time: t + 1,
+              room,
+              attendees: [...inRoom].sort(),
+            });
+          }
+        }
+      }
+
+      expect(ta.three_person_rooms).toEqual(expectedThreePersonRooms);
+      expect(ta.exclusive_trio_count).toBe(ta.exclusive_trio_meetings.length);
+      if (expectedThreePersonRooms.length > 0) {
+        expect(ta.exclusive_trio_count).toBe(expectedThreePersonRooms.length);
+      }
+    });
+  });
 });
