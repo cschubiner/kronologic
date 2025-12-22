@@ -665,7 +665,8 @@ const SCENARIOS = [
   { id: 's11', name: 'The Vault', desc: 'Only the key holder may enter the locked room.' },
   { id: 's12', name: 'Glue Room', desc: 'Sticky room forces two-turn visits.' },
   { id: 's13', name: 'Glue Shoes', desc: 'Glue carrier makes co-occupants stay an extra turn.' },
-  { id: 's14', name: 'Curse of Amarinta', desc: 'Trace the original curse carrier.' }
+  { id: 's14', name: 'Curse of Amarinta', desc: 'Trace the original curse carrier.' },
+  { id: 's15', name: 'World Travelers', desc: 'Rank top 3 travelers by rooms visited.' }
 ];
 
 /* ===========================
@@ -1241,6 +1242,7 @@ qs("genBtn").addEventListener("click", async () => {
       s12: scenarioValue === 's12',
       s13: scenarioValue === 's13',
       s14: scenarioValue === 's14',
+      s15: scenarioValue === 's15',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }

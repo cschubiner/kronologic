@@ -3360,3 +3360,195 @@ describe("S14: The Curse of Amarinta", () => {
     });
   });
 });
+
+describe("S15: World Travelers", () => {
+  it("should have 1st place visit all rooms", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1500,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt).toBeTruthy();
+      expect(wt.visit_counts[wt.first]).toBe(cfg.rooms.length);
+    });
+  });
+
+  it("should have 2nd place visit exactly R-1 rooms", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1501,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt).toBeTruthy();
+      expect(wt.visit_counts[wt.second]).toBe(cfg.rooms.length - 1);
+    });
+  });
+
+  it("should have 3rd place visit exactly R-2 rooms", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1502,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt).toBeTruthy();
+      expect(wt.visit_counts[wt.third]).toBe(cfg.rooms.length - 2);
+    });
+  });
+
+  it("should constrain non-top-3 to at most R-3 rooms", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "A"],
+      ],
+      chars: ["P", "Q", "R", "S", "T"],
+      T: 8,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1503,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt).toBeTruthy();
+      for (const ch of cfg.chars) {
+        if (ch === wt.first || ch === wt.second || ch === wt.third) continue;
+        expect(wt.visit_counts[ch]).toBeLessThanOrEqual(cfg.rooms.length - 3);
+      }
+    });
+  });
+
+  it("should work with mustMove constraint", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "A"],
+        ["A", "C"],
+      ],
+      chars: ["X", "Y", "Z", "W"],
+      T: 8,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s15: true },
+      seed: 1504,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt).toBeTruthy();
+      expect(wt.visit_counts[wt.first]).toBe(cfg.rooms.length);
+      expect(wt.visit_counts[wt.second]).toBe(cfg.rooms.length - 1);
+      expect(wt.visit_counts[wt.third]).toBe(cfg.rooms.length - 2);
+    });
+  });
+
+  it("should reject maps with fewer than 4 rooms", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1505,
+    };
+    expect(() => solveAndDecode(cfg)).toThrow("S15 requires at least 4 rooms");
+  });
+
+  it("should reject configs with fewer than 3 characters", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1506,
+    };
+    expect(() => solveAndDecode(cfg)).toThrow("S15 requires at least 3 characters");
+  });
+
+  it("should track rooms missed by 2nd and 3rd place", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1507,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt).toBeTruthy();
+      expect(wt.rooms_missed.first).toHaveLength(0);
+      expect(wt.rooms_missed.second).toHaveLength(1);
+      expect(wt.rooms_missed.third).toHaveLength(2);
+    });
+  });
+});
