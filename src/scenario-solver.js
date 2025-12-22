@@ -529,6 +529,86 @@ export function buildCNF(config) {
     privKeys.S14 = true;
   }
 
+  // S15: World Travelers — rank top 3 travelers by unique rooms visited
+  if (config.scenarios && config.scenarios.s15) {
+    if (R.length < 4) throw new Error("S15 requires at least 4 rooms");
+    if (C.length < 3) throw new Error("S15 requires at least 3 characters");
+
+    const rng = mulberry32(resolvedSeed);
+
+    // Randomly assign top 3 travelers by shuffling chars
+    const shuffled = [...C];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const first = shuffled[0];   // visits all R rooms
+    const second = shuffled[1];  // visits R-1 rooms
+    const third = shuffled[2];   // visits R-2 rooms
+
+    // Create "visited" helper variables: V_{char}_{room} = true if char visits room at any time
+    const S15V = (ci, ri) => vp.get(`S15_V_${C[ci]}_${R[ri]}`);
+
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        // V[ci][ri] = OR over all timesteps of X[ci][t][ri]
+        const anyTime = [];
+        for (let t = 0; t < T; t++) {
+          anyTime.push(X(ci, t, ri));
+        }
+        // V => at least one X is true: (-V OR X[0] OR X[1] OR ...)
+        clauses.push([-S15V(ci, ri), ...anyTime]);
+        // Each X => V: for each t, X[ci][t][ri] => V[ci][ri]
+        for (let t = 0; t < T; t++) {
+          clauses.push([-X(ci, t, ri), S15V(ci, ri)]);
+        }
+      }
+    }
+
+    // 1st place: visits ALL rooms
+    const firstIdx = C.indexOf(first);
+    for (let ri = 0; ri < R.length; ri++) {
+      clauses.push([S15V(firstIdx, ri)]); // Must visit every room
+    }
+
+    // 2nd place: visits exactly R-1 rooms (using totalizer for cardinality)
+    const secondIdx = C.indexOf(second);
+    const secondVars = R.map((_, ri) => S15V(secondIdx, ri));
+    const secondTotalizer = buildTotalizer(secondVars, vp, clauses, `S15_2nd_${C[secondIdx]}`);
+    // Exactly R-1: at least R-1 AND at most R-1
+    if (R.length - 1 > 0 && secondTotalizer.length >= R.length - 1) {
+      clauses.push([secondTotalizer[R.length - 2]]); // At least R-1 (0-indexed)
+    }
+    if (R.length - 1 < R.length && secondTotalizer.length >= R.length) {
+      clauses.push([-secondTotalizer[R.length - 1]]); // At most R-1 (not R)
+    }
+
+    // 3rd place: visits exactly R-2 rooms
+    const thirdIdx = C.indexOf(third);
+    const thirdVars = R.map((_, ri) => S15V(thirdIdx, ri));
+    const thirdTotalizer = buildTotalizer(thirdVars, vp, clauses, `S15_3rd_${C[thirdIdx]}`);
+    // Exactly R-2: at least R-2 AND at most R-2
+    if (R.length - 2 > 0 && thirdTotalizer.length >= R.length - 2) {
+      clauses.push([thirdTotalizer[R.length - 3]]); // At least R-2 (0-indexed)
+    }
+    if (R.length - 2 < R.length && thirdTotalizer.length >= R.length - 1) {
+      clauses.push([-thirdTotalizer[R.length - 2]]); // At most R-2 (not R-1)
+    }
+
+    // Others (4th+): visit at most R-3 rooms
+    for (let ci = 0; ci < C.length; ci++) {
+      if (C[ci] === first || C[ci] === second || C[ci] === third) continue;
+      const otherVars = R.map((_, ri) => S15V(ci, ri));
+      const otherTotalizer = buildTotalizer(otherVars, vp, clauses, `S15_other_${C[ci]}`);
+      // At most R-3: totalizer[R-3] must be false (if R-3 >= 0)
+      if (R.length - 3 >= 0 && otherTotalizer.length >= R.length - 2) {
+        clauses.push([-otherTotalizer[R.length - 3]]); // At most R-3
+      }
+    }
+
+    privKeys.S15 = { first, second, third };
+  }
+
   // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
   if (config.scenarios && config.scenarios.s11) {
     if (!R.length) throw new Error("S11 requires at least one room");
@@ -1912,6 +1992,38 @@ export function solveAndDecode(cfg) {
       possible_origins: possibleOrigins,
       cursed_at_time6_by_origin: cursedAtTime6ByOrigin,
       timeline: chosen.sim.timeline,
+    };
+  }
+
+  // S15: World Travelers decoding
+  if (privKeys.S15) {
+    // Count unique rooms visited by each character
+    const visitCounts = {};
+    const roomsVisitedByChar = {};
+    for (const ch of C) {
+      const roomsVisited = new Set();
+      for (let t = 0; t < T; t++) {
+        roomsVisited.add(schedule[ch][t]);
+      }
+      visitCounts[ch] = roomsVisited.size;
+      roomsVisitedByChar[ch] = Array.from(roomsVisited).sort();
+    }
+
+    // Calculate rooms missed by 2nd and 3rd place
+    const secondMissed = R.filter(room => !roomsVisitedByChar[privKeys.S15.second].includes(room));
+    const thirdMissed = R.filter(room => !roomsVisitedByChar[privKeys.S15.third].includes(room));
+
+    priv.world_travelers = {
+      first: privKeys.S15.first,
+      second: privKeys.S15.second,
+      third: privKeys.S15.third,
+      visit_counts: visitCounts,
+      rooms_visited: roomsVisitedByChar,
+      rooms_missed: {
+        first: [], // 1st visits all rooms
+        second: secondMissed,
+        third: thirdMissed,
+      },
     };
   }
 

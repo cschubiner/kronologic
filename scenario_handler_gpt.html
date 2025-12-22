@@ -151,6 +151,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s14" value="s14" /> S14: Curse of Amarinta (trace the original curse carrier)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s15" value="s15" /> S15: World Travelers (rank top 3 by rooms visited)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -555,6 +558,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s12: scenarioValue === 's12',
       s13: scenarioValue === 's13',
       s14: scenarioValue === 's14',
+      s15: scenarioValue === 's15',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }

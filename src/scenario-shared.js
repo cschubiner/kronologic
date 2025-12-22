@@ -56,6 +56,10 @@ export function scoreScenario(res, cfg) {
     scores.curse = scoreCurseOfAmarinta(res, cfg);
     score += scores.curse;
   }
+  if (cfg.scenarios.s15 && res.priv.world_travelers) {
+    scores.worldTravelers = scoreWorldTravelers(res, cfg);
+    score += scores.worldTravelers;
+  }
   return { total: score, breakdown: scores };
 }
 
@@ -341,6 +345,30 @@ function scoreCurseOfAmarinta(res, cfg) {
   score += handoffs * 6;
   score += cursedAtSix.length * 14;
   score += totalCursed * 3;
+  return score;
+}
+
+function scoreWorldTravelers(res, cfg) {
+  const info = res.priv.world_travelers;
+  if (!info) return 0;
+
+  let score = 0;
+  const chars = cfg.chars;
+  const R = cfg.rooms.length;
+
+  // Score based on red herrings - characters with similar visit counts to top 3
+  for (const ch of chars) {
+    const count = info.visit_counts[ch];
+    // Characters who happen to have high visit counts but aren't top 3 are red herrings
+    if (ch !== info.first && count === R) score += 100; // very unlikely but defensive
+    if (ch !== info.second && count === R - 1) score += 80;
+    if (ch !== info.third && count === R - 2) score += 60;
+    if (count === R - 3) score += 30; // close to 3rd place
+  }
+
+  // Bonus for more characters (more suspects to consider)
+  score += (chars.length - 3) * 20;
+
   return score;
 }
 
