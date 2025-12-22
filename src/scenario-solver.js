@@ -794,6 +794,12 @@ export function buildCNF(config) {
         clauses.push([-M(t, ri), x1]);
         clauses.push([-M(t, ri), x2]);
 
+        // M => no non-trio characters in the room
+        for (let ci = 0; ci < C.length; ci++) {
+          if (trioIndices.includes(ci)) continue;
+          clauses.push([-M(t, ri), -X(ci, t, ri)]);
+        }
+
         // (X[0] AND X[1] AND X[2]) => M
         clauses.push([-x0, -x1, -x2, M(t, ri)]);
       }
@@ -2366,25 +2372,23 @@ export function solveAndDecode(cfg) {
   if (privKeys.S17) {
     const trio = privKeys.S17.trio;
 
-    // Find all meetings of the trio
+    // Find all meetings of the trio (only when they're alone together)
     const meetings = [];
     const threePersonRooms = [];
     for (let t = 0; t < T; t++) {
       for (const room of R) {
         const inRoom = C.filter((ch) => schedule[ch][t] === room);
         if (inRoom.length === 3) {
-          threePersonRooms.push({ time: t + 1, room, attendees: [...inRoom].sort() });
-        }
-        // Check if all trio members are in this room
-        if (trio.every((ch) => inRoom.includes(ch))) {
-          meetings.push({ time: t + 1, room, attendees: [...inRoom].sort() });
+          const attendees = [...inRoom].sort();
+          threePersonRooms.push({ time: t + 1, room, attendees });
+          if (trio.every((ch) => attendees.includes(ch))) {
+            meetings.push({ time: t + 1, room, attendees });
+          }
         }
       }
     }
 
-    const exclusiveTrioMeetings = meetings.filter(
-      (m) => m.attendees.length === 3 && trio.every((ch) => m.attendees.includes(ch)),
-    );
+    const exclusiveTrioMeetings = [...meetings];
 
     priv.triple_alibi = {
       trio: trio,
