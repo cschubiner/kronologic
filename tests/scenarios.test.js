@@ -872,6 +872,199 @@ describe("S3: Singer's Jewels Scenario", () => {
     );
     expect(visited).toBe(true);
   });
+
+  it("should correctly identify the alphabetically first room with various room names", () => {
+    const cfg = {
+      rooms: ["Zebra", "Apple", "Mango", "Banana"],
+      edges: [
+        ["Apple", "Banana"],
+        ["Banana", "Mango"],
+        ["Mango", "Zebra"],
+        ["Zebra", "Apple"],
+      ],
+      chars: ["X", "Y"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5020,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    // "Apple" should be the alphabetically first room
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
+    expect(alphabeticFirst).toBe("Apple");
+
+    const visited = cfg.chars.some((char) =>
+      res.schedule[char].includes("Apple"),
+    );
+    expect(visited).toBe(true);
+  });
+
+  it("should work with single character", () => {
+    const cfg = {
+      rooms: ["Room1", "Room2"],
+      edges: [["Room1", "Room2"]],
+      chars: ["Solo"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5030,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
+    expect(alphabeticFirst).toBe("Room1");
+
+    const visited = res.schedule["Solo"].includes("Room1");
+    expect(visited).toBe(true);
+  });
+
+  it("should work with many rooms and characters", () => {
+    const cfg = {
+      rooms: ["E", "D", "C", "B", "A"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "A"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5040,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    // "A" should be the alphabetically first room
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
+    expect(alphabeticFirst).toBe("A");
+
+    const visited = cfg.chars.some((char) =>
+      res.schedule[char].includes("A"),
+    );
+    expect(visited).toBe(true);
+  });
+
+  it("should work across multiple seeds consistently", () => {
+    const baseConfig = {
+      rooms: ["Foyer", "Gallery", "Attic"],
+      edges: [
+        ["Attic", "Foyer"],
+        ["Foyer", "Gallery"],
+        ["Gallery", "Attic"],
+      ],
+      chars: ["A", "B"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+    };
+
+    const alphabeticFirst = [...baseConfig.rooms].sort()[0];
+    expect(alphabeticFirst).toBe("Attic");
+
+    // Test with 10 different seeds
+    for (let seed = 5050; seed < 5060; seed++) {
+      const cfg = { ...baseConfig, seed };
+      const res = solveAndDecode(cfg);
+      expect(res).not.toBeNull();
+
+      const visited = cfg.chars.some((char) =>
+        res.schedule[char].includes("Attic"),
+      );
+      expect(visited).toBe(true);
+    }
+  });
+
+  it("should work with mustMove when alphabetic room is not directly connected to all rooms", () => {
+    const cfg = {
+      rooms: ["Zeta", "Alpha", "Beta", "Gamma"],
+      edges: [
+        ["Alpha", "Beta"],
+        ["Beta", "Gamma"],
+        ["Gamma", "Zeta"],
+        ["Zeta", "Alpha"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s3: true },
+      seed: 5070,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
+    expect(alphabeticFirst).toBe("Alpha");
+
+    const visited = cfg.chars.some((char) =>
+      res.schedule[char].includes("Alpha"),
+    );
+    expect(visited).toBe(true);
+  });
+
+  it("should handle rooms with similar prefixes", () => {
+    const cfg = {
+      rooms: ["RoomB", "RoomA", "RoomAA", "RoomAB"],
+      edges: [
+        ["RoomA", "RoomAA"],
+        ["RoomAA", "RoomAB"],
+        ["RoomAB", "RoomB"],
+        ["RoomB", "RoomA"],
+      ],
+      chars: ["P", "Q"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5080,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    // "RoomA" should come before "RoomAA" alphabetically
+    const alphabeticFirst = [...cfg.rooms].sort()[0];
+    expect(alphabeticFirst).toBe("RoomA");
+
+    const visited = cfg.chars.some((char) =>
+      res.schedule[char].includes("RoomA"),
+    );
+    expect(visited).toBe(true);
+  });
+
+  it("should work with minimum configuration (1 room)", () => {
+    const cfg = {
+      rooms: ["OnlyRoom"],
+      edges: [],
+      chars: ["A"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5090,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    // With only one room, everyone must be in it
+    expect(res.schedule["A"][0]).toBe("OnlyRoom");
+    expect(res.schedule["A"][1]).toBe("OnlyRoom");
+  });
 });
 
 describe("S4: Bomb Duo Scenario", () => {
