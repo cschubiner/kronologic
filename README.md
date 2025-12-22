@@ -769,8 +769,13 @@ Add your scenario to:
 - [ ] CNF constraints in `buildCNF()` (`src/scenario-solver.js`)
 - [ ] Decoding in `solveAndDecode()` (`src/scenario-solver.js`)
 - [ ] Scoring function in `src/scenario-shared.js`
+- [ ] Scoring hook in `computeScenarioScore()` (`src/scenario-shared.js`)
 - [ ] Private facts display in both `scenario_handler_*.html` files
-- [ ] Radio button/config in both `scenario_handler_*.html` files
+- [ ] Radio button in both `scenario_handler_*.html` files
+- [ ] **Config builder**: Add `sXX: scenarioValue === 'sXX'` in both HTML files' config objects
+- [ ] Scenario list entry in `scenario_handler_v2.html` (`SCENARIOS` array)
 - [ ] Tests in `tests/scenarios.test.js`
 - [ ] Documentation in `README.md`
 - [ ] Run `bun test` to verify all tests pass
+
+**Important**: The config builder step is easy to miss! In both HTML files, find the `scenarios: { ... }` object where config is built and add your scenario flag (e.g., `s18: scenarioValue === 's18'`). Without this, the scenario radio button won't actually enable the scenario.
