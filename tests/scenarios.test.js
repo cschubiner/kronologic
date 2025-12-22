@@ -950,9 +950,7 @@ describe("S3: Singer's Jewels Scenario", () => {
     const alphabeticFirst = [...cfg.rooms].sort()[0];
     expect(alphabeticFirst).toBe("A");
 
-    const visited = cfg.chars.some((char) =>
-      res.schedule[char].includes("A"),
-    );
+    const visited = cfg.chars.some((char) => res.schedule[char].includes("A"));
     expect(visited).toBe(true);
   });
 
@@ -1204,7 +1202,7 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(res.priv.singers_jewels).toBeTruthy();
 
     const info = res.priv.singers_jewels;
-    const passEvents = info.passing_chain.filter(p => p.event === "pass");
+    const passEvents = info.passing_chain.filter((p) => p.event === "pass");
     expect(info.total_passes).toBe(passEvents.length);
   });
 
@@ -1235,7 +1233,9 @@ describe("S3: Singer's Jewels Scenario", () => {
       if (event.event === "pass") {
         const t = event.time - 1;
         const room = event.room;
-        const occupants = cfg.chars.filter(ch => res.schedule[ch][t] === room);
+        const occupants = cfg.chars.filter(
+          (ch) => res.schedule[ch][t] === room,
+        );
         expect(occupants.length).toBe(2);
         expect(occupants).toContain(event.from);
         expect(occupants).toContain(event.to);
@@ -3324,7 +3324,9 @@ describe("S11: The Vault", () => {
       const keyHolder = res.priv.vault.key_holder;
 
       for (let t = 0; t < cfg.T; t++) {
-        const occupants = cfg.chars.filter((ch) => res.schedule[ch][t] === vaultRoom);
+        const occupants = cfg.chars.filter(
+          (ch) => res.schedule[ch][t] === vaultRoom,
+        );
         if (occupants.length > 0) {
           expect(occupants).toContain(keyHolder);
         }
@@ -3356,7 +3358,9 @@ describe("S11: The Vault", () => {
       let khVisits = 0;
 
       for (let t = 0; t < cfg.T; t++) {
-        const occupants = cfg.chars.filter((ch) => res.schedule[ch][t] === vaultRoom);
+        const occupants = cfg.chars.filter(
+          (ch) => res.schedule[ch][t] === vaultRoom,
+        );
         if (occupants.includes(keyHolder)) {
           khVisits++;
         }
@@ -3436,7 +3440,9 @@ describe("S11: The Vault", () => {
 
       for (const ch of cfg.chars) {
         if (ch === keyHolder) continue;
-        const misses = khVaultTimes.filter((t) => res.schedule[ch][t] !== vaultRoom);
+        const misses = khVaultTimes.filter(
+          (t) => res.schedule[ch][t] !== vaultRoom,
+        );
         expect(misses.length).toBeGreaterThanOrEqual(1);
       }
     });
@@ -3529,18 +3535,23 @@ describe("S12: Glue Room", () => {
       const shuffleRng = mulberry32(seed);
       for (let i = shuffledRooms.length - 1; i > 0; i--) {
         const j = Math.floor(shuffleRng() * (i + 1));
-        [shuffledRooms[i], shuffledRooms[j]] = [shuffledRooms[j], shuffledRooms[i]];
+        [shuffledRooms[i], shuffledRooms[j]] = [
+          shuffledRooms[j],
+          shuffledRooms[i],
+        ];
       }
 
       const rng = mulberry32(seed);
-      const expectedGlueRoom = shuffledRooms[Math.floor(rng() * shuffledRooms.length)];
+      const expectedGlueRoom =
+        shuffledRooms[Math.floor(rng() * shuffledRooms.length)];
       expect(res.priv.glue_room.glue_room).toBe(expectedGlueRoom);
 
       for (const ch of cfg.chars) {
         let firstEntry = null;
         for (let t = 0; t < cfg.T; t++) {
           const here = res.schedule[ch][t] === expectedGlueRoom;
-          const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== expectedGlueRoom;
+          const cameFromOther =
+            t === 0 || res.schedule[ch][t - 1] !== expectedGlueRoom;
           if (here && cameFromOther) {
             firstEntry = t + 1;
             break;
@@ -4003,7 +4014,9 @@ describe("S15: World Travelers", () => {
       scenarios: { s15: true },
       seed: 1506,
     };
-    expect(() => solveAndDecode(cfg)).toThrow("S15 requires at least 3 characters");
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S15 requires at least 3 characters",
+    );
   });
 
   it("should track rooms missed by 2nd and 3rd place", () => {
@@ -4065,7 +4078,9 @@ describe("S16: Homebodies", () => {
       for (const ch of cfg.chars) {
         expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
       }
-      const sortedActual = Object.values(hb.actual_visit_counts).sort((a, b) => a - b);
+      const sortedActual = Object.values(hb.actual_visit_counts).sort(
+        (a, b) => a - b,
+      );
       const sortedTargets = Object.values(hb.visit_count_assignments).sort(
         (a, b) => a - b,
       );
@@ -4177,7 +4192,9 @@ describe("S16: Homebodies", () => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
       const homebodySchedule = res.schedule[hb.homebody];
-      const allSameRoom = homebodySchedule.every((room) => room === homebodySchedule[0]);
+      const allSameRoom = homebodySchedule.every(
+        (room) => room === homebodySchedule[0],
+      );
       expect(allSameRoom).toBe(true);
     });
   });
@@ -4233,7 +4250,9 @@ describe("S16: Homebodies", () => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
       const homebodySchedule = res.schedule[hb.homebody];
-      expect(homebodySchedule.every((room) => room === homebodySchedule[0])).toBe(true);
+      expect(
+        homebodySchedule.every((room) => room === homebodySchedule[0]),
+      ).toBe(true);
       for (const ch of cfg.chars) {
         if (ch === hb.homebody) continue;
         const schedule = res.schedule[ch];
@@ -4281,7 +4300,9 @@ describe("S16: Homebodies", () => {
       scenarios: { s16: true },
       seed: 1606,
     };
-    expect(() => solveAndDecode(cfg)).toThrow("S16 requires at least 2 characters");
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S16 requires at least 2 characters",
+    );
   });
 
   it("should work with 4 characters", () => {
@@ -4337,7 +4358,7 @@ describe("S16: Homebodies", () => {
       // Verify ranking is sorted by visit count
       for (let i = 0; i < hb.ranking.length - 1; i++) {
         expect(hb.actual_visit_counts[hb.ranking[i]]).toBeLessThanOrEqual(
-          hb.actual_visit_counts[hb.ranking[i + 1]]
+          hb.actual_visit_counts[hb.ranking[i + 1]],
         );
       }
     });
@@ -4476,7 +4497,10 @@ describe("S17: Triple Alibi", () => {
       for (let t = 0; t < cfg.T && !foundExclusive; t++) {
         for (const room of cfg.rooms) {
           const inRoom = cfg.chars.filter((ch) => schedule[ch][t] === room);
-          if (inRoom.length === 3 && ta.trio.every((ch) => inRoom.includes(ch))) {
+          if (
+            inRoom.length === 3 &&
+            ta.trio.every((ch) => inRoom.includes(ch))
+          ) {
             foundExclusive = true;
             break;
           }
@@ -4577,7 +4601,9 @@ describe("S17: Triple Alibi", () => {
       T: 3,
       scenarios: { s17: true },
     };
-    expect(() => solveAndDecode(cfg)).toThrow("S17 requires at least 3 characters");
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S17 requires at least 3 characters",
+    );
   });
 
   it("should count trio meetings correctly", () => {
@@ -4603,7 +4629,10 @@ describe("S17: Triple Alibi", () => {
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const inRoom = cfg.chars.filter((ch) => res.schedule[ch][t] === room);
-          if (inRoom.length === 3 && ta.trio.every((ch) => inRoom.includes(ch))) {
+          if (
+            inRoom.length === 3 &&
+            ta.trio.every((ch) => inRoom.includes(ch))
+          ) {
             actualMeetings++;
           }
         }
@@ -4639,7 +4668,10 @@ describe("S17: Triple Alibi", () => {
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const inRoom = cfg.chars.filter((ch) => schedule[ch][t] === room);
-          if (inRoom.length === 3 && ta.trio.every((ch) => inRoom.includes(ch))) {
+          if (
+            inRoom.length === 3 &&
+            ta.trio.every((ch) => inRoom.includes(ch))
+          ) {
             exclusiveFromSchedule.push({
               time: t + 1,
               room,
@@ -4807,7 +4839,9 @@ describe("S18: Heavy Sofa", () => {
     testWithThreshold(cfg, (res) => {
       const hs = res.priv.heavy_sofa;
       // Before pickup, all journey entries should show same room (start room)
-      const prePickupJourney = hs.journey.filter((j) => j.time < hs.pickup_time);
+      const prePickupJourney = hs.journey.filter(
+        (j) => j.time < hs.pickup_time,
+      );
       if (prePickupJourney.length > 0) {
         // Should all be the start room
         prePickupJourney.forEach((j) => {
@@ -4838,7 +4872,9 @@ describe("S18: Heavy Sofa", () => {
       const hs = res.priv.heavy_sofa;
       // During carrying, sofa must change rooms each timestep
       // The journey entries during transport should show a different room each time
-      const transportJourney = hs.journey.filter((j) => j.time >= hs.pickup_time);
+      const transportJourney = hs.journey.filter(
+        (j) => j.time >= hs.pickup_time,
+      );
       // Each entry represents a room change, so consecutive entries should differ
       for (let i = 1; i < transportJourney.length; i++) {
         expect(transportJourney[i].room).not.toBe(transportJourney[i - 1].room);
@@ -4945,7 +4981,7 @@ describe("S18: Heavy Sofa", () => {
     };
 
     expect(() => solveAndDecode(cfg)).toThrow(
-      "S18 requires at least 2 characters"
+      "S18 requires at least 2 characters",
     );
   });
 });

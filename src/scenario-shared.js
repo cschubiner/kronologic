@@ -85,7 +85,9 @@ function scorePhantom(res, cfg) {
     let aloneCount = 0;
     for (let t = 0; t < T; t++) {
       const room = res.schedule[char][t];
-      const othersInRoom = chars.filter(c => c !== char && res.schedule[c][t] === room).length;
+      const othersInRoom = chars.filter(
+        (c) => c !== char && res.schedule[c][t] === room,
+      ).length;
       if (othersInRoom === 0) aloneCount++;
     }
     if (aloneCount >= T - 2) score += 100 * (aloneCount / T);
@@ -101,8 +103,10 @@ function scoreLovers(res, cfg) {
   let score = 0;
   for (let i = 0; i < chars.length; i++) {
     for (let j = i + 1; j < chars.length; j++) {
-      const c1 = chars[i], c2 = chars[j];
-      if ((c1 === lover1 && c2 === lover2) || (c1 === lover2 && c2 === lover1)) continue;
+      const c1 = chars[i],
+        c2 = chars[j];
+      if ((c1 === lover1 && c2 === lover2) || (c1 === lover2 && c2 === lover1))
+        continue;
       let meetings = 0;
       for (let t = 0; t < T; t++) {
         if (res.schedule[c1][t] === res.schedule[c2][t]) meetings++;
@@ -123,13 +127,20 @@ function scorePoison(res, cfg) {
   let score = 0;
   for (let i = 0; i < chars.length; i++) {
     for (let j = i + 1; j < chars.length; j++) {
-      const c1 = chars[i], c2 = chars[j];
-      if ((c1 === assassin && c2 === victim) || (c1 === victim && c2 === assassin)) continue;
+      const c1 = chars[i],
+        c2 = chars[j];
+      if (
+        (c1 === assassin && c2 === victim) ||
+        (c1 === victim && c2 === assassin)
+      )
+        continue;
       for (let t = 0; t < T; t++) {
         const room1 = res.schedule[c1][t];
         const room2 = res.schedule[c2][t];
         if (room1 === room2) {
-          const othersInRoom = chars.filter(c => c !== c1 && c !== c2 && res.schedule[c][t] === room1).length;
+          const othersInRoom = chars.filter(
+            (c) => c !== c1 && c !== c2 && res.schedule[c][t] === room1,
+          ).length;
           if (othersInRoom === 0) score += 60;
         }
       }
@@ -165,13 +176,15 @@ function scoreBomb(res, cfg) {
     const room1 = res.schedule[bomber1][t];
     const room2 = res.schedule[bomber2][t];
     if (room1 === room2) {
-      const othersInRoom = chars.filter(c => c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1).length;
+      const othersInRoom = chars.filter(
+        (c) => c !== bomber1 && c !== bomber2 && res.schedule[c][t] === room1,
+      ).length;
       if (othersInRoom > 0) score += 40;
     }
   }
   for (let t = 0; t < T; t++) {
     for (const room of cfg.rooms) {
-      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      const charsInRoom = chars.filter((c) => res.schedule[c][t] === room);
       if (charsInRoom.length === 3) score += 30;
     }
   }
@@ -186,7 +199,7 @@ function scoreAggrosassin(res, cfg) {
   score += victimCount * 10;
   for (let t = 0; t < T; t++) {
     for (const room of cfg.rooms) {
-      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
+      const charsInRoom = chars.filter((c) => res.schedule[c][t] === room);
       if (charsInRoom.length === 2) score += 1;
     }
   }
@@ -203,8 +216,9 @@ function scoreFreeze(res, cfg) {
   let redHerrings = 0;
   for (let t = 0; t < T; t++) {
     for (const room of cfg.rooms) {
-      const charsInRoom = chars.filter(c => res.schedule[c][t] === room);
-      if (charsInRoom.length === 2 && !charsInRoom.includes(freeze)) redHerrings++;
+      const charsInRoom = chars.filter((c) => res.schedule[c][t] === room);
+      if (charsInRoom.length === 2 && !charsInRoom.includes(freeze))
+        redHerrings++;
     }
   }
   score += redHerrings * 5;
@@ -235,7 +249,8 @@ function scoreContagion(res, cfg) {
   const infectionTimes = contagion.infection_times || {};
   const timeline = contagion.infection_timeline || [];
   let score = (infectedCount / totalChars) * 180;
-  const uniqueTimes = new Set(Object.values(infectionTimes).filter(Boolean)).size;
+  const uniqueTimes = new Set(Object.values(infectionTimes).filter(Boolean))
+    .size;
   score += uniqueTimes * 20;
   for (const step of timeline) {
     const newCount = step.characters?.length || 0;
@@ -265,16 +280,18 @@ function scoreVault(res, cfg) {
   const companions = new Set();
   const groupPatterns = new Set();
   for (let t = 0; t < T; t++) {
-    const occupants = chars.filter(c => res.schedule[c][t] === vaultRoom);
+    const occupants = chars.filter((c) => res.schedule[c][t] === vaultRoom);
     if (occupants.length) {
       totalVisits++;
-      groupPatterns.add(occupants.slice().sort().join(','));
+      groupPatterns.add(occupants.slice().sort().join(","));
     }
     if (occupants.includes(keyHolder)) {
       khVisits++;
       if (occupants.length > 1) {
         withOthers++;
-        occupants.filter(c => c !== keyHolder).forEach(c => companions.add(c));
+        occupants
+          .filter((c) => c !== keyHolder)
+          .forEach((c) => companions.add(c));
       }
     }
     if (occupants.length > maxGroup) maxGroup = occupants.length;
@@ -322,7 +339,9 @@ function scoreGlueShoes(res, cfg) {
   if (gluePerson) {
     for (let t = 0; t < T - 1; t++) {
       const room = res.schedule[gluePerson][t];
-      const others = cfg.chars.filter(ch => ch !== gluePerson && res.schedule[ch][t] === room);
+      const others = cfg.chars.filter(
+        (ch) => ch !== gluePerson && res.schedule[ch][t] === room,
+      );
       if (others.length) totalStickEvents += others.length;
     }
   }
@@ -340,8 +359,12 @@ function scoreCurseOfAmarinta(res, cfg) {
   let totalCursed = 0;
   const symmetricDiffCount = (a, b) => {
     let count = 0;
-    for (const item of a) { if (!b.has(item)) count++; }
-    for (const item of b) { if (!a.has(item)) count++; }
+    for (const item of a) {
+      if (!b.has(item)) count++;
+    }
+    for (const item of b) {
+      if (!a.has(item)) count++;
+    }
     return count;
   };
   let prevSet = new Set(timeline[0].cursed || []);
@@ -352,7 +375,9 @@ function scoreCurseOfAmarinta(res, cfg) {
     handoffs += symmetricDiffCount(prevSet, currentSet);
     prevSet = currentSet;
   }
-  const cursedAtSix = info.final_cursed?.length ? info.final_cursed : timeline[5]?.cursed || [];
+  const cursedAtSix = info.final_cursed?.length
+    ? info.final_cursed
+    : timeline[5]?.cursed || [];
   let score = 0;
   score += handoffs * 6;
   score += cursedAtSix.length * 14;
@@ -467,8 +492,14 @@ export function deriveGlueRoomFacts(res, cfg) {
         const here = res.schedule[ch][t] === room;
         const cameFromOther = t === 0 || res.schedule[ch][t - 1] !== room;
         if (here && cameFromOther) {
-          if (t === cfg.T - 1 || res.schedule[ch][t + 1] !== room) { violated = true; break; }
-          if (t + 2 < cfg.T && res.schedule[ch][t + 2] === room) { violated = true; break; }
+          if (t === cfg.T - 1 || res.schedule[ch][t + 1] !== room) {
+            violated = true;
+            break;
+          }
+          if (t + 2 < cfg.T && res.schedule[ch][t + 2] === room) {
+            violated = true;
+            break;
+          }
           entryTime ??= t + 1;
           validRoom = true;
         }
@@ -476,7 +507,8 @@ export function deriveGlueRoomFacts(res, cfg) {
       if (violated) break;
       firstEntries[ch] = entryTime;
     }
-    if (!violated && validRoom) return { glue_room: room, first_entries: firstEntries };
+    if (!violated && validRoom)
+      return { glue_room: room, first_entries: firstEntries };
   }
   return null;
 }
@@ -489,17 +521,29 @@ export function deriveGlueShoesFacts(res, cfg) {
     let sawVictim = false;
     for (let t = 0; t < cfg.T - 1; t++) {
       const room = res.schedule[glueCandidate][t];
-      const victims = cfg.chars.filter(ch => ch !== glueCandidate && res.schedule[ch][t] === room);
+      const victims = cfg.chars.filter(
+        (ch) => ch !== glueCandidate && res.schedule[ch][t] === room,
+      );
       for (const v of victims) {
-        if (res.schedule[v][t + 1] !== room) { violated = true; break; }
-        if (t + 2 < cfg.T && res.schedule[v][t + 2] === room) { violated = true; break; }
-        if (!firstStuck.has(v)) firstStuck.set(v, { character: v, time: t + 1, room });
+        if (res.schedule[v][t + 1] !== room) {
+          violated = true;
+          break;
+        }
+        if (t + 2 < cfg.T && res.schedule[v][t + 2] === room) {
+          violated = true;
+          break;
+        }
+        if (!firstStuck.has(v))
+          firstStuck.set(v, { character: v, time: t + 1, room });
         sawVictim = true;
       }
       if (violated) break;
     }
     if (!violated && sawVictim) {
-      return { glue_person: glueCandidate, stuck: Array.from(firstStuck.values()).sort((a, b) => a.time - b.time) };
+      return {
+        glue_person: glueCandidate,
+        stuck: Array.from(firstStuck.values()).sort((a, b) => a.time - b.time),
+      };
     }
   }
   return null;
@@ -513,7 +557,11 @@ export function encodeScenarioToURL(res, cfg) {
     t: cfg.T,
     e: cfg.edges,
     s: cfg.seed,
-    sch: cfg.chars.map(char => res.schedule[char].map(room => cfg.rooms.indexOf(room)).join(',')).join('|')
+    sch: cfg.chars
+      .map((char) =>
+        res.schedule[char].map((room) => cfg.rooms.indexOf(room)).join(","),
+      )
+      .join("|"),
   };
   const json = JSON.stringify(state);
   return btoa(encodeURIComponent(json));
@@ -525,44 +573,53 @@ export function decodeScenarioFromURL(encoded) {
     const state = JSON.parse(json);
     if (state.v !== 1) return null;
     const schedule = {};
-    const schedParts = state.sch.split('|');
+    const schedParts = state.sch.split("|");
     state.c.forEach((char, ci) => {
-      const roomIndices = schedParts[ci].split(',').map(Number);
-      schedule[char] = roomIndices.map(ri => state.r[ri]);
+      const roomIndices = schedParts[ci].split(",").map(Number);
+      schedule[char] = roomIndices.map((ri) => state.r[ri]);
     });
     const byTime = {};
     for (let t = 0; t < state.t; t++) {
       const counts = {};
-      state.r.forEach(r => counts[r] = 0);
-      state.c.forEach(char => {
+      state.r.forEach((r) => (counts[r] = 0));
+      state.c.forEach((char) => {
         const room = schedule[char][t];
         if (counts[room] != null) counts[room]++;
       });
       byTime[t + 1] = counts;
     }
     const visits = {};
-    state.c.forEach(char => {
+    state.c.forEach((char) => {
       const v = {};
-      state.r.forEach(r => v[r] = 0);
+      state.r.forEach((r) => (v[r] = 0));
       for (let t = 0; t < state.t; t++) v[schedule[char][t]]++;
       visits[char] = v;
     });
-    return { schedule, byTime, visits, rooms: state.r, chars: state.c, T: state.t, edges: state.e, seed: state.s };
+    return {
+      schedule,
+      byTime,
+      visits,
+      rooms: state.r,
+      chars: state.c,
+      T: state.t,
+      edges: state.e,
+      seed: state.s,
+    };
   } catch (e) {
-    console.error('Failed to decode scenario from URL:', e);
+    console.error("Failed to decode scenario from URL:", e);
     return null;
   }
 }
 
 export function updateURL(encoded) {
   const url = new URL(window.location);
-  url.searchParams.set('scenario', encoded);
-  window.history.pushState({}, '', url);
+  url.searchParams.set("scenario", encoded);
+  window.history.pushState({}, "", url);
 }
 
 export function getScenarioFromURL() {
   const params = new URLSearchParams(window.location.search);
-  return params.get('scenario');
+  return params.get("scenario");
 }
 
 export function clampPercentile(value) {

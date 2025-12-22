@@ -101,10 +101,7 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
       let sat = prevSat;
       let unassigned = prevUnassigned - 1;
 
-      if (
-        !sat &&
-        ((val === 1 && sign > 0) || (val === -1 && sign < 0))
-      ) {
+      if (!sat && ((val === 1 && sign > 0) || (val === -1 && sign < 0))) {
         sat = true;
         unresolvedCount--;
       }
@@ -518,7 +515,10 @@ export function buildCNF(config) {
     if (!visitCountTargets.includes(1)) {
       visitCountTargets[visitCountTargets.length - 1] = 1;
     }
-    const minReachableCount = Math.max(1, visitCountTargets[visitCountTargets.length - 1]);
+    const minReachableCount = Math.max(
+      1,
+      visitCountTargets[visitCountTargets.length - 1],
+    );
     while (visitCountTargets.length < shuffled.length) {
       visitCountTargets.push(minReachableCount);
     }
@@ -699,8 +699,12 @@ export function buildCNF(config) {
   // S16: Homebodies — each character visits a unique number of rooms (1, 2, 3, ...)
   // Only the character visiting exactly 1 room may stay in place; all others must move
   if (config.scenarios && config.scenarios.s16) {
-    const { visitCountAssignments, visitCountTargets, minVisitCount, homebody } =
-      s16Setup || {};
+    const {
+      visitCountAssignments,
+      visitCountTargets,
+      minVisitCount,
+      homebody,
+    } = s16Setup || {};
     if (!visitCountAssignments || !homebody || !visitCountTargets) {
       throw new Error("S16 setup missing visit assignments");
     }
@@ -755,7 +759,12 @@ export function buildCNF(config) {
       }
     }
 
-    privKeys.S16 = { visitCountAssignments, visitCountTargets, minVisitCount, homebody };
+    privKeys.S16 = {
+      visitCountAssignments,
+      visitCountTargets,
+      minVisitCount,
+      homebody,
+    };
   }
 
   // S17: Triple Alibi — three specific characters must meet as a trio at least once,
@@ -852,7 +861,9 @@ export function buildCNF(config) {
     if (C.length < 3) throw new Error("S11 requires at least three characters");
     if (T < 2) throw new Error("S11 requires at least two timesteps");
     if (config.mustMove && !config.allowStay && T < 3) {
-      throw new Error("S11 requires at least three timesteps when movement is forced");
+      throw new Error(
+        "S11 requires at least three timesteps when movement is forced",
+      );
     }
 
     const vaultRoom = [...R].sort()[0];
@@ -958,7 +969,9 @@ export function buildCNF(config) {
         clauses.push([-KH[ci], ...withOther[ci]]);
       }
 
-      const companions = compVars[ci].filter((v, idx) => idx !== ci && v !== null);
+      const companions = compVars[ci].filter(
+        (v, idx) => idx !== ci && v !== null,
+      );
       if (companions.length === 0) {
         clauses.push([-KH[ci]]);
       } else {
@@ -1045,7 +1058,9 @@ export function buildCNF(config) {
     }
 
     if (entriesBeforeFinal.length === 0) {
-      throw new Error("S12 requires at least one possible glue entry before final timestep");
+      throw new Error(
+        "S12 requires at least one possible glue entry before final timestep",
+      );
     }
     clauses.push(...atLeastOne(entriesBeforeFinal));
 
@@ -1067,7 +1082,9 @@ export function buildCNF(config) {
 
     const meetVarsByGlue = Array.from({ length: C.length }, () => []);
     const stuckSupports = Array.from({ length: C.length }, () =>
-      Array.from({ length: T }, () => Array.from({ length: R.length }, () => [])),
+      Array.from({ length: T }, () =>
+        Array.from({ length: R.length }, () => []),
+      ),
     );
 
     // Glue carrier must always move; they are immune to sticking effects.
@@ -1084,9 +1101,7 @@ export function buildCNF(config) {
         if (vi === gp) continue;
         for (let t = 0; t < T - 1; t++) {
           for (let ri = 0; ri < R.length; ri++) {
-            const meet = vp.get(
-              `S13Meet_${C[gp]}_${C[vi]}_${t}_${R[ri]}`
-            );
+            const meet = vp.get(`S13Meet_${C[gp]}_${C[vi]}_${t}_${R[ri]}`);
             meetVarsByGlue[gp].push(meet);
             stuckSupports[vi][t + 1][ri].push(meet);
 
@@ -1713,10 +1728,7 @@ export function buildCNF(config) {
       0.2,
       Math.min(0.8, Number(config.scenarios.s9FrozenRatio ?? 0.3) || 0.3),
     );
-    const targetFrozen = Math.max(
-      1,
-      Math.round(C.length * targetFrozenRatio),
-    );
+    const targetFrozen = Math.max(1, Math.round(C.length * targetFrozenRatio));
     const slack = Math.max(1, Math.round(C.length * 0.15));
     const minFrozen = Math.max(1, targetFrozen - slack);
     const maxFrozen = Math.min(C.length - 1, targetFrozen + slack);
@@ -1765,9 +1777,10 @@ export function buildCNF(config) {
         const frozenVar = vp.get(frozenName);
         const nextFrozenVar =
           t < T - 1
-            ? StillFrozen[ci][t + 1] ??
-              (StillFrozen[ci][t + 1] =
-                vp.get(`S9StillFrozen_${C[ci]}_${t + 1}`))
+            ? (StillFrozen[ci][t + 1] ??
+              (StillFrozen[ci][t + 1] = vp.get(
+                `S9StillFrozen_${C[ci]}_${t + 1}`,
+              )))
             : null;
         Heal[ci][t] = healVar;
         StillFrozen[ci][t] = frozenVar;
@@ -1778,11 +1791,7 @@ export function buildCNF(config) {
         } else {
           clauses.push([-frozenVar, StillFrozen[ci][t - 1]]);
           clauses.push([-frozenVar, -Heal[ci][t - 1]]);
-          clauses.push([
-            -StillFrozen[ci][t - 1],
-            Heal[ci][t - 1],
-            frozenVar,
-          ]);
+          clauses.push([-StillFrozen[ci][t - 1], Heal[ci][t - 1], frozenVar]);
         }
 
         clauses.push([-healVar, FROZ[ci]]);
@@ -2350,7 +2359,9 @@ export function solveAndDecode(cfg) {
           }
         }
       }
-      stuckRecords.push(...Array.from(firstStuck.values()).sort((a, b) => a.time - b.time));
+      stuckRecords.push(
+        ...Array.from(firstStuck.values()).sort((a, b) => a.time - b.time),
+      );
     }
 
     priv.glue_shoes = { glue_person: gluePerson, stuck: stuckRecords };
@@ -2383,7 +2394,10 @@ export function solveAndDecode(cfg) {
           uncursedHere.forEach((ch) => updatedCarriers.add(ch));
         }
 
-        timeline.push({ time: t + 1, cursed: Array.from(updatedCarriers).sort() });
+        timeline.push({
+          time: t + 1,
+          cursed: Array.from(updatedCarriers).sort(),
+        });
         carriers = updatedCarriers;
       }
 
@@ -2398,7 +2412,11 @@ export function solveAndDecode(cfg) {
     for (const ch of C) {
       const sim = simulateCurse(ch);
       cursedAtTime6ByOrigin[ch] = sim.cursedAtSix;
-      outcomes.push({ origin: ch, finalKey: sim.cursedAtSix.join("|") || "-", sim });
+      outcomes.push({
+        origin: ch,
+        finalKey: sim.cursedAtSix.join("|") || "-",
+        sim,
+      });
     }
 
     const finalKeyCounts = outcomes.reduce((acc, outcome) => {
@@ -2456,7 +2474,9 @@ export function solveAndDecode(cfg) {
       visit_counts: visitCounts,
       rooms_visited: roomsVisitedByChar,
       rooms_missed: {
-        first: R.filter((room) => !roomsVisitedByChar[privKeys.S15.first].includes(room)),
+        first: R.filter(
+          (room) => !roomsVisitedByChar[privKeys.S15.first].includes(room),
+        ),
         second: secondMissed,
         third: thirdMissed,
       },
@@ -2594,23 +2614,28 @@ export function solveAndDecode(cfg) {
     let currentHolder = firstThief;
 
     if (currentHolder) {
-      passingChain.push({ holder: currentHolder, time: firstThiefTime, room: jewelRoom, event: 'pickup' });
+      passingChain.push({
+        holder: currentHolder,
+        time: firstThiefTime,
+        room: jewelRoom,
+        event: "pickup",
+      });
 
-      for (let t = (firstThiefTime - 1); t < T; t++) {
+      for (let t = firstThiefTime - 1; t < T; t++) {
         if (!currentHolder) break;
         const holderRoom = schedule[currentHolder][t];
-        const occupants = C.filter(ch => schedule[ch][t] === holderRoom);
+        const occupants = C.filter((ch) => schedule[ch][t] === holderRoom);
 
         // Jewels pass when holder meets exactly one other person (2 people total in room)
         if (occupants.length === 2) {
-          const otherPerson = occupants.find(ch => ch !== currentHolder);
+          const otherPerson = occupants.find((ch) => ch !== currentHolder);
           if (otherPerson && otherPerson !== currentHolder) {
             passingChain.push({
               from: currentHolder,
               to: otherPerson,
               time: t + 1,
               room: holderRoom,
-              event: 'pass'
+              event: "pass",
             });
             currentHolder = otherPerson;
           }
@@ -2627,7 +2652,7 @@ export function solveAndDecode(cfg) {
       first_thief_time: firstThiefTime,
       passing_chain: passingChain,
       final_holder: finalHolder,
-      total_passes: passingChain.filter(p => p.event === 'pass').length,
+      total_passes: passingChain.filter((p) => p.event === "pass").length,
     };
   }
 
