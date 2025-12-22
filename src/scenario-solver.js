@@ -1282,6 +1282,19 @@ export function buildCNF(config) {
       }
     }
 
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let vj = 0; vj < C.length; vj++) {
+        if (ci === vj) continue;
+        const victimOccurrences = killVictimVars[ci][vj].filter(Boolean);
+        if (victimOccurrences.length > 1) {
+          const uniqueVictimClauses = atMostOne(victimOccurrences);
+          for (const clause of uniqueVictimClauses) {
+            clauses.push([-AGG[ci], ...clause]);
+          }
+        }
+      }
+    }
+
     for (let ak = 0; ak < C.length; ak++) {
       for (let ci = 0; ci < C.length; ci++) {
         if (ci === ak) continue;
