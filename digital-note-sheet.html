@@ -119,6 +119,18 @@
             background: #374151;
         }
 
+        .controls button.shrink-layout {
+            background: #f59e0b;
+        }
+
+        .controls button.shrink-layout:hover {
+            background: #d97706;
+        }
+
+        .controls button.shrink-layout:active {
+            background: #b45309;
+        }
+
         .nav-links {
             display: flex;
             gap: 10px;
@@ -344,6 +356,24 @@
             background: #b91c1c;
         }
 
+        .chip-item button.flag {
+            background: #f59e0b;
+            color: #111827;
+            min-width: 32px;
+        }
+
+        .chip-item button.flag:hover {
+            background: #d97706;
+        }
+
+        .chip-item button.flag:active {
+            background: #b45309;
+        }
+
+        .chip-item button.flag.active {
+            background: #fbbf24;
+        }
+
         /* Character tracking table */
         .tracking-section {
             margin: 30px 0;
@@ -368,6 +398,14 @@
             font-size: 13px;
             min-width: max-content;
             table-layout: auto;
+        }
+
+        .tracking-table th:first-child,
+        .tracking-table td.character-name {
+            width: 24px;
+            min-width: 24px;
+            max-width: 24px;
+            text-align: center;
         }
 
         .tracking-table th,
@@ -789,6 +827,7 @@
             <button class="shuffle-structure" onclick="randomizeGraphStructure()" id="shuffleConnectionsBtn" disabled>Shuffle Connections</button>
             <button class="shuffle-layout" onclick="regenerateGraphLayout()" id="shuffleLayoutBtn" disabled>Shuffle Layout</button>
             <button class="reset-layout" onclick="resetLayout()" id="resetLayoutBtn" disabled>Reset Default Layout</button>
+            <button class="shrink-layout" onclick="shrinkGraph()" id="shrinkGraphBtn" disabled>Shrink</button>
             <button onclick="undo()" id="undoBtn" disabled>Undo</button>
             <button onclick="redo()" id="redoBtn" disabled>Redo</button>
         </div>
@@ -902,6 +941,8 @@
             historyIndex: -1,
             currentSelector: null,
             currentLayoutIndex: 0,
+            graphShrinkLevel: 0,
+            basePositions: null,
             counts: {}
         };
 
@@ -1008,6 +1049,7 @@
                 document.getElementById('shuffleConnectionsBtn').disabled = false;
                 document.getElementById('shuffleLayoutBtn').disabled = false;
                 document.getElementById('resetLayoutBtn').disabled = false;
+                document.getElementById('shrinkGraphBtn').disabled = false;
 
                 return true;
             } catch (error) {
@@ -1082,6 +1124,9 @@
                 }, 2000);
             });
         }
+
+        const SHRINK_STEP = 0.9;
+        const MAX_SHRINK_LEVEL = 8;
 
         // Available layout algorithms
         const layoutAlgorithms = [
@@ -1266,6 +1311,8 @@
             const mermaidLines = ['graph TD', ...edges.map(([a, b]) => `  ${a} --- ${b}`)];
             graphInput.value = mermaidLines.join('\n');
 
+            state.graphShrinkLevel = 0;
+            state.basePositions = null;
             initializeSheet();
         }
 
@@ -1318,6 +1365,8 @@
 
             // Reset layout index
             state.currentLayoutIndex = 0;
+            state.graphShrinkLevel = 0;
+            state.basePositions = null;
 
             // Render
             renderMaps();
@@ -1328,6 +1377,7 @@
             document.getElementById('shuffleConnectionsBtn').disabled = false;
             document.getElementById('shuffleLayoutBtn').disabled = false;
             document.getElementById('resetLayoutBtn').disabled = false;
+            document.getElementById('shrinkGraphBtn').disabled = false;
         }
 
         function renderMaps() {
@@ -1417,16 +1467,60 @@
         }
 
         function regenerateGraphLayout() {
+            state.graphShrinkLevel = 0;
             applyLayoutToAll(state.currentLayoutIndex + 1);
         }
 
         function resetLayout() {
+            state.graphShrinkLevel = 0;
             applyLayoutToAll(0);
+        }
+
+        function applyGraphShrink() {
+            if (!state.basePositions || !state.cytoscapeInstances.length) return;
+            const ids = Object.keys(state.basePositions);
+            if (!ids.length) return;
+
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+            ids.forEach(id => {
+                const pos = state.basePositions[id];
+                minX = Math.min(minX, pos.x);
+                maxX = Math.max(maxX, pos.x);
+                minY = Math.min(minY, pos.y);
+                maxY = Math.max(maxY, pos.y);
+            });
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const scale = Math.pow(SHRINK_STEP, state.graphShrinkLevel);
+
+            state.cytoscapeInstances.forEach(cy => {
+                cy.nodes().positions(node => {
+                    const base = state.basePositions[node.id()];
+                    if (!base) return node.position();
+                    return {
+                        x: centerX + (base.x - centerX) * scale,
+                        y: centerY + (base.y - centerY) * scale
+                    };
+                });
+                cy.center();
+            });
+        }
+
+        function shrinkGraph() {
+            if (!state.basePositions) return;
+            state.graphShrinkLevel = Math.min(state.graphShrinkLevel + 1, MAX_SHRINK_LEVEL);
+            applyGraphShrink();
         }
 
         function applyLayoutToAll(layoutIndex) {
             if (!state.cytoscapeInstances.length) return;
 
+            state.graphShrinkLevel = 0;
+            state.basePositions = null;
             const normalizedIndex = ((layoutIndex % layoutAlgorithms.length) + layoutAlgorithms.length) % layoutAlgorithms.length;
             state.currentLayoutIndex = normalizedIndex;
             const currentLayout = layoutAlgorithms[normalizedIndex];
@@ -1449,6 +1543,9 @@
                     cy.nodes().positions(node => positions[node.id()]);
                     cy.fit(cy.elements(), currentLayout.options.padding || 20);
                 });
+
+                state.basePositions = positions;
+                applyGraphShrink();
             });
 
             layout.run();
@@ -1475,11 +1572,16 @@
                     const struckChars = placements.filter(p => p.strikethrough);
 
                     if (activeChars.length > 0 || struckChars.length > 0) {
+                        const formatInitial = (placement) => {
+                            const suffix = placement.highlighted ? '!' : '';
+                            return `${placement.initial}${suffix}`;
+                        };
+
                         label += '\n\n';
 
                         // Add active characters
                         if (activeChars.length > 0) {
-                            label += activeChars.map(p => p.initial).join(' ');
+                            label += activeChars.map(p => formatInitial(p)).join(' ');
                         }
 
                         // Add struck characters with strikethrough
@@ -1487,7 +1589,7 @@
                             if (activeChars.length > 0) label += ' ';
                             // Note: Cytoscape doesn't support text-decoration in labels
                             // So we'll use a different visual indicator
-                            label += struckChars.map(p => `[${p.initial}]`).join(' ');
+                            label += struckChars.map(p => `[${formatInitial(p)}]`).join(' ');
                         }
                     }
 
@@ -1582,6 +1684,7 @@
                         <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}', event)">
                             ${placement.strikethrough ? 'Unstrike' : 'Strike'}
                         </button>
+                        <button class="flag ${placement.highlighted ? 'active' : ''}" onclick="toggleHighlight(${timestep}, '${roomName}', '${placement.char}', event)">!</button>
                         <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}', event)">Remove</button>
                     `;
                     existingChips.appendChild(chipItem);
@@ -1655,7 +1758,8 @@
                 char: char.name,
                 initial: char.initial,
                 color: char.color,
-                strikethrough: false
+                strikethrough: false,
+                highlighted: false
             });
 
             updateMiniMapVisuals(timestep);
@@ -1681,6 +1785,17 @@
                 saveState();
 
                 // Refresh existing chips display without closing modal
+                refreshExistingChips(timestep, roomName);
+            }
+        }
+
+        function toggleHighlight(timestep, roomName, charName, event) {
+            if (event) event.stopPropagation();
+            const placement = state.placements[timestep][roomName].find(p => p.char === charName);
+            if (placement) {
+                placement.highlighted = !placement.highlighted;
+                updateMiniMapVisuals(timestep);
+                saveState();
                 refreshExistingChips(timestep, roomName);
             }
         }
@@ -1741,6 +1856,7 @@
                         <button class="${placement.strikethrough ? 'strike' : ''}" onclick="toggleStrikethrough(${timestep}, '${roomName}', '${placement.char}', event)">
                             ${placement.strikethrough ? 'Unstrike' : 'Strike'}
                         </button>
+                        <button class="flag ${placement.highlighted ? 'active' : ''}" onclick="toggleHighlight(${timestep}, '${roomName}', '${placement.char}', event)">!</button>
                         <button onclick="removeCharacterChip(${timestep}, '${roomName}', '${placement.char}', event)">Remove</button>
                     `;
                     existingChips.appendChild(chipItem);
@@ -1772,7 +1888,8 @@
                         char: char.name,
                         initial: char.initial,
                         color: char.color,
-                        strikethrough: true
+                        strikethrough: true,
+                        highlighted: false
                     });
                 }
             });
@@ -1796,7 +1913,8 @@
                         char: char.name,
                         initial: char.initial,
                         color: char.color,
-                        strikethrough: false
+                        strikethrough: false,
+                        highlighted: false
                     });
                 }
             });
@@ -1835,7 +1953,8 @@
                                 char: char.name,
                                 initial: char.initial,
                                 color: char.color,
-                                strikethrough: true
+                                strikethrough: true,
+                                highlighted: false
                             });
                         }
                     });
@@ -2036,10 +2155,3 @@
     </script>
 </body>
 </html>
-        .tracking-table th:first-child,
-        .tracking-table td.character-name {
-            width: 24px;
-            min-width: 24px;
-            max-width: 24px;
-            text-align: center;
-        }
