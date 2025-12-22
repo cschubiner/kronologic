@@ -38,46 +38,19 @@ bun x prettier --check "src/**/*.js" "tests/**/*.js"  # Check formatting
 - Comment only on tricky constraints, not obvious code
 - Keep functions focused and small
 
-## Adding New Scenarios
+## Adding New Scenarios (Condensed)
 
-This is the most common task. Follow this checklist strictly:
+This is the most common task. Update all of these:
 
-### Files to Modify (ALL required!)
+- `src/scenario-solver.js`: add CNF constraints in `buildCNF()`, store `privKeys.SXX`, decode in `solveAndDecode()`. Use `mulberry32(resolvedSeed)` and room names in SAT variable keys.
+- `src/scenario-shared.js`: add `scoreMyScenario()` and hook it in `computeScenarioScore()`.
+- `scenario_handler_gpt.html`: add radio button, `sXX: scenarioValue === 'sXX'` in config, private facts display.
+- `scenario_handler_v2.html`: add to `SCENARIOS`, add `sXX: scenarioValue === 'sXX'`, private facts display.
+- `tests/scenarios.test.js`: add `describe("SXX: ...")`, use `testWithThreshold`, include invalid-config throw tests.
+- `README.md`: update Scenarios documentation and Scenario Selection list.
+- Run `bun test`.
 
-1. **`src/scenario-solver.js`**
-   - Add CNF constraints in `buildCNF()`
-   - Add decoding logic in `solveAndDecode()`
-   - Use `privKeys.SXX = {...}` to pass data between building and decoding
-
-2. **`src/scenario-shared.js`**
-   - Add scoring function `scoreMyScenario(res, cfg)`
-   - Add hook in `computeScenarioScore()`: `if (cfg.scenarios.sXX && res.priv.xxx) {...}`
-
-3. **`scenario_handler_gpt.html`**
-   - Add radio button input
-   - Add `sXX: scenarioValue === 'sXX'` in config object (CRITICAL!)
-   - Add private facts display in `updatePrivateFacts()` or similar
-
-4. **`scenario_handler_v2.html`**
-   - Add to `SCENARIOS` array
-   - Add `sXX: scenarioValue === 'sXX'` in config object (CRITICAL!)
-   - Add private facts display
-
-5. **`tests/scenarios.test.js`**
-   - Add `describe("SXX: Name", () => {...})`
-   - Test main constraints, edge cases, and error conditions
-   - Use `testWithThreshold()` for seeded reproducibility
-
-6. **`README.md`**
-   - Add full scenario documentation to Scenarios section
-   - Add brief entry to Scenario Selection list
-
-### Common Mistakes to Avoid
-
-1. **Missing config builder**: The radio button won't work without `sXX: scenarioValue === 'sXX'` in the scenarios object
-2. **Room name vs index mismatch**: Rooms are shuffled; use room names in SAT variable names
-3. **Forgetting one HTML file**: Both `scenario_handler_gpt.html` AND `scenario_handler_v2.html` need updates
-4. **Missing scoring hook**: Add to `computeScenarioScore()` even if scoring function exists
+Common pitfalls: missing config builder line, forgetting one HTML file, room-name vs index mismatch, missing scoring hook.
 
 ## SAT Solver Patterns
 

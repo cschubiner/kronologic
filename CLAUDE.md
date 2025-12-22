@@ -15,116 +15,19 @@ Kronologic is a deduction game scenario generator that uses SAT solving to creat
 - **`scenario_handler_v2.html`**: Alternative UI with grid layout
 - **`digital-note-sheet.html`**: Player note-taking interface
 
-## Adding New Scenarios
+## Adding New Scenarios (Condensed)
 
-When adding a new scenario (e.g., S18), you MUST update ALL of these:
+When adding a new scenario (e.g., S18), update all of these:
 
-### 1. Core Logic (`src/scenario-solver.js`)
+- `src/scenario-solver.js`: add CNF constraints in `buildCNF()`, store `privKeys.SXX`, decode in `solveAndDecode()`. Use `mulberry32(resolvedSeed)` and room names in SAT variable keys.
+- `src/scenario-shared.js`: add `scoreMyScenario()` and hook it in `computeScenarioScore()`.
+- `scenario_handler_gpt.html`: add radio button, `sXX: scenarioValue === 'sXX'` in config, private facts display.
+- `scenario_handler_v2.html`: add to `SCENARIOS`, add `sXX: scenarioValue === 'sXX'`, private facts display.
+- `tests/scenarios.test.js`: add `describe("SXX: ...")`, use `testWithThreshold`, include invalid-config throw tests.
+- `README.md`: update Scenarios documentation and Scenario Selection list.
+- Run `bun test`.
 
-**In `buildCNF()`:**
-```javascript
-if (config.scenarios && config.scenarios.s18) {
-  // Validation
-  if (R.length < 2) throw new Error("S18 requires at least 2 rooms");
-
-  // Setup with RNG
-  const rng = mulberry32(resolvedSeed);
-
-  // Create SAT variables using vp.get()
-  const MY_VAR = (t, ri) => vp.get(`S18_MYVAR_${t}_${R[ri]}`);
-
-  // Add clauses
-  clauses.push([...]);
-
-  // Store private keys for decoding
-  privKeys.S18 = { key1, key2 };
-}
-```
-
-**In `solveAndDecode()`:**
-```javascript
-if (privKeys.S18) {
-  const { key1, key2 } = privKeys.S18;
-  // Decode SAT solution using val() helper
-  // Store results in priv object
-  priv.my_scenario = { ... };
-}
-```
-
-### 2. Scoring (`src/scenario-shared.js`)
-
-**Add scoring function:**
-```javascript
-function scoreMyScenario(res, cfg) {
-  const info = res.priv.my_scenario;
-  if (!info) return 0;
-  let score = 0;
-  // Add difficulty factors
-  return score;
-}
-```
-
-**Add hook in `computeScenarioScore()`:**
-```javascript
-if (cfg.scenarios.s18 && res.priv.my_scenario) {
-  scores.myScenario = scoreMyScenario(res, cfg);
-  score += scores.myScenario;
-}
-```
-
-### 3. UI Updates (BOTH HTML files!)
-
-**Radio button (`scenario_handler_gpt.html`):**
-```html
-<div class="row">
-  <label><input type="radio" name="scenario" id="s18" value="s18" />
-    S18: My Scenario (brief description)</label>
-</div>
-```
-
-**Config builder (CRITICAL - easy to miss!):**
-```javascript
-scenarios: {
-  // ... existing ...
-  s18: scenarioValue === 's18',  // ADD THIS LINE
-}
-```
-
-**Private facts display:**
-```javascript
-if (res.priv.my_scenario) {
-  const info = res.priv.my_scenario;
-  pf.push(`My Scenario: ${info.value}`);
-}
-```
-
-**For `scenario_handler_v2.html`, also add to SCENARIOS array:**
-```javascript
-{ id: 's18', name: 'My Scenario', desc: 'Brief description.' }
-```
-
-### 4. Tests (`tests/scenarios.test.js`)
-
-```javascript
-describe("S18: My Scenario", () => {
-  it("should enforce main constraint", () => {
-    const cfg = { /* config */ };
-    testWithThreshold(cfg, (res) => {
-      expect(res.priv.my_scenario).toBeTruthy();
-    });
-  });
-
-  it("should reject invalid configs", () => {
-    expect(() => solveAndDecode(cfg)).toThrow("S18 requires...");
-  });
-});
-```
-
-### 5. Documentation (`README.md`)
-
-Add to:
-1. Scenarios section with full rules
-2. Scenario Selection list
+Common pitfalls: missing config builder line, forgetting one HTML file, room-name vs index mismatch, missing scoring hook.
 
 ## Common Patterns
 
