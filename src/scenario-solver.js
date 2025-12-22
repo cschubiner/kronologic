@@ -502,6 +502,7 @@ export function buildCNF(config) {
     }
 
     const maxDistinctVisits = Math.min(R.length, T);
+    const maxUniqueRanks = Math.min(maxDistinctVisits, C.length);
     const rng = mulberry32(resolvedSeed);
 
     const shuffled = [...C];
@@ -511,18 +512,13 @@ export function buildCNF(config) {
     }
 
     const visitCountAssignments = {};
-    const visitCountTargets = [];
-    const minReachableCount = Math.max(1, Math.min(maxDistinctVisits, 1));
-    for (
-      let count = maxDistinctVisits;
-      visitCountTargets.length < shuffled.length && count >= minReachableCount;
-      count--
-    ) {
-      visitCountTargets.push(count);
+    const visitCountTargets = Array.from({ length: maxUniqueRanks }, (_, i) =>
+      Math.max(1, maxDistinctVisits - i),
+    );
+    if (!visitCountTargets.includes(1)) {
+      visitCountTargets[visitCountTargets.length - 1] = 1;
     }
-    if (!visitCountTargets.includes(minReachableCount)) {
-      visitCountTargets[visitCountTargets.length - 1] = minReachableCount;
-    }
+    const minReachableCount = Math.max(1, visitCountTargets[visitCountTargets.length - 1]);
     while (visitCountTargets.length < shuffled.length) {
       visitCountTargets.push(minReachableCount);
     }
