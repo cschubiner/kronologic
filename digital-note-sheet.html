@@ -1127,6 +1127,8 @@
 
         const SHRINK_STEP = 0.9;
         const MAX_SHRINK_LEVEL = 8;
+        const LAYOUT_TRIALS = 6;
+        const EDGE_NODE_PADDING = 4;
 
         // Available layout algorithms
         const layoutAlgorithms = [
@@ -1516,7 +1518,119 @@
             applyGraphShrink();
         }
 
-        function applyLayoutToAll(layoutIndex) {
+        function capturePositions(cy) {
+            const positions = {};
+            cy.nodes().forEach(node => {
+                positions[node.id()] = { ...node.position() };
+            });
+            return positions;
+        }
+
+        function segmentIntersectsRect(p1, p2, rect) {
+            let t0 = 0;
+            let t1 = 1;
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const p = [-dx, dx, -dy, dy];
+            const q = [p1.x - rect.x1, rect.x2 - p1.x, p1.y - rect.y1, rect.y2 - p1.y];
+
+            for (let i = 0; i < 4; i++) {
+                if (p[i] === 0) {
+                    if (q[i] < 0) return false;
+                } else {
+                    const r = q[i] / p[i];
+                    if (p[i] < 0) {
+                        if (r > t1) return false;
+                        if (r > t0) t0 = r;
+                    } else {
+                        if (r < t0) return false;
+                        if (r < t1) t1 = r;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        function countEdgeNodeOverlaps(cy) {
+            const nodes = cy.nodes();
+            const edges = cy.edges();
+            const rects = {};
+
+            nodes.forEach(node => {
+                const box = node.boundingBox({ includeLabels: false });
+                rects[node.id()] = {
+                    x1: box.x1 - EDGE_NODE_PADDING,
+                    y1: box.y1 - EDGE_NODE_PADDING,
+                    x2: box.x2 + EDGE_NODE_PADDING,
+                    y2: box.y2 + EDGE_NODE_PADDING
+                };
+            });
+
+            let overlaps = 0;
+            edges.forEach(edge => {
+                const source = edge.source();
+                const target = edge.target();
+                const sourceId = source.id();
+                const targetId = target.id();
+                const p1 = source.position();
+                const p2 = target.position();
+
+                nodes.forEach(node => {
+                    const id = node.id();
+                    if (id === sourceId || id === targetId) return;
+                    const rect = rects[id];
+                    if (segmentIntersectsRect(p1, p2, rect)) {
+                        overlaps++;
+                    }
+                });
+            });
+
+            return overlaps;
+        }
+
+        function getLayoutTrialCount(layoutOptions) {
+            if (!layoutOptions) return 1;
+            if (layoutOptions.name === 'cose') return LAYOUT_TRIALS;
+            if (layoutOptions.randomize) return LAYOUT_TRIALS;
+            return 1;
+        }
+
+        function runLayoutOnce(cy, layoutOptions) {
+            return new Promise(resolve => {
+                const layout = cy.layout(layoutOptions);
+                layout.once('layoutstop', () => resolve());
+                layout.run();
+            });
+        }
+
+        async function findBestLayoutPositions(cy, layoutOptions) {
+            const trials = getLayoutTrialCount(layoutOptions);
+            let bestPositions = null;
+            let bestScore = Infinity;
+
+            for (let i = 0; i < trials; i++) {
+                const options = { ...layoutOptions };
+                if (options.name === 'cose' && options.randomize === undefined && i > 0) {
+                    options.randomize = true;
+                }
+
+                await runLayoutOnce(cy, options);
+
+                const score = countEdgeNodeOverlaps(cy);
+                const positions = capturePositions(cy);
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestPositions = positions;
+                    if (score === 0) break;
+                }
+            }
+
+            return bestPositions || capturePositions(cy);
+        }
+
+        async function applyLayoutToAll(layoutIndex) {
             if (!state.cytoscapeInstances.length) return;
 
             state.graphShrinkLevel = 0;
@@ -1528,27 +1642,18 @@
             const [primaryCy, ...rest] = state.cytoscapeInstances;
             if (!primaryCy) return;
 
-            const layout = primaryCy.layout(currentLayout.options);
+            const positions = await findBestLayoutPositions(primaryCy, currentLayout.options);
 
-            layout.once('layoutstop', () => {
-                const positions = {};
-                primaryCy.nodes().forEach(node => {
-                    positions[node.id()] = { ...node.position() };
-                });
+            primaryCy.nodes().positions(node => positions[node.id()] || node.position());
+            primaryCy.fit(primaryCy.elements(), currentLayout.options.padding || 20);
 
-                // Fit the primary view and mirror positions to every timestep
-                primaryCy.fit(primaryCy.elements(), currentLayout.options.padding || 20);
-
-                rest.forEach(cy => {
-                    cy.nodes().positions(node => positions[node.id()]);
-                    cy.fit(cy.elements(), currentLayout.options.padding || 20);
-                });
-
-                state.basePositions = positions;
-                applyGraphShrink();
+            rest.forEach(cy => {
+                cy.nodes().positions(node => positions[node.id()] || node.position());
+                cy.fit(cy.elements(), currentLayout.options.padding || 20);
             });
 
-            layout.run();
+            state.basePositions = positions;
+            applyGraphShrink();
 
             console.log(`Applied layout: ${currentLayout.name}`);
         }
