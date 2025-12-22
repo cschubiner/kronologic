@@ -3374,6 +3374,74 @@ describe("S11: The Vault", () => {
     });
   });
 
+  it("forces the key holder to visit the vault at least twice", () => {
+    const cfg = {
+      rooms: ["Vault", "Gallery", "Lounge"],
+      edges: [
+        ["Vault", "Gallery"],
+        ["Gallery", "Lounge"],
+        ["Lounge", "Vault"],
+      ],
+      chars: ["Ava", "Ben", "Cora", "Dina"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s11: true },
+      seed: 7,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const keyHolder = res.priv.vault.key_holder;
+      const vaultRoom = [...cfg.rooms].sort()[0];
+      const visits = [];
+
+      for (let t = 0; t < cfg.T; t++) {
+        if (res.schedule[keyHolder][t] === vaultRoom) {
+          visits.push(t);
+        }
+      }
+
+      expect(visits.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("ensures non-holders miss at least one key-holder vault visit", () => {
+    const cfg = {
+      rooms: ["Vault", "Studio", "Study"],
+      edges: [
+        ["Vault", "Studio"],
+        ["Studio", "Study"],
+        ["Study", "Vault"],
+      ],
+      chars: ["Keyer", "Echo", "Ford", "Gray"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s11: true },
+      seed: 33,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const keyHolder = res.priv.vault.key_holder;
+      const vaultRoom = [...cfg.rooms].sort()[0];
+      const khVaultTimes = [];
+
+      for (let t = 0; t < cfg.T; t++) {
+        if (res.schedule[keyHolder][t] === vaultRoom) {
+          khVaultTimes.push(t);
+        }
+      }
+
+      expect(khVaultTimes.length).toBeGreaterThanOrEqual(2);
+
+      for (const ch of cfg.chars) {
+        if (ch === keyHolder) continue;
+        const misses = khVaultTimes.filter((t) => res.schedule[ch][t] !== vaultRoom);
+        expect(misses.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+  });
+
   it("records every vault visitor in the private payload", () => {
     const cfg = {
       rooms: ["Vault", "Kitchen", "Study"],

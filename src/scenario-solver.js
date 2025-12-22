@@ -731,6 +731,10 @@ export function buildCNF(config) {
 
     // Track vault co-visits to enforce two distinct companions across two timesteps
     const withOther = Array.from({ length: C.length }, () => []);
+    const khVaultVisits = Array.from({ length: C.length }, () => []);
+    const khWithoutCompanion = Array.from({ length: C.length }, () =>
+      Array.from({ length: C.length }, () => []),
+    );
     const compVars = Array.from({ length: C.length }, () =>
       Array.from({ length: C.length }, () => null),
     );
@@ -740,6 +744,12 @@ export function buildCNF(config) {
 
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
+        const khVisit = vp.get(`S11_khVisit_${C[ci]}_${t}`);
+        khVaultVisits[ci].push(khVisit);
+        clauses.push([-khVisit, KH[ci]]);
+        clauses.push([-khVisit, X(ci, t, vr)]);
+        clauses.push([-KH[ci], -X(ci, t, vr), khVisit]);
+
         const otherVars = [];
         for (let cj = 0; cj < C.length; cj++) {
           if (ci === cj) continue;
@@ -769,6 +779,13 @@ export function buildCNF(config) {
           clauses.push([-pair, X(ci, t, vr)]);
           clauses.push([-pair, X(cj, t, vr)]);
           clauses.push([-KH[ci], -X(ci, t, vr), -X(cj, t, vr), pair]);
+
+          const khOnly = vp.get(`S11_without_${C[ci]}_${C[cj]}_${t}`);
+          khWithoutCompanion[ci][cj].push(khOnly);
+          clauses.push([-khOnly, KH[ci]]);
+          clauses.push([-khOnly, X(ci, t, vr)]);
+          clauses.push([-khOnly, -X(cj, t, vr)]);
+          clauses.push([-KH[ci], -X(ci, t, vr), X(cj, t, vr), khOnly]);
         }
       }
     }
@@ -799,6 +816,28 @@ export function buildCNF(config) {
         clauses.push([-KH[ci]]);
       } else {
         clauses.push([-KH[ci], ...companions]);
+      }
+
+      const visitCount = buildTotalizer(
+        khVaultVisits[ci],
+        vp,
+        clauses,
+        `S11_${C[ci]}_VisitTotal`,
+      );
+      if (visitCount.length >= 2) {
+        clauses.push([-KH[ci], visitCount[1]]);
+      } else {
+        clauses.push([-KH[ci]]);
+      }
+
+      for (let cj = 0; cj < C.length; cj++) {
+        if (ci === cj) continue;
+        const khOnlyGaps = khWithoutCompanion[ci][cj];
+        if (khOnlyGaps.length === 0) {
+          clauses.push([-KH[ci]]);
+        } else {
+          clauses.push([-KH[ci], ...khOnlyGaps]);
+        }
       }
     }
 
