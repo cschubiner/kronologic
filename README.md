@@ -167,20 +167,20 @@ Players must deduce the secret scenario by combining:
 **Rules**:
 1. **Exactly one aggrosassin** exists (can be any character, not necessarily the first)
 
-2. **Minimum kill frequency**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **max(2, ⌈T/2⌉)** different timesteps
-   - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps; with T=2, they still need 2 kills
-   - This ensures the aggrosassin is actively hunting throughout the timeline and prevents trivial single-kill timelines
- 
+2. **Minimum kill quota**: The aggrosassin must secure at least **max(2, ⌈T/2⌉)** kills across the timeline
+   - Every required kill happens during a 1-on-1 meeting (exactly two people in a room)
+   - Examples mirroring the solver: with T=6, the aggrosassin must notch 3 kills; with T=2, they still need 2 kills (minimum-two-kills rule)
+
 3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
    - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
    - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
-   - **No repeat kills**: once a character has met the aggrosassin 1-on-1, they cannot be targeted again
+   - **No repeat kills**: once a character has met the aggrosassin 1-on-1, they cannot be targeted again, so scenarios must include at least **requiredKills + 1** characters (the aggrosassin plus enough distinct victims)
+   - Example: With T=6 (requiredKills=3), the scenario needs at least 4 characters so every kill can target a unique victim
 
 5. **Flexibility otherwise**: The aggrosassin can spend other timesteps alone, in pairs with victims, or in larger groups (which help disguise them between kills)
-   - Every required kill timestep must involve a **new** victim, so scenarios need enough characters to cover the kill quota
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 
