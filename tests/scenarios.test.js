@@ -3963,6 +3963,8 @@ describe("S16: Homebodies", () => {
       const counts = Object.values(hb.actual_visit_counts);
       const uniqueCounts = new Set(counts);
       expect(uniqueCounts.size).toBe(cfg.chars.length);
+      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
+      expect(Math.min(...counts)).toBe(1);
     });
   });
 
@@ -3990,7 +3992,7 @@ describe("S16: Homebodies", () => {
     });
   });
 
-  it("should have visit counts of 1, 2, 3, ... for each character", () => {
+  it("should cap visit counts at min(rooms, T) rather than character count", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -4010,8 +4012,9 @@ describe("S16: Homebodies", () => {
     testWithThreshold(cfg, (res, cfg) => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
-      const counts = Object.values(hb.actual_visit_counts).sort((a, b) => a - b);
-      expect(counts).toEqual([1, 2, 3]);
+      const counts = Object.values(hb.actual_visit_counts);
+      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
+      expect(counts).toContain(1);
     });
   });
 
@@ -4114,7 +4117,9 @@ describe("S16: Homebodies", () => {
       scenarios: { s16: true },
       seed: 1605,
     };
-    expect(() => solveAndDecode(cfg)).toThrow("S16 requires at least as many rooms as characters");
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S16 requires unique visit counts but only min(rooms, timesteps) are available",
+    );
   });
 
   it("should reject configs with fewer than 2 characters", () => {
@@ -4155,8 +4160,10 @@ describe("S16: Homebodies", () => {
     testWithThreshold(cfg, (res, cfg) => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
-      const counts = Object.values(hb.actual_visit_counts).sort((a, b) => a - b);
-      expect(counts).toEqual([1, 2, 3, 4]);
+      const counts = Object.values(hb.actual_visit_counts);
+      expect(new Set(counts).size).toBe(cfg.chars.length);
+      expect(counts).toContain(1);
+      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
     });
   });
 
@@ -4189,6 +4196,83 @@ describe("S16: Homebodies", () => {
           hb.actual_visit_counts[hb.ranking[i + 1]]
         );
       }
+    });
+  });
+
+  it("should allow many rooms but limit top traveler to reachable timesteps", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E", "F", "G", "H"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "F"],
+        ["F", "G"],
+        ["G", "H"],
+        ["H", "A"],
+      ],
+      chars: ["L", "M", "N"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1610,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const counts = Object.values(hb.actual_visit_counts);
+      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
+    });
+  });
+
+  it("should fail gracefully when timesteps limit unique visit counts", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+      ],
+      chars: ["O", "P", "Q"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1611,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S16 requires unique visit counts but only min(rooms, timesteps) are available",
+    );
+  });
+
+  it("should honor visit caps when timesteps are tight but sufficient", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["R", "S"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1612,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const counts = Object.values(hb.actual_visit_counts);
+      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
+      expect(counts).toContain(1);
     });
   });
 });

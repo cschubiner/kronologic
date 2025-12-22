@@ -497,11 +497,15 @@ export function buildCNF(config) {
 
   let s16Setup = null;
   if (config.scenarios && config.scenarios.s16) {
-    if (C.length > R.length) {
-      throw new Error("S16 requires at least as many rooms as characters");
-    }
     if (C.length < 2) {
       throw new Error("S16 requires at least 2 characters");
+    }
+
+    const maxDistinctVisits = Math.min(R.length, T);
+    if (C.length > maxDistinctVisits) {
+      throw new Error(
+        "S16 requires unique visit counts but only min(rooms, timesteps) are available",
+      );
     }
 
     const rng = mulberry32(resolvedSeed);
@@ -513,8 +517,21 @@ export function buildCNF(config) {
     }
 
     const visitCountAssignments = {};
+    const countsPool = [1];
+    for (
+      let count = maxDistinctVisits;
+      count > 1 && countsPool.length < shuffled.length;
+      count--
+    ) {
+      countsPool.push(count);
+    }
+
+    if (countsPool.length < shuffled.length) {
+      throw new Error("S16 could not assign distinct visit counts to characters");
+    }
+
     for (let i = 0; i < shuffled.length; i++) {
-      visitCountAssignments[shuffled[i]] = i + 1;
+      visitCountAssignments[shuffled[i]] = countsPool[i];
     }
 
     s16Setup = { visitCountAssignments, homebody: shuffled[0] };
