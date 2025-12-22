@@ -773,39 +773,56 @@ export function buildCNF(config) {
     }
     const trio = [shuffled[0], shuffled[1], shuffled[2]].sort();
     const trioIndices = trio.map((ch) => C.indexOf(ch));
-    const trioKey = trioIndices
-      .slice()
-      .sort((a, b) => a - b)
-      .join(",");
-
-    // Generate all 3-combinations of character indices
-    const allTrios = [];
-    for (let i = 0; i < C.length; i++) {
-      for (let j = i + 1; j < C.length; j++) {
-        for (let k = j + 1; k < C.length; k++) {
-          allTrios.push([i, j, k]);
-        }
-      }
-    }
-
-    // Forbid each non-trio combination from meeting in any room at any time
-    for (const [ci1, ci2, ci3] of allTrios) {
-      const key = [ci1, ci2, ci3].sort((a, b) => a - b).join(",");
-      if (key === trioKey) continue; // Skip the special trio
-
-      for (let t = 0; t < T; t++) {
-        for (let ri = 0; ri < R.length; ri++) {
-          // NOT (X[ci1][t][ri] AND X[ci2][t][ri] AND X[ci3][t][ri])
-          // = (-X[ci1][t][ri] OR -X[ci2][t][ri] OR -X[ci3][t][ri])
-          clauses.push([-X(ci1, t, ri), -X(ci2, t, ri), -X(ci3, t, ri)]);
-        }
-      }
-    }
 
     // The special trio must meet at least once
     // Create helper variable M_t_r = trio meets in room r at time t
     const M = (t, ri) => vp.get(`S17_M_${t}_${ri}`);
     const [ti0, ti1, ti2] = trioIndices;
+
+    // If a room has exactly three occupants, they must be the trio
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const occupants = C.map((_, ci) => X(ci, t, ri));
+        const occTotalizer = buildTotalizer(
+          occupants,
+          vp,
+          clauses,
+          `S17_OCC_${t}_${ri}`,
+        );
+
+        if (occTotalizer.length >= 3) {
+          const atLeastThree = occTotalizer[2];
+          const atLeastFour = occTotalizer[3];
+          const exactThree = vp.get(`S17_EQ3_${t}_${ri}`);
+
+          // exactThree => at least 3 occupants
+          clauses.push([-exactThree, atLeastThree]);
+          // exactThree => NOT at least 4 occupants (when definable)
+          if (atLeastFour !== undefined) {
+            clauses.push([-exactThree, -atLeastFour]);
+          }
+
+          // (at least 3 occupants and not at least 4) => exactThree
+          const exactSupport = [-atLeastThree];
+          if (atLeastFour !== undefined) {
+            exactSupport.push(atLeastFour);
+          }
+          exactSupport.push(exactThree);
+          clauses.push(exactSupport);
+
+          // exactThree requires all trio members present
+          clauses.push([-exactThree, X(ti0, t, ri)]);
+          clauses.push([-exactThree, X(ti1, t, ri)]);
+          clauses.push([-exactThree, X(ti2, t, ri)]);
+
+          // exactThree forbids any non-trio member in the room
+          for (let ci = 0; ci < C.length; ci++) {
+            if (trioIndices.includes(ci)) continue;
+            clauses.push([-exactThree, -X(ci, t, ri)]);
+          }
+        }
+      }
+    }
 
     for (let t = 0; t < T; t++) {
       for (let ri = 0; ri < R.length; ri++) {
@@ -2360,9 +2377,18 @@ export function solveAndDecode(cfg) {
 
     // Find all meetings of the trio
     const meetings = [];
+    const roomsWithThree = [];
+    const exclusiveMeetings = [];
     for (let t = 0; t < T; t++) {
       for (const room of R) {
         const inRoom = C.filter((ch) => schedule[ch][t] === room);
+        if (inRoom.length === 3) {
+          const record = { time: t + 1, room, attendees: [...inRoom].sort() };
+          roomsWithThree.push(record);
+          if (trio.every((ch) => inRoom.includes(ch))) {
+            exclusiveMeetings.push(record);
+          }
+        }
         // Check if all trio members are in this room
         if (trio.every((ch) => inRoom.includes(ch))) {
           meetings.push({ time: t + 1, room, attendees: [...inRoom].sort() });
@@ -2373,6 +2399,8 @@ export function solveAndDecode(cfg) {
     priv.triple_alibi = {
       trio: trio,
       meetings: meetings,
+      rooms_with_three: roomsWithThree,
+      exclusive_trio_meetings: exclusiveMeetings,
       total_meetings: meetings.length,
     };
   }
