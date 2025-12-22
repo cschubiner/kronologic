@@ -1630,7 +1630,9 @@ export function buildCNF(config) {
     const DOC = C.map((_, ci) => vp.get(`S9Doctor_${C[ci]}`));
     const FROZ = C.map((_, ci) => vp.get(`S9Frozen_${C[ci]}`));
     const Heal = Array.from({ length: C.length }, () => Array(T).fill(null));
-    const Freed = Array.from({ length: C.length }, () => Array(T).fill(null));
+    const StillFrozen = Array.from({ length: C.length }, () =>
+      Array(T).fill(null),
+    );
     const DocAt = Array.from({ length: T }, () => Array(R.length).fill(null));
     const LeftStart = C.map((_, ci) => vp.get(`S9Left_${C[ci]}`));
     const FrozenMoved = C.map((_, ci) => vp.get(`S9FrozenMoved_${C[ci]}`));
@@ -1662,23 +1664,29 @@ export function buildCNF(config) {
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
         const healName = `S9Heal_${C[ci]}_${t}`;
-        const freeName = `S9Freed_${C[ci]}_${t}`;
+        const frozenName = `S9StillFrozen_${C[ci]}_${t}`;
         const healVar = vp.get(healName);
-        const freeVar = vp.get(freeName);
+        const frozenVar = vp.get(frozenName);
+        const nextFrozenVar =
+          t < T - 1
+            ? StillFrozen[ci][t + 1] ??
+              (StillFrozen[ci][t + 1] =
+                vp.get(`S9StillFrozen_${C[ci]}_${t + 1}`))
+            : null;
         Heal[ci][t] = healVar;
-        Freed[ci][t] = freeVar;
+        StillFrozen[ci][t] = frozenVar;
+
+        clauses.push([-frozenVar, FROZ[ci]]);
+        if (t === 0) {
+          clauses.push([-FROZ[ci], frozenVar]);
+        } else {
+          clauses.push([-frozenVar, StillFrozen[ci][t - 1]]);
+          clauses.push([-frozenVar, -Heal[ci][t - 1]]);
+        }
 
         clauses.push([-healVar, FROZ[ci]]);
-        clauses.push([-healVar, freeVar]);
-
-        if (t === 0) {
-          clauses.push([FROZ[ci], freeVar]);
-          clauses.push([-FROZ[ci], -freeVar, healVar]);
-        } else {
-          clauses.push([-Freed[ci][t - 1], freeVar]);
-          clauses.push([-freeVar, Freed[ci][t - 1], healVar]);
-          clauses.push([-healVar, -Freed[ci][t - 1]]);
-        }
+        clauses.push([-healVar, frozenVar]);
+        if (nextFrozenVar) clauses.push([-healVar, -nextFrozenVar]);
 
         if (t > 0) healNotFirst.push(healVar);
         if (t < T - 1) healNotLast.push(healVar);
@@ -1687,25 +1695,9 @@ export function buildCNF(config) {
           clauses.push([-healVar, -X(ci, t, ri), DocAt[t][ri]]);
         }
 
-        if (t === 0) {
-          for (let ri = 0; ri < R.length; ri++) {
-            clauses.push([-FROZ[ci], -X(ci, 0, ri), -DocAt[0][ri], healVar]);
-          }
-        } else {
-          for (let ri = 0; ri < R.length; ri++) {
-            clauses.push([
-              -FROZ[ci],
-              Freed[ci][t - 1],
-              -X(ci, t, ri),
-              -DocAt[t][ri],
-              healVar,
-            ]);
-          }
-        }
-
         if (t < T - 1) {
           for (let ri = 0; ri < R.length; ri++) {
-            clauses.push([freeVar, -X(ci, t, ri), X(ci, t + 1, ri)]);
+            clauses.push([frozenVar, -X(ci, t, ri), X(ci, t + 1, ri)]);
           }
         }
       }
