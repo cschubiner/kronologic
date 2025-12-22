@@ -1065,6 +1065,181 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(res.schedule["A"][0]).toBe("OnlyRoom");
     expect(res.schedule["A"][1]).toBe("OnlyRoom");
   });
+
+  it("should populate private facts with jewel room and first thief", () => {
+    const cfg = {
+      rooms: ["Ballroom", "Atrium", "Cellar"],
+      edges: [
+        ["Atrium", "Ballroom"],
+        ["Ballroom", "Cellar"],
+        ["Cellar", "Atrium"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5100,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.singers_jewels).toBeTruthy();
+
+    const info = res.priv.singers_jewels;
+    expect(info.jewel_room).toBe("Atrium"); // alphabetically first
+    expect(info.first_thief).toBeTruthy();
+    expect(info.first_thief_time).toBeGreaterThanOrEqual(1);
+    expect(info.final_holder).toBeTruthy();
+  });
+
+  it("should track jewel passing when holder meets exactly one person", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
+      chars: ["P", "Q", "R"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5110,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.singers_jewels).toBeTruthy();
+
+    const info = res.priv.singers_jewels;
+    expect(info.passing_chain).toBeTruthy();
+    expect(Array.isArray(info.passing_chain)).toBe(true);
+    expect(info.passing_chain.length).toBeGreaterThanOrEqual(1); // at least the pickup
+
+    // First event should be a pickup
+    expect(info.passing_chain[0].event).toBe("pickup");
+    expect(info.passing_chain[0].holder).toBe(info.first_thief);
+  });
+
+  it("should correctly identify first thief as alphabetically first visitor at earliest time", () => {
+    const cfg = {
+      rooms: ["Zoo", "Alpha"],
+      edges: [["Alpha", "Zoo"]],
+      chars: ["B", "A", "C"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5120,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.singers_jewels).toBeTruthy();
+
+    const info = res.priv.singers_jewels;
+    expect(info.jewel_room).toBe("Alpha");
+
+    // Find who actually visited Alpha first
+    let firstVisitorTime = null;
+    let visitorsAtFirstTime = [];
+    for (let t = 0; t < cfg.T; t++) {
+      const visitors = cfg.chars.filter(ch => res.schedule[ch][t] === "Alpha");
+      if (visitors.length > 0) {
+        firstVisitorTime = t + 1;
+        visitorsAtFirstTime = visitors.sort();
+        break;
+      }
+    }
+
+    expect(info.first_thief_time).toBe(firstVisitorTime);
+    expect(info.first_thief).toBe(visitorsAtFirstTime[0]);
+  });
+
+  it("should have final holder be first thief if no passes occur", () => {
+    // With only 1 character, no passes can occur
+    const cfg = {
+      rooms: ["X", "Y"],
+      edges: [["X", "Y"]],
+      chars: ["Solo"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5130,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.singers_jewels).toBeTruthy();
+
+    const info = res.priv.singers_jewels;
+    expect(info.total_passes).toBe(0);
+    expect(info.final_holder).toBe(info.first_thief);
+  });
+
+  it("should count passes correctly", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5140,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.singers_jewels).toBeTruthy();
+
+    const info = res.priv.singers_jewels;
+    const passEvents = info.passing_chain.filter(p => p.event === "pass");
+    expect(info.total_passes).toBe(passEvents.length);
+  });
+
+  it("should only pass jewels when exactly 2 people are in the room", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5150,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.singers_jewels).toBeTruthy();
+
+    const info = res.priv.singers_jewels;
+
+    // Verify each pass event has exactly 2 people in room
+    for (const event of info.passing_chain) {
+      if (event.event === "pass") {
+        const t = event.time - 1;
+        const room = event.room;
+        const occupants = cfg.chars.filter(ch => res.schedule[ch][t] === room);
+        expect(occupants.length).toBe(2);
+        expect(occupants).toContain(event.from);
+        expect(occupants).toContain(event.to);
+      }
+    }
+  });
 });
 
 describe("S4: Bomb Duo Scenario", () => {

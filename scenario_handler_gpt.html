@@ -461,6 +461,17 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       `Homebodies: homebody <b>${info.homebody}</b> (stays in 1 room); ranking: ${ranking}`,
     );
   }
+  if (res.priv.singers_jewels) {
+    const info = res.priv.singers_jewels;
+    const passes = info.passing_chain
+      .filter(p => p.event === 'pass')
+      .map(p => `${p.from}→${p.to} @ t=${p.time}`)
+      .join('; ');
+    pf.push(
+      `Singer's Jewels: room <b>${info.jewel_room}</b>; first thief <b>${info.first_thief}</b> @ t=${info.first_thief_time}; ` +
+      `passes: ${passes || 'none'}; final holder: <b>${info.final_holder}</b>`,
+    );
+  }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);
   qs("privateFacts").innerHTML = pf.join("");
 

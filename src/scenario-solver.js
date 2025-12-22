@@ -2133,6 +2133,64 @@ export function solveAndDecode(cfg) {
     };
   }
 
+  // S3: Singer's Jewels decoding - compute jewel passing chain
+  if (cfg.scenarios && cfg.scenarios.s3) {
+    const jewelRoom = [...R].sort()[0];
+
+    // Find who visits the jewel room first (earliest timestep, then alphabetically)
+    let firstThief = null;
+    let firstThiefTime = null;
+    for (let t = 0; t < T; t++) {
+      const visitorsAtT = C.filter(ch => schedule[ch][t] === jewelRoom).sort();
+      if (visitorsAtT.length > 0) {
+        firstThief = visitorsAtT[0]; // alphabetically first if tie
+        firstThiefTime = t + 1;
+        break;
+      }
+    }
+
+    // Simulate jewel passing: jewels pass when holder meets exactly one other person
+    const passingChain = [];
+    let currentHolder = firstThief;
+
+    if (currentHolder) {
+      passingChain.push({ holder: currentHolder, time: firstThiefTime, room: jewelRoom, event: 'pickup' });
+
+      for (let t = (firstThiefTime - 1); t < T; t++) {
+        if (!currentHolder) break;
+        const holderRoom = schedule[currentHolder][t];
+        const occupants = C.filter(ch => schedule[ch][t] === holderRoom);
+
+        // Jewels pass when holder meets exactly one other person (2 people total in room)
+        if (occupants.length === 2) {
+          const otherPerson = occupants.find(ch => ch !== currentHolder);
+          if (otherPerson && otherPerson !== currentHolder) {
+            passingChain.push({
+              from: currentHolder,
+              to: otherPerson,
+              time: t + 1,
+              room: holderRoom,
+              event: 'pass'
+            });
+            currentHolder = otherPerson;
+          }
+        }
+      }
+    }
+
+    // Who has the jewels at the end?
+    const finalHolder = currentHolder;
+
+    priv.singers_jewels = {
+      jewel_room: jewelRoom,
+      first_thief: firstThief,
+      first_thief_time: firstThiefTime,
+      passing_chain: passingChain,
+      final_holder: finalHolder,
+      total_passes: passingChain.filter(p => p.event === 'pass').length,
+    };
+  }
+
   const stats = {
     totalVars: numVars,
     totalClauses: clauses.length,

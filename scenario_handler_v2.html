@@ -851,6 +851,22 @@ function renderPrivateFacts(res, cfg) {
     }
   }
 
+  if (res.priv.singers_jewels) {
+    const info = res.priv.singers_jewels;
+    facts.push({
+      type: 'jewels',
+      char: info.first_thief,
+      text: `First thief @ t=${info.first_thief_time} in ${info.jewel_room}`
+    });
+    if (info.final_holder && info.final_holder !== info.first_thief) {
+      facts.push({
+        type: 'jewels',
+        char: info.final_holder,
+        text: `Final holder (${info.total_passes} pass${info.total_passes !== 1 ? 'es' : ''})`
+      });
+    }
+  }
+
   if (facts.length === 0) {
     container.innerHTML = `<div class="muted">No private facts available</div>`;
     return;
