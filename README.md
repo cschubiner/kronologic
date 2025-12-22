@@ -339,6 +339,43 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S15: World Travelers
+**Mystery**: Three characters are the top travelers, ranked by how many unique rooms they visited.
+
+**Rules**:
+- **1st place** visits ALL rooms (the "greatest world traveler")
+- **2nd place** visits exactly R-1 rooms (misses one room)
+- **3rd place** visits exactly R-2 rooms (misses two rooms)
+- All other characters visit at most R-3 rooms (loose constraint, ties allowed among non-top-3)
+- Requires at least 4 rooms and 3 characters
+
+**Goal**: Deduce who is 1st, 2nd, and 3rd place by analyzing which rooms each character visited.
+
+**Difficulty Factors**:
+- Characters with similar visit counts to the top 3 create red herrings
+- More characters means more suspects to eliminate
+- Larger maps make it harder to track who visited which rooms
+
+---
+
+### S16: Homebodies
+**Mystery**: Each character visited a different number of unique rooms. One character—the homebody—never left their starting room.
+
+**Rules**:
+- Each character visits a **unique** number of rooms: 1, 2, 3, ... up to N (where N = number of characters)
+- The **homebody** visits exactly 1 room and stays there the entire game
+- All other characters **must move every turn** (cannot stay in the same room twice in a row)
+- Requires at least as many rooms as characters
+
+**Goal**: Determine the complete ranking of who visited how many rooms, and identify the homebody.
+
+**Difficulty Factors**:
+- Adjacent visit counts (e.g., 2 vs 3 rooms) require careful tracking
+- More characters create more rankings to deduce
+- The homebody is easy to spot if alone, but harder if others visit their room
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -376,6 +413,8 @@ Enable one scenario:
 - **S12 (Glue Room)**: No configuration needed
 - **S13 (Glue Shoes)**: No configuration needed
 - **S14 (Curse of Amarinta)**: No configuration needed
+- **S15 (World Travelers)**: No configuration needed (requires 4+ rooms, 3+ characters)
+- **S16 (Homebodies)**: No configuration needed (requires rooms ≥ characters)
 
 ### Difficulty Control
 

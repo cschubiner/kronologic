@@ -758,6 +758,12 @@
   Masks --- DanceRoom
   Masks --- MusicRoom
   MusicRoom --- DanceRoom</textarea>
+            <div style="margin-top: 8px;">
+                <button onclick="copyMermaidToClipboard()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
+                    📋 Copy Mermaid Text to Clipboard
+                </button>
+                <span id="copyFeedback" style="margin-left: 10px; color: #059669; font-size: 13px; display: none;">Copied!</span>
+            </div>
             <div class="graph-error" id="graphError"></div>
         </div>
 
@@ -1118,6 +1124,37 @@
                     </div>
                 </details>
 
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S15: World Travelers</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> Three characters are the top travelers, ranked by how many unique rooms they visited.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li><strong>1st place</strong> visits ALL rooms (the "greatest world traveler").</li>
+                            <li><strong>2nd place</strong> visits exactly R-1 rooms (misses one room).</li>
+                            <li><strong>3rd place</strong> visits exactly R-2 rooms (misses two rooms).</li>
+                            <li>All other characters visit at most R-3 rooms.</li>
+                            <li>Requires at least 4 rooms and 3 characters.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Deduce who is 1st, 2nd, and 3rd place by analyzing which rooms each character visited.</p>
+                    </div>
+                </details>
+
+                <details style="margin-bottom: 12px;">
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S16: Homebodies</summary>
+                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
+                        <p><strong>Mystery:</strong> Each character visited a different number of unique rooms. One character—the homebody—never left their starting room.</p>
+                        <p><strong>Rules:</strong></p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li>Each character visits a <strong>unique</strong> number of rooms: 1, 2, 3, ... up to N (where N = number of characters).</li>
+                            <li>The <strong>homebody</strong> visits exactly 1 room and stays there the entire game.</li>
+                            <li>All other characters <strong>must move every turn</strong> (cannot stay in the same room twice in a row).</li>
+                            <li>Requires at least as many rooms as characters.</li>
+                        </ul>
+                        <p><strong>Goal:</strong> Determine the complete ranking of who visited how many rooms, and identify the homebody.</p>
+                    </div>
+                </details>
+
                 <p style="margin-top: 12px; font-size: 12px; color: #6b7280; font-style: italic;">
                     Note: Only ONE scenario is active per puzzle. Use this guide to understand the rules and constraints for the scenario you're solving.
                 </p>
@@ -1329,6 +1366,26 @@
                 localStorage.removeItem(STORAGE_KEY);
                 location.reload();
             }
+        }
+
+        function copyMermaidToClipboard() {
+            const graphInput = document.getElementById('graphInput');
+            const feedback = document.getElementById('copyFeedback');
+
+            navigator.clipboard.writeText(graphInput.value).then(() => {
+                feedback.style.display = 'inline';
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 2000);
+            }).catch(err => {
+                // Fallback for older browsers
+                graphInput.select();
+                document.execCommand('copy');
+                feedback.style.display = 'inline';
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 2000);
+            });
         }
 
         // Available layout algorithms
