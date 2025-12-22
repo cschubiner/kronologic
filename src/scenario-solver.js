@@ -1682,6 +1682,11 @@ export function buildCNF(config) {
         } else {
           clauses.push([-frozenVar, StillFrozen[ci][t - 1]]);
           clauses.push([-frozenVar, -Heal[ci][t - 1]]);
+          clauses.push([
+            -StillFrozen[ci][t - 1],
+            Heal[ci][t - 1],
+            frozenVar,
+          ]);
         }
 
         clauses.push([-healVar, FROZ[ci]]);
@@ -1697,7 +1702,7 @@ export function buildCNF(config) {
 
         if (t < T - 1) {
           for (let ri = 0; ri < R.length; ri++) {
-            clauses.push([frozenVar, -X(ci, t, ri), X(ci, t + 1, ri)]);
+            clauses.push([-frozenVar, -X(ci, t, ri), X(ci, t + 1, ri)]);
           }
         }
       }
