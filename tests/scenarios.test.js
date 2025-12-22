@@ -1088,9 +1088,14 @@ describe("S3: Singer's Jewels Scenario", () => {
 
     const info = res.priv.singers_jewels;
     expect(info.jewel_room).toBe("Atrium"); // alphabetically first
-    expect(info.first_thief).toBeTruthy();
-    expect(info.first_thief_time).toBeGreaterThanOrEqual(1);
-    expect(info.final_holder).toBeTruthy();
+    if (info.first_thief) {
+      expect(info.first_thief_time).toBeGreaterThanOrEqual(1);
+      expect(info.final_holder).toBeTruthy();
+    } else {
+      expect(info.first_thief_time).toBeNull();
+      expect(info.passing_chain.length).toBe(0);
+      expect(info.final_holder).toBeNull();
+    }
   });
 
   it("should track jewel passing when holder meets exactly one person", () => {
@@ -1116,14 +1121,17 @@ describe("S3: Singer's Jewels Scenario", () => {
     const info = res.priv.singers_jewels;
     expect(info.passing_chain).toBeTruthy();
     expect(Array.isArray(info.passing_chain)).toBe(true);
-    expect(info.passing_chain.length).toBeGreaterThanOrEqual(1); // at least the pickup
 
-    // First event should be a pickup
-    expect(info.passing_chain[0].event).toBe("pickup");
-    expect(info.passing_chain[0].holder).toBe(info.first_thief);
+    if (info.first_thief) {
+      expect(info.passing_chain.length).toBeGreaterThanOrEqual(1); // at least the pickup
+      expect(info.passing_chain[0].event).toBe("pickup");
+      expect(info.passing_chain[0].holder).toBe(info.first_thief);
+    } else {
+      expect(info.passing_chain.length).toBe(0);
+    }
   });
 
-  it("should correctly identify first thief as alphabetically first visitor at earliest time", () => {
+  it("should correctly identify first thief as first solo visitor to the jewel room", () => {
     const cfg = {
       rooms: ["Zoo", "Alpha"],
       edges: [["Alpha", "Zoo"]],
@@ -1142,20 +1150,20 @@ describe("S3: Singer's Jewels Scenario", () => {
     const info = res.priv.singers_jewels;
     expect(info.jewel_room).toBe("Alpha");
 
-    // Find who actually visited Alpha first
-    let firstVisitorTime = null;
-    let visitorsAtFirstTime = [];
+    // Find who is first alone in Alpha
+    let firstSoloVisitorTime = null;
+    let firstSoloVisitor = null;
     for (let t = 0; t < cfg.T; t++) {
       const visitors = cfg.chars.filter(ch => res.schedule[ch][t] === "Alpha");
-      if (visitors.length > 0) {
-        firstVisitorTime = t + 1;
-        visitorsAtFirstTime = visitors.sort();
+      if (visitors.length === 1) {
+        firstSoloVisitorTime = t + 1;
+        firstSoloVisitor = visitors[0];
         break;
       }
     }
 
-    expect(info.first_thief_time).toBe(firstVisitorTime);
-    expect(info.first_thief).toBe(visitorsAtFirstTime[0]);
+    expect(info.first_thief_time).toBe(firstSoloVisitorTime);
+    expect(info.first_thief).toBe(firstSoloVisitor);
   });
 
   it("should have final holder be first thief if no passes occur", () => {
