@@ -391,6 +391,32 @@ Players must deduce the secret scenario by combining:
 - More characters = more possible trios to consider (C choose 3)
 - Movement patterns may reveal the trio based on where they converge
 
+### S18: Heavy Sofa
+**Mystery**: A heavy sofa needs to be transported from one room to the alphabetically first room. The sofa is so heavy that it requires exactly two people to carry it, and they must be alone together to pick it up.
+
+**Rules**:
+- Two specific characters are the designated carriers
+- The sofa starts in a non-destination room
+- **Pickup**: Both carriers must be alone together (exactly 2 people) in the sofa's room to pick it up
+- **Before pickup**: Sofa stays in place; carriers can be anywhere (separate or together)
+- **During transport**: Carriers must stay together and move the sofa to an adjacent room each timestep
+- The sofa arrives at the alphabetically first room exactly at the final timestep
+- Requires at least 2 rooms and 2 characters
+
+**Goal**: Identify the two carriers, where the sofa started, and the path it took.
+
+**Private Info**:
+- The two carriers
+- Starting room
+- Pickup time
+- Journey/path taken
+
+**Difficulty Factors**:
+- Longer journey = harder puzzle
+- Later pickup = more pre-pickup noise to analyze
+- More characters = more possible carrier pairs
+- More rooms = more possible starting locations
+
 ---
 
 ## Using the Generator
@@ -433,6 +459,7 @@ Enable one scenario:
 - **S15 (World Travelers)**: No configuration needed (requires 4+ rooms, 3+ characters)
 - **S16 (Homebodies)**: No configuration needed (requires rooms ≥ characters)
 - **S17 (Triple Alibi)**: No configuration needed (requires at least 3 characters)
+- **S18 (Heavy Sofa)**: No configuration needed (requires at least 2 rooms and 2 characters)
 
 ### Difficulty Control
 

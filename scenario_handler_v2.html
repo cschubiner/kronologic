@@ -670,7 +670,8 @@ const SCENARIOS = [
   { id: 's14', name: 'Curse of Amarinta', desc: 'Trace the original curse carrier.' },
   { id: 's15', name: 'World Travelers', desc: 'Rank top 3 travelers by rooms visited.' },
   { id: 's16', name: 'Homebodies', desc: 'Each character visits a unique number of rooms.' },
-  { id: 's17', name: 'Triple Alibi', desc: 'Which three characters always meet together?' }
+  { id: 's17', name: 'Triple Alibi', desc: 'Which three characters always meet together?' },
+  { id: 's18', name: 'Heavy Sofa', desc: 'Who carried the sofa and where did it start?' }
 ];
 
 /* ===========================
@@ -883,6 +884,25 @@ function renderPrivateFacts(res, cfg) {
     facts.push({
       type: 'trio',
       text: `Trio met ${info.total_meetings} time(s): ${meetingsStr || 'none'}`
+    });
+  }
+
+  if (res.priv.heavy_sofa) {
+    const info = res.priv.heavy_sofa;
+    for (const ch of info.carriers) {
+      facts.push({
+        type: 'sofa',
+        char: ch,
+        text: `Sofa carrier`
+      });
+    }
+    facts.push({
+      type: 'sofa',
+      text: `Sofa started in ${info.start_room}, picked up at t=${info.pickup_time}`
+    });
+    facts.push({
+      type: 'sofa',
+      text: `Path: ${info.path.join(' → ')}`
     });
   }
 

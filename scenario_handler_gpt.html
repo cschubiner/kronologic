@@ -161,6 +161,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s17" value="s17" /> S17: Triple Alibi (identify the trio that meets together)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s18" value="s18" /> S18: Heavy Sofa (identify carriers and sofa's journey)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -486,6 +489,14 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       .join(', ');
     pf.push(
       `Triple Alibi: trio <b>${info.trio.join(', ')}</b>; met ${info.total_meetings} time(s) at: ${meetingsStr || 'none'}`,
+    );
+  }
+  if (res.priv.heavy_sofa) {
+    const info = res.priv.heavy_sofa;
+    pf.push(
+      `Heavy Sofa: carriers <b>${info.carriers.join(' & ')}</b>; ` +
+      `started in <b>${info.start_room}</b>; picked up at t=${info.pickup_time}; ` +
+      `path: ${info.path.join(' → ')}`,
     );
   }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);

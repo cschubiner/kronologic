@@ -68,6 +68,10 @@ export function scoreScenario(res, cfg) {
     scores.tripleAlibi = scoreTripleAlibi(res, cfg);
     score += scores.tripleAlibi;
   }
+  if (cfg.scenarios.s18 && res.priv.heavy_sofa) {
+    scores.heavySofa = scoreHeavySofa(res, cfg);
+    score += scores.heavySofa;
+  }
   return { total: score, breakdown: scores };
 }
 
@@ -424,6 +428,29 @@ function scoreTripleAlibi(res, cfg) {
 
   // More rooms = more places to check
   score += cfg.rooms.length * 5;
+
+  return score;
+}
+
+function scoreHeavySofa(res, cfg) {
+  const info = res.priv.heavy_sofa;
+  if (!info) return 0;
+
+  let score = 0;
+
+  // Longer journey = harder puzzle
+  score += info.path.length * 30;
+
+  // Later pickup = more pre-pickup noise
+  score += (info.pickup_time || 1) * 20;
+
+  // More characters = more potential carrier pairs
+  const numChars = cfg.chars.length;
+  const numPossiblePairs = (numChars * (numChars - 1)) / 2;
+  score += numPossiblePairs * 15;
+
+  // More rooms = more possible start locations
+  score += cfg.rooms.length * 10;
 
   return score;
 }

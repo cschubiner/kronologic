@@ -1917,6 +1917,131 @@ export function buildCNF(config) {
     privKeys.A2 = A2;
   }
 
+  // S18: Heavy Sofa — two carriers must move sofa from start room to alphabetically first room
+  if (config.scenarios && config.scenarios.s18) {
+    if (R.length < 2) throw new Error("S18 requires at least 2 rooms");
+    if (C.length < 2) throw new Error("S18 requires at least 2 characters");
+
+    const rng = mulberry32(resolvedSeed);
+
+    // Destination is alphabetically first room
+    const destRoom = [...R].sort()[0];
+    const destIdx = Ridx.get(destRoom);
+
+    // Pick a random start room (not the destination)
+    const nonDestRooms = R.filter((r) => r !== destRoom);
+    const startRoom = nonDestRooms[Math.floor(rng() * nonDestRooms.length)];
+    const startIdx = Ridx.get(startRoom);
+
+    // Pick two random carriers
+    const shuffled = [...C];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const carrier1 = shuffled[0];
+    const carrier2 = shuffled[1];
+    const c1Idx = C.indexOf(carrier1);
+    const c2Idx = C.indexOf(carrier2);
+
+    // SOFA(t, ri): sofa is in room R[ri] at time t
+    const SOFA = (t, ri) => vp.get(`S18_SOFA_${t}_${R[ri]}`);
+
+    // CARRYING(t): sofa is being carried at time t
+    const CARRYING = (t) => vp.get(`S18_CARRYING_${t}`);
+
+    // Sofa is in exactly one room at each timestep
+    for (let t = 0; t < T; t++) {
+      const sofaVars = R.map((_, ri) => SOFA(t, ri));
+      clauses.push(...exactlyOne(sofaVars));
+    }
+
+    // Sofa starts in startRoom at t=0
+    clauses.push([SOFA(0, startIdx)]);
+
+    // Sofa ends in destRoom at t=T-1
+    clauses.push([SOFA(T - 1, destIdx)]);
+
+    // CARRYING state: once true, stays true (monotonic)
+    // CARRYING(t) => CARRYING(t+1)
+    for (let t = 0; t < T - 1; t++) {
+      clauses.push([-CARRYING(t), CARRYING(t + 1)]);
+    }
+
+    // Must be carrying at final timestep (to have delivered)
+    clauses.push([CARRYING(T - 1)]);
+
+    // When CARRYING: both carriers must be with sofa
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        // CARRYING(t) AND SOFA(t, ri) => X(c1, t, ri)
+        clauses.push([-CARRYING(t), -SOFA(t, ri), X(c1Idx, t, ri)]);
+        // CARRYING(t) AND SOFA(t, ri) => X(c2, t, ri)
+        clauses.push([-CARRYING(t), -SOFA(t, ri), X(c2Idx, t, ri)]);
+      }
+    }
+
+    // When CARRYING: carriers must be together (same room)
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        // CARRYING(t) AND X(c1, t, ri) => X(c2, t, ri)
+        clauses.push([-CARRYING(t), -X(c1Idx, t, ri), X(c2Idx, t, ri)]);
+        // CARRYING(t) AND X(c2, t, ri) => X(c1, t, ri)
+        clauses.push([-CARRYING(t), -X(c2Idx, t, ri), X(c1Idx, t, ri)]);
+      }
+    }
+
+    // When CARRYING: sofa MUST move to adjacent room (cannot stay)
+    for (let t = 0; t < T - 1; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        // CARRYING(t) AND SOFA(t, ri) => NOT SOFA(t+1, ri)
+        clauses.push([-CARRYING(t), -SOFA(t, ri), -SOFA(t + 1, ri)]);
+
+        // CARRYING(t) AND SOFA(t, ri) => SOFA(t+1, adjacent)
+        const adjacentRooms = nbr[ri];
+        if (adjacentRooms.length > 0) {
+          const nextOptions = adjacentRooms.map((rj) => SOFA(t + 1, rj));
+          clauses.push([-CARRYING(t), -SOFA(t, ri), ...nextOptions]);
+        }
+      }
+    }
+
+    // When NOT CARRYING: sofa stays in place
+    for (let t = 0; t < T - 1; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        // NOT CARRYING(t) AND SOFA(t, ri) => SOFA(t+1, ri)
+        clauses.push([CARRYING(t), -SOFA(t, ri), SOFA(t + 1, ri)]);
+      }
+    }
+
+    // Pickup condition: CARRYING starts when both carriers are alone with sofa
+    // At pickup: exactly carriers in sofa's room (no one else)
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        // If pickup at t in room ri: no other characters present
+        for (let ci = 0; ci < C.length; ci++) {
+          if (ci === c1Idx || ci === c2Idx) continue;
+          // Pickup at t means: NOT CARRYING(t-1) AND CARRYING(t)
+          // When this happens and SOFA(t, ri), other chars can't be there
+          if (t === 0) {
+            // Special case: if carrying at t=0, pickup is at t=0
+            clauses.push([-CARRYING(0), -SOFA(0, ri), -X(ci, 0, ri)]);
+          } else {
+            // CARRYING(t-1) OR NOT CARRYING(t) OR NOT SOFA(t, ri) OR NOT X(ci, t, ri)
+            clauses.push([
+              CARRYING(t - 1),
+              -CARRYING(t),
+              -SOFA(t, ri),
+              -X(ci, t, ri),
+            ]);
+          }
+        }
+      }
+    }
+
+    privKeys.S18 = { carrier1, carrier2, startRoom, destRoom };
+  }
+
   return { vp, clauses, privKeys };
 }
 
@@ -2393,6 +2518,57 @@ export function solveAndDecode(cfg) {
       three_person_rooms: threePersonRooms,
       exclusive_trio_meetings: exclusiveTrioMeetings,
       exclusive_trio_count: exclusiveTrioMeetings.length,
+    };
+  }
+
+  // S18: Heavy Sofa decoding
+  if (privKeys.S18) {
+    const { carrier1, carrier2, startRoom, destRoom } = privKeys.S18;
+
+    // Decode sofa position at each timestep from SAT solution
+    const sofaPositions = [];
+    for (let t = 0; t < T; t++) {
+      for (const room of R) {
+        if (val(`S18_SOFA_${t}_${room}`)) {
+          sofaPositions.push(room);
+          break;
+        }
+      }
+    }
+
+    // Decode carrying state at each timestep
+    const carryingStates = [];
+    for (let t = 0; t < T; t++) {
+      carryingStates.push(val(`S18_CARRYING_${t}`));
+    }
+
+    // Find pickup time (first timestep where CARRYING is true)
+    let pickupTime = null;
+    for (let t = 0; t < T; t++) {
+      if (carryingStates[t]) {
+        pickupTime = t + 1; // 1-indexed
+        break;
+      }
+    }
+
+    // Build journey from sofa positions (only during carrying)
+    const journey = [];
+    let lastRoom = null;
+    for (let t = 0; t < T; t++) {
+      const room = sofaPositions[t];
+      if (room !== lastRoom) {
+        journey.push({ time: t + 1, room: room });
+        lastRoom = room;
+      }
+    }
+
+    priv.heavy_sofa = {
+      carriers: [carrier1, carrier2].sort(),
+      start_room: startRoom,
+      destination: destRoom,
+      pickup_time: pickupTime,
+      journey: journey,
+      path: journey.map((j) => j.room),
     };
   }
 

@@ -4620,3 +4620,249 @@ describe("S17: Triple Alibi", () => {
     });
   });
 });
+
+describe("S18: Heavy Sofa", () => {
+  it("should have sofa end in alphabetically first room at final timestep", () => {
+    const cfg = {
+      rooms: ["Alpha", "Beta", "Gamma"],
+      edges: [
+        ["Alpha", "Beta"],
+        ["Beta", "Gamma"],
+        ["Alpha", "Gamma"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1800,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      expect(hs).toBeTruthy();
+      expect(hs.destination).toBe("Alpha");
+      // The path should end at the destination
+      expect(hs.path[hs.path.length - 1]).toBe("Alpha");
+    });
+  });
+
+  it("should have carriers together during transport", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1801,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      const schedule = res.schedule;
+      const [c1, c2] = hs.carriers;
+
+      // From pickup time onwards, carriers must be in same room
+      for (let t = hs.pickup_time - 1; t < cfg.T; t++) {
+        expect(schedule[c1][t]).toBe(schedule[c2][t]);
+      }
+    });
+  });
+
+  it("should allow carriers to be separate before pickup", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1802,
+    };
+
+    // This test verifies pickup can happen at various times
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      expect(hs.pickup_time).toBeGreaterThanOrEqual(1);
+      expect(hs.pickup_time).toBeLessThanOrEqual(cfg.T);
+    });
+  });
+
+  it("should have sofa stay in place before pickup", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["X", "Y"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1803,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      // Before pickup, all journey entries should show same room (start room)
+      const prePickupJourney = hs.journey.filter((j) => j.time < hs.pickup_time);
+      if (prePickupJourney.length > 0) {
+        // Should all be the start room
+        prePickupJourney.forEach((j) => {
+          expect(j.room).toBe(hs.start_room);
+        });
+      }
+    });
+  });
+
+  it("should move sofa every turn during transport", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1804,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      // During carrying, sofa must change rooms each timestep
+      // The journey entries during transport should show a different room each time
+      const transportJourney = hs.journey.filter((j) => j.time >= hs.pickup_time);
+      // Each entry represents a room change, so consecutive entries should differ
+      for (let i = 1; i < transportJourney.length; i++) {
+        expect(transportJourney[i].room).not.toBe(transportJourney[i - 1].room);
+      }
+    });
+  });
+
+  it("should require carriers alone at pickup", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1805,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      const schedule = res.schedule;
+      const pickupT = hs.pickup_time - 1; // 0-indexed
+      const [c1, c2] = hs.carriers;
+
+      // Find the sofa's room at pickup time
+      const journeyAtPickup = hs.journey.find((j) => j.time === hs.pickup_time);
+      const sofaRoom = journeyAtPickup ? journeyAtPickup.room : hs.start_room;
+
+      // Both carriers should be in sofa's room
+      expect(schedule[c1][pickupT]).toBe(sofaRoom);
+      expect(schedule[c2][pickupT]).toBe(sofaRoom);
+
+      // No other characters should be there
+      const others = cfg.chars.filter((c) => !hs.carriers.includes(c));
+      for (const other of others) {
+        expect(schedule[other][pickupT]).not.toBe(sofaRoom);
+      }
+    });
+  });
+
+  it("should track journey correctly", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["P", "Q"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1806,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+
+      // Journey should start with start_room
+      expect(hs.journey[0].room).toBe(hs.start_room);
+
+      // Journey should end with destination
+      expect(hs.path[hs.path.length - 1]).toBe(hs.destination);
+
+      // Path should match journey rooms
+      expect(hs.path).toEqual(hs.journey.map((j) => j.room));
+    });
+  });
+
+  it("should reject configs with fewer than 2 rooms", () => {
+    const cfg = {
+      rooms: ["A"],
+      edges: [],
+      chars: ["X", "Y"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1807,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow("S18 requires at least 2 rooms");
+  });
+
+  it("should reject configs with fewer than 2 characters", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1808,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S18 requires at least 2 characters"
+    );
+  });
+});
