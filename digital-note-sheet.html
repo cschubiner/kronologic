@@ -809,354 +809,38 @@
         <div class="tracking-section">
             <h2>Scenario Reference Guide</h2>
             <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 13px; line-height: 1.6;">
+                <p style="margin: 0 0 12px 0;">
+                    <strong>Full scenario documentation is available in the
+                    <a href="https://github.com/cschubiner/kronologic#scenarios" target="_blank" rel="noopener" style="color: #2563eb; text-decoration: underline;">README on GitHub</a>.</strong>
+                </p>
+                <p style="margin: 0 0 12px 0; color: #4b5563;">
+                    The README includes complete rules, goals, and difficulty factors for all scenarios (S1-S16).
+                </p>
                 <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S1: Poison (Assassin)</summary>
+                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">Quick Scenario Summary (click to expand)</summary>
                     <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One character poisoned someone at a specific time and location.</p>
-                        <p><strong>Rules:</strong></p>
                         <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>The assassin is always the <strong>first character</strong> in your character list</li>
-                            <li>Exactly one victim (not the assassin) was poisoned</li>
-                            <li>At exactly one (time, room) pair (the "poison moment"):
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>The assassin and victim are both present</li>
-                                    <li>NO other characters are present (exactly 2 people total)</li>
-                                </ul>
-                            </li>
-                            <li>At ALL other (time, room) pairs where the assassin is present:
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Either the assassin is completely alone (1 person), OR</li>
-                                    <li>At least 2 other people are present with the assassin (3+ people total)</li>
-                                    <li>The assassin is NEVER alone with exactly one other person except at the poison moment</li>
-                                </ul>
-                            </li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify the victim, poison time, and poison room.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S2: Phantom</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One character was mysteriously alone at every single timestep.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Exactly one character is the phantom</li>
-                            <li>At EVERY timestep (t=1, t=2, ..., t=T):
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>The phantom is in some room</li>
-                                    <li>NO other character is in the same room as the phantom</li>
-                                    <li>The phantom is completely isolated at that timestep</li>
-                                </ul>
-                            </li>
-                            <li>All non-phantom characters must share a room with at least one other character at some point during the timeline</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify which character is the phantom.</p>
-                        <p><strong>Difficulty Factors:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Non-phantoms who are alone in at least <em>T−2</em> timesteps add 100 × their alone proportion to the difficulty score</li>
-                            <li>Non-phantoms who are alone at least half the time add 50 × their alone proportion, creating “almost phantom” red herrings</li>
+                            <li><strong>S1: Poison</strong> — Find the assassin, victim, time, and room of a poisoning</li>
+                            <li><strong>S2: Phantom</strong> — Identify who was alone at every timestep</li>
+                            <li><strong>S3: Singer's Jewels</strong> — Track the necklace through 1-on-1 handoffs</li>
+                            <li><strong>S4: Bomb Duo</strong> — Find the only pair ever alone together</li>
+                            <li><strong>S5: Lovers</strong> — Find the two characters who never meet</li>
+                            <li><strong>S6: Phantom + Lovers</strong> — Combines S2 and S5</li>
+                            <li><strong>S7: Aggrosassin</strong> — Serial killer who claims all 1-on-1 victims</li>
+                            <li><strong>S8: The Freeze</strong> — Mr. Freeze freezes victims in place</li>
+                            <li><strong>S9: Doctor's Cure</strong> — Doctor thaws frozen victims mid-game</li>
+                            <li><strong>S10: Contagion</strong> — Infection spreads from the first room</li>
+                            <li><strong>S11: The Vault</strong> — Only the key holder can enter the locked room</li>
+                            <li><strong>S12: Glue Room</strong> — Sticky room forces 2-turn visits</li>
+                            <li><strong>S13: Glue Shoes</strong> — Carrier makes co-occupants stay extra</li>
+                            <li><strong>S14: Curse of Amarinta</strong> — Trace the original curse carrier from time 6</li>
+                            <li><strong>S15: World Travelers</strong> — Rank top 3 by unique rooms visited</li>
+                            <li><strong>S16: Homebodies</strong> — Each character visits a unique number of rooms</li>
                         </ul>
                     </div>
                 </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S4: Bomb Duo</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> Two accomplices are planning something suspicious.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Exactly two characters are the bombers (A1 and A2)</li>
-                            <li>The bombers are distinct (A1 ≠ A2)</li>
-                            <li>They must be alone together (exactly those two, no one else) in at least one room/time</li>
-                            <li><strong>Critical constraint:</strong> For ANY (time, room) pair, if exactly 2 characters are present in that room at that time, those 2 characters MUST be the bombers</li>
-                            <li>Equivalently: The bombers are the ONLY pair who can ever be alone together</li>
-                            <li>Other character groupings are allowed:
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>1 person (anyone can be alone, including bombers)</li>
-                                    <li>3+ people (any combination, including with or without bombers)</li>
-                                </ul>
-                            </li>
-                            <li>But exactly 2 people in a room is ONLY allowed if those 2 are the bombers</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify the two bombers.</p>
-                        <p><strong>Difficulty Factors:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Each timestep where both bombers share a room with anyone else adds 40 points (camouflage moments)</li>
-                            <li>Every room-time with exactly three occupants adds 30 points (near-miss groups that mimic suspicious pairs)</li>
-                        </ul>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S5: Lovers</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> Two characters are secret lovers who never meet.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Exactly two characters are the lovers (L1 and L2)</li>
-                            <li>The lovers are distinct (L1 ≠ L2)</li>
-                            <li>The lovers NEVER share a room at any timestep:
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>For ALL (time, room) pairs: L1 and L2 are never both present</li>
-                                </ul>
-                            </li>
-                            <li><strong>Every pair of non-lovers must meet at least once:</strong>
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>For any two characters who are NOT both lovers, they must share a room at some (time, room) pair</li>
-                                    <li>This ensures all non-lovers encounter each other at least once</li>
-                                    <li>The lovers themselves never meet each other</li>
-                                </ul>
-                            </li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify the two lovers.</p>
-                        <p><strong>Difficulty Factors:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Each non-lover pair that never meets adds 100 points to the difficulty score</li>
-                            <li>Pairs that meet exactly once add 80 points; pairs that meet only twice add 40 points</li>
-                            <li>Rare meetings create strong red herrings that obscure who the real lovers are</li>
-                        </ul>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S6: Phantom + Lovers</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One character is a phantom (alone at every timestep) AND there are two lovers who never meet.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Combines S2 (Phantom) and S5 (Lovers) constraints</li>
-                            <li>Exactly one character is the phantom:
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>At EVERY timestep, the phantom is alone in their room</li>
-                                    <li>NO other character shares a room with the phantom at any time</li>
-                                    <li>The phantom is in their own category - neither a lover nor a non-lover</li>
-                                </ul>
-                            </li>
-                            <li>Exactly two characters are the lovers (L1 and L2):
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>The lovers NEVER share a room at any timestep</li>
-                                    <li>The lovers are distinct from the phantom</li>
-                                    <li><strong>Neither lover can be the phantom</strong> (phantom is always alone, so can't have a relationship)</li>
-                                </ul>
-                            </li>
-                            <li><strong>Every pair of non-phantom, non-lovers must meet at least once:</strong>
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>For any two characters who are NOT lovers AND NOT the phantom, they must share a room at some point</li>
-                                    <li>This ensures all "regular" characters encounter each other</li>
-                                    <li>The phantom is excluded from this requirement (they never meet anyone)</li>
-                                </ul>
-                            </li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify the phantom and the two lovers.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S7: Aggrosassin</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One character is a serial poisoner who kills everyone they meet one-on-one.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ol style="margin: 8px 0; padding-left: 20px;">
-                            <li><strong>Exactly one aggrosassin</strong> exists (can be any character, not necessarily the first)</li>
-                            <li><strong>Minimum kill frequency:</strong> The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least <strong>⌈T/2⌉ timesteps</strong>
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps</li>
-                                    <li>This ensures the aggrosassin is actively hunting throughout the timeline</li>
-                                </ul>
-                            </li>
-                            <li><strong>Exclusive two-person meetings:</strong> Any room with exactly two people must include the aggrosassin
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Non-aggrosassin characters can be alone by themselves or in groups of 3+, but never alone together</li>
-                                    <li>Every 1-on-1 encounter therefore marks a confirmed kill</li>
-                                </ul>
-                            </li>
-                            <li><strong>Victims:</strong> The aggrosassin kills everyone they meet 1-on-1
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Victims = all characters who were alone with the aggrosassin at any timestep</li>
-                                    <li>A character can be alone with the aggrosassin multiple times (still counts as one victim)</li>
-                                </ul>
-                            </li>
-                            <li><strong>Flexibility otherwise:</strong> The aggrosassin can travel alone, meet victims repeatedly, or hide inside larger groups between kills
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Repeated meetings with the same victim are allowed</li>
-                                </ul>
-                            </li>
-                        </ol>
-                        <p><strong>Goal:</strong> Identify the aggrosassin and determine how many victims they claimed.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S8: The Freeze</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> Mr. Freeze is on the loose. Anyone they catch alone is frozen in place for the rest of the timeline.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li><strong>Exactly one character is the Freeze</strong> (randomly chosen from all characters)</li>
-                            <li>Whenever the Freeze shares a room with exactly <strong>one</strong> other person, that person is frozen</li>
-                            <li>Frozen characters remain in that room for all remaining timesteps (even if <code>mustMove=true</code>)</li>
-                            <li><strong>Randomized kill constraints:</strong> The scenario randomly requires:
-                                <ul style="margin: 4px 0; padding-left: 20px;">
-                                    <li>Between 1-3 kills to occur</li>
-                                    <li>Specific timesteps where kills must happen (excluding the final timestep)</li>
-                                    <li>This creates variety - some scenarios have early kills, others have kills spread throughout</li>
-                                </ul>
-                            </li>
-                            <li>Frozen victims can be visited later, but they never move again</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify Mr. Freeze and list every frozen victim (with their freeze moments).</p>
-                        <p><strong>Difficulty Factors:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>More frozen victims make the pattern more obvious (easier to identify)</li>
-                            <li>1-on-1 meetings between non-Freeze characters act as red herrings and increase difficulty</li>
-                            <li>The randomized kill timing creates unpredictable patterns across different scenarios</li>
-                        </ul>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S10: Contagion</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> The alphabetically first room is contagious. Anyone who steps inside becomes infected, and infections spread to anyone sharing a room with an infected character.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>The contagious room is always the alphabetically earliest room name on the map</li>
-                            <li>Anyone in that room at any timestep becomes infected immediately and stays infected</li>
-                            <li>Whenever an infected character shares a room with others (pairs or groups), everyone in that room becomes infected during that timestep</li>
-                            <li>At least one character must enter the contagious room, so infections are guaranteed to appear</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Work out when each character was first infected and reconstruct the infection order.</p>
-                        <p><strong>Difficulty Factors:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>More infected characters raise difficulty</li>
-                            <li>Infections spread across many different timesteps—especially one new infection per timestep—are the hardest</li>
-                            <li>Big one-step outbreaks are easier to deduce, while slow, staggered spread is trickier</li>
-                        </ul>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S11: The Vault</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> The alphabetically earliest room is The Vault. Only the key holder can unlock it, and anyone entering must be with the key holder.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>The Vault is always the alphabetically first room on the map.</li>
-                            <li>The key holder is randomly chosen among all characters.</li>
-                            <li>No one may enter The Vault without the key holder; any non-holder inside must be accompanied by them.</li>
-                            <li>The key holder must visit The Vault on at least two different timesteps with company, and those visits must include at least two distinct companions.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify the key holder and list everyone who ever entered The Vault.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S3: The Singer's Jewels</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> A prized necklace keeps changing hands, starting with whoever first visits the alphabetically earliest room.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>The alphabetically first room in the map must be visited at least once.</li>
-                            <li>The first person alone in that room becomes the initial thief; any 1-on-1 meeting passes the jewels.</li>
-                            <li>Other movement is unconstrained, making timeline reconstruction key.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Track who entered the key room first and how the jewels could have passed afterward.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S9: Doctor's Cure</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> A doctor thaws victims who started frozen in place.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>One doctor is chosen at random.</li>
-                            <li>At least one character begins frozen during timestep 1.</li>
-                            <li>The doctor must perform a heal mid-game (not first or last timestep) while sharing the room with the victim.</li>
-                            <li>Healed characters must leave their starting room after thawing.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Identify the doctor, note who started frozen, and log each heal's time and room.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S12: Glue Room</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One room is sticky—anyone who enters has to stay an extra turn.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>A glue room is randomly selected from the map.</li>
-                            <li>Entering before the final timestep forces the visitor to remain for one more turn, then leave immediately.</li>
-                            <li>At least one non-final entry is guaranteed so the effect is visible.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Determine which room is glued and when each character first entered it.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S13: Glue Shoes</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> One character's shoes make others stick for an extra turn.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>A glue carrier is randomly chosen from the cast.</li>
-                            <li>Anyone sharing a room with the carrier before the final timestep must remain there for exactly one extra turn and then depart.</li>
-                            <li>The carrier is never stuck by their own glue, and at least one sticking event is enforced.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Find the glue carrier and log when each victim was first stuck with them.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S14: The Curse of Amarinta</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> A supernatural curse leaps to uncursed people when they meet the current carrier.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Exactly one character is cursed at time 1.</li>
-                            <li>When cursed and uncursed characters share a room, everyone there is cursed for that timestep; starting next timestep the curse moves to the formerly uncursed attendees.</li>
-                            <li>If only cursed characters meet, the curse doesn't move.</li>
-                            <li>Players get a snapshot of who is cursed at time 6 and must work backward.</li>
-                            <li>Requires at least six timesteps for the time-6 reveal to matter.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Use the time-6 cursed list and meetings to deduce the original carrier at time 1.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S15: World Travelers</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> Three characters are the top travelers, ranked by how many unique rooms they visited.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li><strong>1st place</strong> visits ALL rooms (the "greatest world traveler").</li>
-                            <li><strong>2nd place</strong> visits exactly R-1 rooms (misses one room).</li>
-                            <li><strong>3rd place</strong> visits exactly R-2 rooms (misses two rooms).</li>
-                            <li>All other characters visit at most R-3 rooms.</li>
-                            <li>Requires at least 4 rooms and 3 characters.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Deduce who is 1st, 2nd, and 3rd place by analyzing which rooms each character visited.</p>
-                    </div>
-                </details>
-
-                <details style="margin-bottom: 12px;">
-                    <summary style="cursor: pointer; font-weight: 600; color: #1a1a1a; padding: 8px 0;">S16: Homebodies</summary>
-                    <div style="padding: 8px 0 0 16px; color: #4b5563;">
-                        <p><strong>Mystery:</strong> Each character visited a different number of unique rooms. One character—the homebody—never left their starting room.</p>
-                        <p><strong>Rules:</strong></p>
-                        <ul style="margin: 8px 0; padding-left: 20px;">
-                            <li>Each character visits a <strong>unique</strong> number of rooms: 1, 2, 3, ... up to N (where N = number of characters).</li>
-                            <li>The <strong>homebody</strong> visits exactly 1 room and stays there the entire game.</li>
-                            <li>All other characters <strong>must move every turn</strong> (cannot stay in the same room twice in a row).</li>
-                            <li>Requires at least as many rooms as characters.</li>
-                        </ul>
-                        <p><strong>Goal:</strong> Determine the complete ranking of who visited how many rooms, and identify the homebody.</p>
-                    </div>
-                </details>
-
                 <p style="margin-top: 12px; font-size: 12px; color: #6b7280; font-style: italic;">
-                    Note: Only ONE scenario is active per puzzle. Use this guide to understand the rules and constraints for the scenario you're solving.
+                    Note: Only ONE scenario is active per puzzle.
                 </p>
             </div>
         </div>

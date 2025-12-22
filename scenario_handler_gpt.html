@@ -440,6 +440,27 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       `Curse of Amarinta: starting carrier <b>${info.origin}</b>; cursed @ t=6: ${finalList}; possible origins from t=6 state: ${possibles}`,
     );
   }
+  if (res.priv.world_travelers) {
+    const info = res.priv.world_travelers;
+    const visitDetails = Object.entries(info.visit_counts)
+      .map(([ch, count]) => `${ch}:${count}`)
+      .join(', ');
+    pf.push(
+      `World Travelers: 1st <b>${info.first}</b> (${info.visit_counts[info.first]} rooms), ` +
+      `2nd <b>${info.second}</b> (${info.visit_counts[info.second]} rooms), ` +
+      `3rd <b>${info.third}</b> (${info.visit_counts[info.third]} rooms); ` +
+      `all visit counts: ${visitDetails}`,
+    );
+  }
+  if (res.priv.homebodies) {
+    const info = res.priv.homebodies;
+    const ranking = info.ranking
+      .map((ch, i) => `${i + 1}. ${ch} (${info.actual_visit_counts[ch]} rooms)`)
+      .join(', ');
+    pf.push(
+      `Homebodies: homebody <b>${info.homebody}</b> (stays in 1 room); ranking: ${ranking}`,
+    );
+  }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);
   qs("privateFacts").innerHTML = pf.join("");
 

@@ -831,6 +831,26 @@ function renderPrivateFacts(res, cfg) {
     facts.push({ type: 'curse', char: info.origin, text: `Origin; Cursed @ t=6: ${info.final_cursed?.join(', ') || 'none'}` });
   }
 
+  if (res.priv.world_travelers) {
+    const info = res.priv.world_travelers;
+    facts.push({ type: 'worldTravelers', char: info.first, text: `1st place (${info.visit_counts[info.first]} rooms)` });
+    facts.push({ type: 'worldTravelers', char: info.second, text: `2nd place (${info.visit_counts[info.second]} rooms)` });
+    facts.push({ type: 'worldTravelers', char: info.third, text: `3rd place (${info.visit_counts[info.third]} rooms)` });
+  }
+
+  if (res.priv.homebodies) {
+    const info = res.priv.homebodies;
+    for (let i = 0; i < info.ranking.length; i++) {
+      const ch = info.ranking[i];
+      const isHomebody = ch === info.homebody;
+      facts.push({
+        type: 'homebodies',
+        char: ch,
+        text: `Rank ${i + 1}: ${info.actual_visit_counts[ch]} room(s)${isHomebody ? ' (homebody)' : ''}`
+      });
+    }
+  }
+
   if (facts.length === 0) {
     container.innerHTML = `<div class="muted">No private facts available</div>`;
     return;
