@@ -494,6 +494,32 @@ export function buildCNF(config) {
       config.scenarios.s12 ||
       config.scenarios.s13)
   );
+
+  let s16Setup = null;
+  if (config.scenarios && config.scenarios.s16) {
+    if (C.length > R.length) {
+      throw new Error("S16 requires at least as many rooms as characters");
+    }
+    if (C.length < 2) {
+      throw new Error("S16 requires at least 2 characters");
+    }
+
+    const rng = mulberry32(resolvedSeed);
+
+    const shuffled = [...C];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const visitCountAssignments = {};
+    for (let i = 0; i < shuffled.length; i++) {
+      visitCountAssignments[shuffled[i]] = i + 1;
+    }
+
+    s16Setup = { visitCountAssignments, homebody: shuffled[0] };
+  }
+
   const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || stickyStay);
 
   // Helper to get variable IDs
@@ -512,7 +538,10 @@ export function buildCNF(config) {
   for (let ci = 0; ci < C.length; ci++) {
     for (let t = 0; t < T - 1; t++) {
       for (let ri = 0; ri < R.length; ri++) {
-        const allowed = nbr[ri];
+        let allowed = nbr[ri];
+        if (s16Setup && C[ci] === s16Setup.homebody && !allowed.includes(ri)) {
+          allowed = [...allowed, ri];
+        }
         const rhs = allowed.map((r2) => X(ci, t + 1, r2));
         clauses.push([-X(ci, t, ri), ...rhs]);
       }
@@ -612,30 +641,10 @@ export function buildCNF(config) {
   // S16: Homebodies — each character visits a unique number of rooms (1, 2, 3, ...)
   // Only the character visiting exactly 1 room may stay in place; all others must move
   if (config.scenarios && config.scenarios.s16) {
-    if (C.length > R.length) {
-      throw new Error("S16 requires at least as many rooms as characters");
+    const { visitCountAssignments, homebody } = s16Setup || {};
+    if (!visitCountAssignments || !homebody) {
+      throw new Error("S16 setup missing visit assignments");
     }
-    if (C.length < 2) {
-      throw new Error("S16 requires at least 2 characters");
-    }
-
-    const rng = mulberry32(resolvedSeed);
-
-    // Shuffle characters to randomly assign visit counts
-    const shuffled = [...C];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    // Assign visit counts: shuffled[0] visits 1 room, shuffled[1] visits 2 rooms, etc.
-    const visitCountAssignments = {};
-    for (let i = 0; i < shuffled.length; i++) {
-      visitCountAssignments[shuffled[i]] = i + 1; // 1, 2, 3, ...
-    }
-
-    // The homebody (visits exactly 1 room) can stay; others must move
-    const homebody = shuffled[0];
 
     // Create "visited" helper variables: V_{char}_{room} = true if char visits room at any time
     const S16V = (ci, ri) => vp.get(`S16_V_${C[ci]}_${R[ri]}`);

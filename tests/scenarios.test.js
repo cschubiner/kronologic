@@ -4071,6 +4071,38 @@ describe("S16: Homebodies", () => {
     });
   });
 
+  it("should allow the homebody to stay even when movement is forced globally", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s16: true },
+      seed: 1609,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const homebodySchedule = res.schedule[hb.homebody];
+      expect(homebodySchedule.every((room) => room === homebodySchedule[0])).toBe(true);
+      for (const ch of cfg.chars) {
+        if (ch === hb.homebody) continue;
+        const schedule = res.schedule[ch];
+        for (let t = 0; t < cfg.T - 1; t++) {
+          expect(schedule[t]).not.toBe(schedule[t + 1]);
+        }
+      }
+    });
+  });
+
   it("should reject configs with more characters than rooms", () => {
     const cfg = {
       rooms: ["A", "B"],
