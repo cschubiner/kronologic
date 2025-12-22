@@ -4451,6 +4451,42 @@ describe("S17: Triple Alibi", () => {
     });
   });
 
+  it("should require an exclusive trio meeting even with extra characters", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["P", "Q", "R", "S", "T"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1707,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      const schedule = res.schedule;
+
+      let foundExclusive = false;
+      for (let t = 0; t < cfg.T && !foundExclusive; t++) {
+        for (const room of cfg.rooms) {
+          const inRoom = cfg.chars.filter((ch) => schedule[ch][t] === room);
+          if (inRoom.length === 3 && ta.trio.every((ch) => inRoom.includes(ch))) {
+            foundExclusive = true;
+            break;
+          }
+        }
+      }
+
+      expect(foundExclusive).toBe(true);
+    });
+  });
+
   it("should forbid non-trio trios from meeting", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
@@ -4599,16 +4635,27 @@ describe("S17: Triple Alibi", () => {
       const ta = res.priv.triple_alibi;
       const schedule = res.schedule;
 
+      const exclusiveFromSchedule = [];
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const inRoom = cfg.chars.filter((ch) => schedule[ch][t] === room);
-          if (ta.trio.every((ch) => inRoom.includes(ch))) {
-            expect(inRoom.length).toBe(3);
+          if (inRoom.length === 3 && ta.trio.every((ch) => inRoom.includes(ch))) {
+            exclusiveFromSchedule.push({
+              time: t + 1,
+              room,
+              attendees: [...inRoom].sort(),
+            });
           }
         }
       }
 
-      expect(ta.total_meetings).toBe(ta.exclusive_trio_count);
+      // Only exclusive trio gatherings should be counted as meetings
+      expect(ta.total_meetings).toBe(exclusiveFromSchedule.length);
+      expect(ta.exclusive_trio_count).toBe(exclusiveFromSchedule.length);
+      for (const meeting of ta.exclusive_trio_meetings) {
+        expect(meeting.attendees.length).toBe(3);
+        expect(new Set(meeting.attendees)).toEqual(new Set(ta.trio));
+      }
     });
   });
 

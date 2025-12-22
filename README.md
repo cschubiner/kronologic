@@ -379,7 +379,7 @@ Players must deduce the secret scenario by combining:
 **Mystery**: Three specific characters have a secret pact—they must meet together as a trio at least once during the night. No other group of exactly three can ever share the same room at the same time.
 
 **Rules**:
-- Three specific characters (the "alibi trio") must meet as a trio at least once
+- Three specific characters (the "alibi trio") must meet as a trio **at least once with no other people present**
 - **No other trio** of exactly 3 characters may occupy the same room at any timestep
 - Pairs (2 people) and groups of 4+ are allowed
 - Requires at least 3 characters

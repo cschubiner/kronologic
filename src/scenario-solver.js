@@ -778,8 +778,8 @@ export function buildCNF(config) {
       .sort((a, b) => a - b)
       .join(",");
 
-    // The special trio must meet at least once
-    // Create helper variable M_t_r = trio meets in room r at time t
+    // The special trio must meet alone at least once (no other characters present)
+    // Create helper variable M_t_r = trio meets alone in room r at time t
     const M = (t, ri) => vp.get(`S17_M_${t}_${ri}`);
     const [ti0, ti1, ti2] = trioIndices;
 
@@ -799,9 +799,6 @@ export function buildCNF(config) {
           if (trioIndices.includes(ci)) continue;
           clauses.push([-M(t, ri), -X(ci, t, ri)]);
         }
-
-        // (X[0] AND X[1] AND X[2]) => M
-        clauses.push([-x0, -x1, -x2, M(t, ri)]);
       }
     }
 
