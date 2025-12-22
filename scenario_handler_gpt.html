@@ -62,6 +62,21 @@
   .answer-private.hidden { filter: blur(8px); user-select: none; }
   .private-toggle { font-size:11px; padding:6px 12px; cursor:pointer; margin-top:8px; display:inline-block; }
   select.pill { padding:6px 10px; }
+  .tv-card { position:relative; overflow:hidden; }
+  .tv-header { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .badge { padding:6px 10px; border-radius:999px; border:1px solid #253244; font-size:12px; }
+  .badge.idle { color:#9fb1c1; }
+  .badge.running { color:#042017; background:#42d392; border-color:#42d392; font-weight:700; }
+  .tv-controls { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin:10px 0 4px; }
+  .tv-control { background:#0e141b; border:1px solid #18222f; border-radius:10px; padding:10px; }
+  .tv-control label { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#9fb1c1; margin-bottom:6px; }
+  .tv-display { background:radial-gradient(circle at 20% 20%, rgba(77,163,255,0.15), transparent 45%), radial-gradient(circle at 80% 40%, rgba(66,211,146,0.15), transparent 50%), #0b1017; border:1px solid #1f2b3b; border-radius:14px; padding:18px; margin-top:8px; min-height:180px; box-shadow:0 20px 60px rgba(0,0,0,0.25) inset; }
+  .tv-label { letter-spacing:1px; text-transform:uppercase; font-size:11px; color:#9fb1c1; }
+  .tv-question { font-size:22px; margin:6px 0; font-weight:700; color:#e6edf3; }
+  .tv-answer-shared { font-size:18px; color:#42d392; margin-bottom:6px; }
+  .tv-answer-private { font-size:15px; color:#9fb1c1; }
+  .tv-timer { font-size:12px; color:#9fb1c1; }
+  .tv-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -283,6 +298,40 @@
       </div>
     </div>
   </section>
+
+  <section class="card tv-card">
+    <div class="tv-header">
+      <div>
+        <h2 style="margin:0;">TV Question Board</h2>
+        <div class="hint tiny">Autoplay questions on a big screen. Shared info always shows; private info appears based on your reveal chance.</div>
+      </div>
+      <span class="badge idle" id="tvStatus">Idle</span>
+    </div>
+
+    <div class="tv-controls">
+      <div class="tv-control">
+        <label for="tvCadence">Question cadence <span id="tvCadenceValue">60s</span></label>
+        <input id="tvCadence" type="range" min="5" max="300" step="5" value="60" />
+      </div>
+      <div class="tv-control">
+        <label for="tvPrivateChance">Reveal private info chance <span id="tvPrivateValue">50%</span></label>
+        <input id="tvPrivateChance" type="range" min="0" max="100" step="1" value="50" />
+      </div>
+    </div>
+
+    <div class="tv-actions">
+      <button class="primary" id="tvToggleBtn">▶ Start autoplay</button>
+      <button class="ghost" id="tvAskNowBtn">Ask immediately</button>
+      <span class="tv-timer" id="tvTimer">Load or generate a scenario to begin.</span>
+    </div>
+
+    <div class="tv-display">
+      <div class="tv-label" id="tvQuestionType">Waiting for scenario…</div>
+      <div class="tv-question" id="tvQuestionText">Generate or load a scenario to start the TV board.</div>
+      <div class="tv-answer-shared" id="tvSharedAnswer">—</div>
+      <div class="tv-answer-private" id="tvPrivateAnswer">Private info currently hidden.</div>
+    </div>
+  </section>
 </div>
 
 <div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder), S12 (Glue Room - sticky room forces two-turn visits), S13 (Glue Shoes - glue carrier makes co-occupants stay an extra turn), S14 (Curse of Amarinta - curse handoffs to deduce the origin).</div>
@@ -314,6 +363,7 @@ import {
    =========================== */
 function qs(id){ return document.getElementById(id); }
 let lastRun = null;
+const tvState = { res: null, cfg: null, timerId: null, tickerId: null, nextAt: null, running: false };
 
 // Start with a blank seed so repeated generations default to fresh randomness
 qs("seed").value = "";
@@ -324,6 +374,18 @@ function syncPercentileDisplay() {
   const pct = clampPercentile(Number(slider.value));
   slider.value = pct;
   if (display) display.textContent = pct.toFixed(1);
+}
+
+function syncTvControls() {
+  const cadenceSlider = qs("tvCadence");
+  const cadenceVal = Math.max(5, Number(cadenceSlider.value) || 60);
+  cadenceSlider.value = cadenceVal;
+  qs("tvCadenceValue").textContent = `${cadenceVal}s`;
+
+  const privSlider = qs("tvPrivateChance");
+  const privVal = clampPercentile(Number(privSlider.value));
+  privSlider.value = privVal;
+  qs("tvPrivateValue").textContent = `${privVal.toFixed(0)}%`;
 }
 
 function wireCopyButtons(encoded) {
@@ -536,6 +598,7 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
   wireCopyButtons(encoded);
 
   setupQuestionInterface(res, cfg);
+  setTvScenario(res, cfg);
 }
 function renderTable(container, obj, headerLeft){
   const el = typeof container==="string"? qs(container) : container;
@@ -566,6 +629,62 @@ function renderTable(container, obj, headerLeft){
   el.innerHTML = html;
 }
 
+function buildLocTimeAnswer(res, chars, location, time) {
+  const charsAtLocation = [];
+  for (const char of chars){
+    if (res.schedule[char][time-1] === location){
+      charsAtLocation.push(char);
+    }
+  }
+
+  let revealedChar = "none";
+  if (charsAtLocation.length > 0) {
+    let hash = time;
+    for (let i = 0; i < location.length; i++) {
+      hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+    }
+    const idx = hash % charsAtLocation.length;
+    revealedChar = charsAtLocation[idx];
+  }
+
+  return {
+    shared: `🟢 Shared: <b>${charsAtLocation.length}</b> character${charsAtLocation.length===1?'':'s'} ${charsAtLocation.length===1?'was':'were'} in ${location} at t=${time}`,
+    private: `⚪ Private: One character present: <b>${revealedChar}</b>`
+  };
+}
+
+function buildLocCharAnswer(res, T, location, character) {
+  const visitCount = res.visits[character][location] || 0;
+  const times = [];
+  for (let t=0; t<T; t++){
+    if (res.schedule[character][t] === location){
+      times.push(t+1);
+    }
+  }
+
+  let revealedTime = "never";
+  if (times.length > 0) {
+    let hash = 0;
+    for (let i = 0; i < location.length; i++) {
+      hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+    }
+    for (let i = 0; i < character.length; i++) {
+      hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
+    }
+    const idx = hash % times.length;
+    revealedTime = `t=${times[idx]}`;
+  }
+
+  return {
+    shared: `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`,
+    private: `⚪ Private: One time visited: <b>${revealedTime}</b>`
+  };
+}
+
+function pickRandom(arr){
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 qs("validateBtn").addEventListener("click", ()=>{
   const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
   const isValid = rooms.length>=2 && edges.length>=1;
@@ -591,6 +710,28 @@ const syncSamplesDisplay = ()=>{
 };
 qs("samples").addEventListener("input", syncSamplesDisplay);
 syncSamplesDisplay();
+
+syncTvControls();
+qs("tvCadence").addEventListener("input", ()=>{
+  syncTvControls();
+  if (tvState.running) scheduleNextTvQuestion();
+});
+qs("tvPrivateChance").addEventListener("input", syncTvControls);
+qs("tvToggleBtn").addEventListener("click", ()=>{
+  if (tvState.running) {
+    stopTvAutoplay("Paused");
+  } else {
+    startTvAutoplay();
+  }
+});
+qs("tvAskNowBtn").addEventListener("click", ()=>{
+  if (!tvState.res || !tvState.cfg) {
+    updateTvStatus("Generate a scenario first", false);
+    return;
+  }
+  askRandomTvQuestion();
+  if (tvState.running) scheduleNextTvQuestion();
+});
 
 qs("genBtn").addEventListener("click", async ()=>{
   const percentile = clampPercentile(Number(qs("percentile").value));
@@ -747,31 +888,10 @@ function setupQuestionInterface(res, cfg){
   qs("askLocTimeSubmit").onclick = ()=>{
     const location = locTimeLocation.value;
     const time = Number(locTimeTime.value);
-    
-    // Count how many characters were in this location at this time
-    const charsAtLocation = [];
-    for (const char of chars){
-      if (res.schedule[char][time-1] === location){
-        charsAtLocation.push(char);
-      }
-    }
-    
-    const count = charsAtLocation.length;
-    
-    // Deterministically pick one character to reveal (based on location + time hash)
-    let revealedChar = "none";
-    if (count > 0) {
-      // Simple hash: sum char codes of location + time
-      let hash = time;
-      for (let i = 0; i < location.length; i++) {
-        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
-      }
-      const idx = hash % charsAtLocation.length;
-      revealedChar = charsAtLocation[idx];
-    }
-    
-    qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} ${count===1?'was':'were'} in ${location} at t=${time}`;
-    qs("locTimePrivate").innerHTML = `⚪ Private: One character present: <b>${revealedChar}</b>`;
+    const { shared, private: privateText } = buildLocTimeAnswer(res, chars, location, time);
+
+    qs("locTimeShared").innerHTML = shared;
+    qs("locTimePrivate").innerHTML = privateText;
     qs("locTimePrivate").classList.add("hidden");
     qs("locTimeToggle").textContent = "👁️ Show";
     qs("locTimeAnswer").style.display = "block";
@@ -794,35 +914,10 @@ function setupQuestionInterface(res, cfg){
   qs("askLocCharSubmit").onclick = ()=>{
     const location = locCharLocation.value;
     const character = locCharChar.value;
-    
-    // Count how many times this character visited this location
-    const visitCount = res.visits[character][location] || 0;
-    
-    // Find which times they visited
-    const times = [];
-    for (let t=0; t<T; t++){
-      if (res.schedule[character][t] === location){
-        times.push(t+1);
-      }
-    }
-    
-    // Deterministically pick one time to reveal (based on location + character hash)
-    let revealedTime = "never";
-    if (times.length > 0) {
-      // Simple hash: sum char codes of location + character
-      let hash = 0;
-      for (let i = 0; i < location.length; i++) {
-        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
-      }
-      for (let i = 0; i < character.length; i++) {
-        hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
-      }
-      const idx = hash % times.length;
-      revealedTime = `t=${times[idx]}`;
-    }
-    
-    qs("locCharShared").innerHTML = `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
-    qs("locCharPrivate").innerHTML = `⚪ Private: One time visited: <b>${revealedTime}</b>`;
+    const { shared, private: privateText } = buildLocCharAnswer(res, T, location, character);
+
+    qs("locCharShared").innerHTML = shared;
+    qs("locCharPrivate").innerHTML = privateText;
     qs("locCharPrivate").classList.add("hidden");
     qs("locCharToggle").textContent = "👁️ Show";
     qs("locCharAnswer").style.display = "block";
@@ -871,6 +966,132 @@ function setupQuestionInterface(res, cfg){
 
   // Default to Location + Time
   qs("askLocTimeBtn").click();
+}
+
+function updateTvStatus(text, running=false){
+  const badge = qs("tvStatus");
+  if (!badge) return;
+  badge.textContent = text;
+  badge.classList.toggle("running", running);
+  badge.classList.toggle("idle", !running);
+}
+
+function updateTvTimerLabel(){
+  const timerEl = qs("tvTimer");
+  if (!timerEl) return;
+  if (!tvState.res) {
+    timerEl.textContent = "Load or generate a scenario to begin.";
+    return;
+  }
+  if (!tvState.running) {
+    timerEl.textContent = "Autoplay paused.";
+    return;
+  }
+  if (!tvState.nextAt) {
+    timerEl.textContent = "Preparing next question...";
+    return;
+  }
+  const remaining = Math.max(0, Math.round((tvState.nextAt - Date.now()) / 1000));
+  timerEl.textContent = `Next question in ${remaining}s`;
+}
+
+function stopTvAutoplay(label = "Idle"){
+  if (tvState.timerId) clearTimeout(tvState.timerId);
+  if (tvState.tickerId) clearInterval(tvState.tickerId);
+  tvState.timerId = null;
+  tvState.tickerId = null;
+  tvState.nextAt = null;
+  tvState.running = false;
+  qs("tvToggleBtn").textContent = "▶ Start autoplay";
+  updateTvStatus(label, false);
+  updateTvTimerLabel();
+}
+
+function renderTvQuestion(question, shared, privateText, revealPrivate, typeLabel){
+  qs("tvQuestionType").textContent = typeLabel;
+  qs("tvQuestionText").innerHTML = question;
+  qs("tvSharedAnswer").innerHTML = shared;
+  const privEl = qs("tvPrivateAnswer");
+  if (revealPrivate) {
+    privEl.innerHTML = privateText;
+    privEl.style.opacity = "1";
+  } else {
+    privEl.innerHTML = "Private info withheld this round.";
+    privEl.style.opacity = "0.75";
+  }
+}
+
+function scheduleNextTvQuestion(){
+  if (!tvState.running) return;
+  syncTvControls();
+  const cadenceMs = Number(qs("tvCadence").value) * 1000;
+  tvState.nextAt = Date.now() + cadenceMs;
+  if (tvState.timerId) clearTimeout(tvState.timerId);
+  tvState.timerId = setTimeout(()=>{
+    askRandomTvQuestion();
+    scheduleNextTvQuestion();
+  }, cadenceMs);
+  if (!tvState.tickerId) {
+    tvState.tickerId = setInterval(updateTvTimerLabel, 1000);
+  }
+  updateTvTimerLabel();
+}
+
+function askRandomTvQuestion(forceReveal = false){
+  if (!tvState.res || !tvState.cfg) {
+    renderTvQuestion("No scenario loaded", "Shared info unavailable", "", false, "TV board");
+    stopTvAutoplay("Idle");
+    return;
+  }
+
+  const { res, cfg } = tvState;
+  const useLocTime = Math.random() < 0.5;
+  let question = "";
+  let shared = "";
+  let privateText = "";
+  if (useLocTime) {
+    const location = pickRandom(cfg.rooms);
+    const time = Math.floor(Math.random() * cfg.T) + 1;
+    ({ shared, private: privateText } = buildLocTimeAnswer(res, cfg.chars, location, time));
+    question = `Who was in <b>${location}</b> at <b>t=${time}</b>?`;
+  } else {
+    const location = pickRandom(cfg.rooms);
+    const character = pickRandom(cfg.chars);
+    ({ shared, private: privateText } = buildLocCharAnswer(res, cfg.T, location, character));
+    question = `How often did <b>${character}</b> visit <b>${location}</b>?`;
+  }
+
+  const revealPct = clampPercentile(Number(qs("tvPrivateChance").value));
+  const revealPrivate = forceReveal || (Math.random() * 100 < revealPct);
+  const typeLabel = useLocTime ? "Location + Time" : "Location + Character";
+
+  renderTvQuestion(question, shared, privateText, revealPrivate, typeLabel);
+  updateTvStatus(revealPrivate ? "Revealed private info" : "Shared info only", tvState.running);
+  updateTvTimerLabel();
+}
+
+function startTvAutoplay(){
+  if (!tvState.res || !tvState.cfg) {
+    updateTvStatus("Generate a scenario first", false);
+    return;
+  }
+  tvState.running = true;
+  qs("tvToggleBtn").textContent = "⏸ Pause autoplay";
+  updateTvStatus("Running", true);
+  askRandomTvQuestion();
+  scheduleNextTvQuestion();
+}
+
+function setTvScenario(res, cfg){
+  const wasRunning = tvState.running;
+  tvState.res = res;
+  tvState.cfg = cfg;
+  stopTvAutoplay(wasRunning ? "Reloaded scenario" : "Idle");
+  if (wasRunning) {
+    startTvAutoplay();
+  } else {
+    renderTvQuestion("Ready to start", "Shared answers will appear here.", "", false, "TV board");
+  }
 }
 
 // Toggle results collapse/expand
@@ -927,6 +1148,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
         edges: decoded.edges
       };
       setupQuestionInterface(decoded, cfg);
+      setTvScenario(decoded, cfg);
     } else {
       qs("status").innerHTML = `<span class="warn">Failed to load scenario from URL</span>`;
     }
