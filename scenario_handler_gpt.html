@@ -62,6 +62,15 @@
   .answer-private.hidden { filter: blur(8px); user-select: none; }
   .private-toggle { font-size:11px; padding:6px 12px; cursor:pointer; margin-top:8px; display:inline-block; }
   select.pill { padding:6px 10px; }
+  .tv-card { display:flex; flex-direction:column; gap:12px; }
+  .tv-now { background:linear-gradient(145deg, #0f1722, #0c111a); border:1px solid #1f2a3a; border-radius:12px; padding:14px; }
+  .tv-question { font-size:18px; font-weight:700; margin:0 0 8px; letter-spacing:.3px; }
+  .tv-answer { font-size:16px; margin:0; }
+  .tv-private { color:#c8d6e5; margin-top:6px; font-size:14px; }
+  .tv-muted { color:#6c7a89; font-size:12px; }
+  .history { display:grid; gap:8px; max-height:240px; overflow-y:auto; padding-right:6px; }
+  .history-item { padding:10px; border-radius:10px; background:#0e141b; border:1px solid #1e2a3a; }
+  .history-item b { color:#d8e6f6; }
 </style>
 </head>
 <body>
@@ -283,6 +292,38 @@
       </div>
     </div>
   </section>
+
+  <section class="card tv-card">
+    <h2>TV Autoplay (Hands-free Questions)</h2>
+    <div class="row">
+      <label>Question cadence (seconds):</label>
+      <input id="autoplayInterval" type="range" min="5" max="180" step="5" value="60" />
+      <span id="autoplayIntervalValue">60s</span>
+    </div>
+    <div class="row">
+      <label>Reveal private info chance:</label>
+      <input id="autoplayReveal" type="range" min="0" max="100" step="5" value="40" />
+      <span id="autoplayRevealValue">40%</span>
+    </div>
+    <div class="row">
+      <button class="primary" id="startAutoplayBtn" disabled>▶ Start autoplay</button>
+      <button class="ghost" id="askOnceBtn" disabled>Ask one now</button>
+      <span class="hint" id="autoplayStatus">Generate a scenario to start.</span>
+    </div>
+    <div class="tv-now">
+      <div class="tv-question" id="autoplayQuestion">No questions yet.</div>
+      <div class="tv-answer" id="autoplayShared"></div>
+      <div class="tv-private" id="autoplayPrivate"></div>
+      <div class="tv-muted" id="autoplayRevealHint">Private info may be revealed automatically.</div>
+    </div>
+    <div>
+      <div class="row" style="margin:0 0 8px 0; align-items:center; justify-content:space-between;">
+        <span class="muted tiny">Recent questions</span>
+        <button class="ghost" id="clearHistoryBtn">Clear history</button>
+      </div>
+      <div class="history" id="autoplayHistory"></div>
+    </div>
+  </section>
 </div>
 
 <div class="footer tiny">SAT core: DPLL + unit propagation (pure JS). Scenarios: S1 (Poison), S2 (Phantom + non-isolation), S3 (Singer's Jewels), S4 (Bomb Duo – only pair allowed alone, and it happens at least once), S5 (Lovers + all non-lovers meet), S6 (Phantom + Lovers), S7 (Aggrosassin - serial poisoner), S8 (The Freeze - victims frozen in place), S9 (Doctor's Cure - thaw frozen victims mid-game), S10 (Contagion - infection chain from the first alphabetical room), S11 (The Vault - alphabetically first room locked to the key holder), S12 (Glue Room - sticky room forces two-turn visits), S13 (Glue Shoes - glue carrier makes co-occupants stay an extra turn), S14 (Curse of Amarinta - curse handoffs to deduce the origin).</div>
@@ -363,6 +404,216 @@ function updateStartingInfoNote(res, cfg) {
     noteEl.textContent = "";
     noteEl.style.display = "none";
   }
+}
+
+const autoplayState = {
+  timer: null,
+  res: null,
+  cfg: null,
+  history: []
+};
+
+function syncAutoplayDisplays() {
+  const interval = qs("autoplayInterval");
+  const intervalVal = qs("autoplayIntervalValue");
+  const reveal = qs("autoplayReveal");
+  const revealVal = qs("autoplayRevealValue");
+
+  if (intervalVal) intervalVal.textContent = `${interval.value}s`;
+  if (revealVal) revealVal.textContent = `${reveal.value}%`;
+}
+
+function getLocTimeAnswer(res, cfg, location, time) {
+  const charsAtLocation = [];
+  for (const char of cfg.chars) {
+    if (res.schedule[char][time - 1] === location) {
+      charsAtLocation.push(char);
+    }
+  }
+
+  const count = charsAtLocation.length;
+
+  let revealedChar = "none";
+  if (count > 0) {
+    let hash = time;
+    for (let i = 0; i < location.length; i++) {
+      hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+    }
+    const idx = hash % charsAtLocation.length;
+    revealedChar = charsAtLocation[idx];
+  }
+
+  return {
+    shared: `🟢 Shared: <b>${count}</b> character${count === 1 ? '' : 's'} ${count === 1 ? 'was' : 'were'} in ${location} at t=${time}`,
+    priv: `⚪ Private: One character present: <b>${revealedChar}</b>`
+  };
+}
+
+function getLocCharAnswer(res, cfg, location, character) {
+  const visitCount = res.visits[character][location] || 0;
+
+  const times = [];
+  for (let t = 0; t < cfg.T; t++) {
+    if (res.schedule[character][t] === location) {
+      times.push(t + 1);
+    }
+  }
+
+  let revealedTime = "never";
+  if (times.length > 0) {
+    let hash = 0;
+    for (let i = 0; i < location.length; i++) {
+      hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
+    }
+    for (let i = 0; i < character.length; i++) {
+      hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
+    }
+    const idx = hash % times.length;
+    revealedTime = `t=${times[idx]}`;
+  }
+
+  return {
+    shared: `🟢 Shared: <b>${visitCount}</b> visit${visitCount === 1 ? '' : 's'} by ${character} to ${location}`,
+    priv: `⚪ Private: One time visited: <b>${revealedTime}</b>`
+  };
+}
+
+function renderAutoplayHistory() {
+  const historyEl = qs("autoplayHistory");
+  if (!historyEl) return;
+
+  if (autoplayState.history.length === 0) {
+    historyEl.innerHTML = `<div class="tv-muted">No questions asked yet.</div>`;
+    return;
+  }
+
+  historyEl.innerHTML = autoplayState.history
+    .map(h => `
+      <div class="history-item">
+        <div class="tv-muted">${h.time}</div>
+        <div><b>${h.prompt}</b></div>
+        <div class="tiny">${h.shared}</div>
+        <div class="tiny">${h.private}</div>
+      </div>
+    `)
+    .join("");
+}
+
+function setAutoplayStatus(text, variant = "") {
+  const statusEl = qs("autoplayStatus");
+  if (!statusEl) return;
+  statusEl.innerHTML = variant === "warn" ? `<span class="warn">${text}</span>` : text;
+}
+
+function updateAutoplayButtons(enabled) {
+  const startBtn = qs("startAutoplayBtn");
+  const askOnceBtn = qs("askOnceBtn");
+  if (startBtn) startBtn.disabled = !enabled;
+  if (askOnceBtn) askOnceBtn.disabled = !enabled;
+}
+
+function updateAutoplaySource(res, cfg) {
+  autoplayState.res = res;
+  autoplayState.cfg = cfg;
+  if (autoplayState.timer) {
+    clearInterval(autoplayState.timer);
+    autoplayState.timer = null;
+    qs("startAutoplayBtn").textContent = "▶ Start autoplay";
+  }
+  setAutoplayStatus("Ready with the current scenario.");
+  updateAutoplayButtons(true);
+}
+
+function pushAutoplayHistory(entry) {
+  autoplayState.history.unshift(entry);
+  if (autoplayState.history.length > 12) autoplayState.history.pop();
+  renderAutoplayHistory();
+}
+
+function pickRandomQuestion(res, cfg) {
+  const type = Math.random() < 0.5 ? "locTime" : "locChar";
+
+  if (type === "locTime") {
+    const location = cfg.rooms[Math.floor(Math.random() * cfg.rooms.length)];
+    const time = Math.floor(Math.random() * cfg.T) + 1;
+    const answers = getLocTimeAnswer(res, cfg, location, time);
+    return {
+      prompt: `Who was in ${location} at t=${time}?`,
+      shared: answers.shared,
+      priv: answers.priv
+    };
+  }
+
+  const location = cfg.rooms[Math.floor(Math.random() * cfg.rooms.length)];
+  const character = cfg.chars[Math.floor(Math.random() * cfg.chars.length)];
+  const answers = getLocCharAnswer(res, cfg, location, character);
+  return {
+    prompt: `When did ${character} visit ${location}?`,
+    shared: answers.shared,
+    priv: answers.priv
+  };
+}
+
+function renderAutoplayQuestion({ prompt, shared, priv, revealed }) {
+  qs("autoplayQuestion").textContent = prompt;
+  qs("autoplayShared").innerHTML = shared;
+  qs("autoplayPrivate").innerHTML = revealed ? priv : "🔒 Private info withheld this round.";
+  qs("autoplayRevealHint").textContent = revealed
+    ? "Private clue was revealed automatically."
+    : "Waiting for the next reveal roll.";
+}
+
+function runAutoplayOnce() {
+  if (!autoplayState.res || !autoplayState.cfg) {
+    setAutoplayStatus("Generate a scenario before starting autoplay.", "warn");
+    updateAutoplayButtons(false);
+    return;
+  }
+
+  const revealChance = Number(qs("autoplayReveal").value);
+  const question = pickRandomQuestion(autoplayState.res, autoplayState.cfg);
+  const revealed = Math.random() * 100 < revealChance;
+
+  renderAutoplayQuestion({ ...question, revealed });
+
+  const now = new Date();
+  pushAutoplayHistory({
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    prompt: question.prompt,
+    shared: question.shared,
+    private: revealed ? question.priv : "(private hidden)"
+  });
+}
+
+function restartAutoplayTimer() {
+  if (!autoplayState.timer) return;
+  clearInterval(autoplayState.timer);
+  const intervalMs = Number(qs("autoplayInterval").value) * 1000;
+  autoplayState.timer = setInterval(runAutoplayOnce, intervalMs);
+}
+
+function startAutoplay() {
+  if (!autoplayState.res || !autoplayState.cfg) {
+    setAutoplayStatus("Generate a scenario before starting autoplay.", "warn");
+    return;
+  }
+
+  const intervalMs = Number(qs("autoplayInterval").value) * 1000;
+  if (autoplayState.timer) clearInterval(autoplayState.timer);
+
+  runAutoplayOnce();
+  autoplayState.timer = setInterval(runAutoplayOnce, intervalMs);
+  qs("startAutoplayBtn").textContent = "⏹ Stop autoplay";
+  setAutoplayStatus(`Asking a new question every ${qs("autoplayInterval").value}s.`);
+}
+
+function stopAutoplay(reason = "Paused.") {
+  if (autoplayState.timer) {
+    clearInterval(autoplayState.timer);
+    autoplayState.timer = null;
+  }
+  qs("startAutoplayBtn").textContent = "▶ Start autoplay";
+  setAutoplayStatus(reason);
 }
 
 function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, solutions, targetIdx, source }) {
@@ -536,6 +787,7 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
   wireCopyButtons(encoded);
 
   setupQuestionInterface(res, cfg);
+  updateAutoplaySource(res, cfg);
 }
 function renderTable(container, obj, headerLeft){
   const el = typeof container==="string"? qs(container) : container;
@@ -591,6 +843,28 @@ const syncSamplesDisplay = ()=>{
 };
 qs("samples").addEventListener("input", syncSamplesDisplay);
 syncSamplesDisplay();
+
+qs("autoplayInterval").addEventListener("input", ()=>{
+  syncAutoplayDisplays();
+  restartAutoplayTimer();
+});
+qs("autoplayReveal").addEventListener("input", ()=>{
+  syncAutoplayDisplays();
+});
+qs("startAutoplayBtn").addEventListener("click", ()=>{
+  if (autoplayState.timer) {
+    stopAutoplay("Paused.");
+  } else {
+    startAutoplay();
+  }
+});
+qs("askOnceBtn").addEventListener("click", runAutoplayOnce);
+qs("clearHistoryBtn").addEventListener("click", ()=>{
+  autoplayState.history = [];
+  renderAutoplayHistory();
+});
+syncAutoplayDisplays();
+renderAutoplayHistory();
 
 qs("genBtn").addEventListener("click", async ()=>{
   const percentile = clampPercentile(Number(qs("percentile").value));
@@ -747,31 +1021,11 @@ function setupQuestionInterface(res, cfg){
   qs("askLocTimeSubmit").onclick = ()=>{
     const location = locTimeLocation.value;
     const time = Number(locTimeTime.value);
-    
-    // Count how many characters were in this location at this time
-    const charsAtLocation = [];
-    for (const char of chars){
-      if (res.schedule[char][time-1] === location){
-        charsAtLocation.push(char);
-      }
-    }
-    
-    const count = charsAtLocation.length;
-    
-    // Deterministically pick one character to reveal (based on location + time hash)
-    let revealedChar = "none";
-    if (count > 0) {
-      // Simple hash: sum char codes of location + time
-      let hash = time;
-      for (let i = 0; i < location.length; i++) {
-        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
-      }
-      const idx = hash % charsAtLocation.length;
-      revealedChar = charsAtLocation[idx];
-    }
-    
-    qs("locTimeShared").innerHTML = `🟢 Shared: <b>${count}</b> character${count===1?'':'s'} ${count===1?'was':'were'} in ${location} at t=${time}`;
-    qs("locTimePrivate").innerHTML = `⚪ Private: One character present: <b>${revealedChar}</b>`;
+
+    const answers = getLocTimeAnswer(res, cfg, location, time);
+
+    qs("locTimeShared").innerHTML = answers.shared;
+    qs("locTimePrivate").innerHTML = answers.priv;
     qs("locTimePrivate").classList.add("hidden");
     qs("locTimeToggle").textContent = "👁️ Show";
     qs("locTimeAnswer").style.display = "block";
@@ -794,35 +1048,11 @@ function setupQuestionInterface(res, cfg){
   qs("askLocCharSubmit").onclick = ()=>{
     const location = locCharLocation.value;
     const character = locCharChar.value;
-    
-    // Count how many times this character visited this location
-    const visitCount = res.visits[character][location] || 0;
-    
-    // Find which times they visited
-    const times = [];
-    for (let t=0; t<T; t++){
-      if (res.schedule[character][t] === location){
-        times.push(t+1);
-      }
-    }
-    
-    // Deterministically pick one time to reveal (based on location + character hash)
-    let revealedTime = "never";
-    if (times.length > 0) {
-      // Simple hash: sum char codes of location + character
-      let hash = 0;
-      for (let i = 0; i < location.length; i++) {
-        hash = (hash * 31 + location.charCodeAt(i)) & 0x7fffffff;
-      }
-      for (let i = 0; i < character.length; i++) {
-        hash = (hash * 31 + character.charCodeAt(i)) & 0x7fffffff;
-      }
-      const idx = hash % times.length;
-      revealedTime = `t=${times[idx]}`;
-    }
-    
-    qs("locCharShared").innerHTML = `🟢 Shared: <b>${visitCount}</b> visit${visitCount===1?'':'s'} by ${character} to ${location}`;
-    qs("locCharPrivate").innerHTML = `⚪ Private: One time visited: <b>${revealedTime}</b>`;
+
+    const answers = getLocCharAnswer(res, cfg, location, character);
+
+    qs("locCharShared").innerHTML = answers.shared;
+    qs("locCharPrivate").innerHTML = answers.priv;
     qs("locCharPrivate").classList.add("hidden");
     qs("locCharToggle").textContent = "👁️ Show";
     qs("locCharAnswer").style.display = "block";
@@ -927,6 +1157,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
         edges: decoded.edges
       };
       setupQuestionInterface(decoded, cfg);
+      updateAutoplaySource(decoded, cfg);
     } else {
       qs("status").innerHTML = `<span class="warn">Failed to load scenario from URL</span>`;
     }
