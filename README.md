@@ -167,20 +167,20 @@ Players must deduce the secret scenario by combining:
 **Rules**:
 1. **Exactly one aggrosassin** exists (can be any character, not necessarily the first)
 
-2. **Minimum kill frequency**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **⌈T/2⌉ timesteps**
-   - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps
-   - This ensures the aggrosassin is actively hunting throughout the timeline
-
+2. **Minimum kill frequency**: The aggrosassin must be in a 1-on-1 meeting (exactly 2 people in a room) for at least **max(2, ⌈T/2⌉)** different timesteps
+   - Example: With T=6, the aggrosassin must have 1-on-1 meetings in at least 3 different timesteps; with T=2, they still need 2 kills
+   - This ensures the aggrosassin is actively hunting throughout the timeline and prevents trivial single-kill timelines
+ 
 3. **Exclusive two-person meetings**: Any room that contains exactly two people must include the aggrosassin
    - Non-aggrosassin characters can be alone or in groups of 3+, but they are never alone together
    - Every 1-on-1 meeting therefore marks a confirmed kill moment for the aggrosassin
 
 4. **Victims**: The aggrosassin kills everyone they meet 1-on-1
    - Victims = all characters who were alone with the aggrosassin at any timestep
-   - A character can be alone with the aggrosassin multiple times (still counts as one victim)
+   - **No repeat kills**: once a character has met the aggrosassin 1-on-1, they cannot be targeted again
 
 5. **Flexibility otherwise**: The aggrosassin can spend other timesteps alone, in pairs with victims, or in larger groups (which help disguise them between kills)
-   - Repeated meetings with the same victim are allowed
+   - Every required kill timestep must involve a **new** victim, so scenarios need enough characters to cover the kill quota
 
 **Goal**: Identify the aggrosassin and determine how many victims they claimed.
 

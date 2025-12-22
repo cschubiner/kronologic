@@ -2448,6 +2448,8 @@ describe("S7: Aggrosassin Scenario", () => {
 
       // Verify victim count matches actual alone-together instances
       const actualVictims = new Set();
+      const victimKillCounts = new Map();
+      let killTimesteps = 0;
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const charsInRoom = cfg.chars.filter(
@@ -2456,11 +2458,25 @@ describe("S7: Aggrosassin Scenario", () => {
           if (charsInRoom.length === 2 && charsInRoom.includes(agg)) {
             const victim = charsInRoom.find((c) => c !== agg);
             actualVictims.add(victim);
+            victimKillCounts.set(
+              victim,
+              (victimKillCounts.get(victim) || 0) + 1,
+            );
+            killTimesteps++;
           }
         }
       }
 
       expect(new Set(victims)).toEqual(actualVictims);
+
+      // Every kill must target a fresh victim
+      for (const [victim, count] of victimKillCounts.entries()) {
+        expect(count).toBe(1);
+      }
+
+      // Kill frequency must align with unique victims
+      expect(killTimesteps).toBe(victims.length);
+      expect(victims.length).toBeGreaterThanOrEqual(Math.ceil(cfg.T / 2));
     });
   });
 
@@ -2473,8 +2489,8 @@ describe("S7: Aggrosassin Scenario", () => {
         ["C", "D"],
         ["D", "A"],
       ],
-      chars: ["P", "Q", "R", "S"],
-      T: 5,
+      chars: ["P", "Q", "R", "S", "T"],
+      T: 6,
       mustMove: true,
       allowStay: false,
       scenarios: { s7: true },
