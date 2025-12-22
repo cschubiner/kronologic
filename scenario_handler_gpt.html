@@ -98,6 +98,7 @@
     <div class="row">
       <label for="seed">Seed:</label>
       <input id="seed" type="text" class="pill" placeholder="(blank = random)" />
+      <button class="ghost" id="clearSeed">Clear</button>
       <button class="ghost" id="validateBtn">Validate Map</button>
     </div>
 
@@ -162,8 +163,11 @@
       <label>Difficulty percentile (0-100):</label>
       <input id="percentile" type="range" min="0" max="100" step="0.1" value="50" />
       <span id="percentileValue">50</span>
+    </div>
+    <div class="row">
       <label>Samples:</label>
-      <input id="samples" type="number" min="10" max="5000" class="pill" value="10" />
+      <input id="samples" type="range" min="10" max="5000" step="10" value="10" />
+      <span id="samplesValue">10</span>
     </div>
     <div class="row">
       <button class="primary" id="genBtn">Generate</button>
@@ -541,14 +545,29 @@ function renderTable(container, obj, headerLeft){
 
 qs("validateBtn").addEventListener("click", ()=>{
   const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
-  const msg = (rooms.length>=2 && edges.length>=1)
+  const isValid = rooms.length>=2 && edges.length>=1;
+  const msg = isValid
     ? `<span class="ok">OK:</span> ${rooms.length} rooms, ${edges.length} doors`
     : `<span class="warn">Need ≥2 rooms and ≥1 door.</span>`;
   qs("status").innerHTML = msg;
+  alert(isValid ? `Valid map with ${rooms.length} rooms and ${edges.length} doors.` : "Map needs at least 2 rooms and 1 door.");
+});
+
+qs("clearSeed").addEventListener("click", ()=>{
+  const seedInput = qs("seed");
+  seedInput.value = "";
+  seedInput.focus();
 });
 
 qs("percentile").addEventListener("input", syncPercentileDisplay);
 syncPercentileDisplay();
+
+const syncSamplesDisplay = ()=>{
+  const val = Number(qs("samples").value) || 0;
+  qs("samplesValue").textContent = val;
+};
+qs("samples").addEventListener("input", syncSamplesDisplay);
+syncSamplesDisplay();
 
 qs("genBtn").addEventListener("click", async ()=>{
   const percentile = clampPercentile(Number(qs("percentile").value));
