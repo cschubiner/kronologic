@@ -4575,4 +4575,46 @@ describe("S17: Triple Alibi", () => {
       expect(ta.total_meetings).toBe(actualMeetings);
     });
   });
+
+  it("should record three-person rooms and exclusive trio meetings", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X", "Y", "Z"],
+      T: 5,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1705,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      const actualThree = [];
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const inRoom = cfg.chars.filter((ch) => res.schedule[ch][t] === room);
+          if (inRoom.length === 3) {
+            actualThree.push({
+              time: t + 1,
+              room,
+              attendees: [...inRoom].sort(),
+            });
+          }
+        }
+      }
+
+      const sortRecords = (records) =>
+        records
+          .map((r) => ({ ...r, attendees: [...r.attendees].sort() }))
+          .sort((a, b) => a.time - b.time || a.room.localeCompare(b.room));
+
+      expect(sortRecords(ta.rooms_with_three)).toEqual(sortRecords(actualThree));
+      expect(sortRecords(ta.exclusive_trio_meetings)).toEqual(
+        sortRecords(
+          actualThree.filter((rec) => ta.trio.every((ch) => rec.attendees.includes(ch))),
+        ),
+      );
+      expect(ta.meetings.length).toBeGreaterThanOrEqual(ta.exclusive_trio_meetings.length);
+    });
+  });
 });
