@@ -818,7 +818,7 @@ describe("S2: Phantom Scenario", () => {
 });
 
 describe("S3: Singer's Jewels Scenario", () => {
-  it("should ensure the alphabetically first room is visited at least once", () => {
+  it("should ensure the alphabetically first room is visited alone at least once", () => {
     const cfg = {
       rooms: ["Library", "Atrium"],
       edges: [["Atrium", "Library"]],
@@ -834,17 +834,17 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(res).not.toBeNull();
 
     const alphabeticFirst = [...cfg.rooms].sort()[0];
-    let visited = false;
-    for (const char of cfg.chars) {
-      for (let t = 0; t < cfg.T; t++) {
-        if (res.schedule[char][t] === alphabeticFirst) {
-          visited = true;
-          break;
-        }
+    let visitedAlone = false;
+    for (let t = 0; t < cfg.T; t++) {
+      const visitors = cfg.chars.filter(
+        (c) => res.schedule[c][t] === alphabeticFirst,
+      );
+      if (visitors.length === 1) {
+        visitedAlone = true;
+        break;
       }
-      if (visited) break;
     }
-    expect(visited).toBe(true);
+    expect(visitedAlone).toBe(true);
   });
 
   it("should work with mustMove constraint using alphabetic room", () => {
@@ -1123,7 +1123,7 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(info.passing_chain[0].holder).toBe(info.first_thief);
   });
 
-  it("should correctly identify first thief as alphabetically first visitor at earliest time", () => {
+  it("should identify the first lone visitor as the first thief", () => {
     const cfg = {
       rooms: ["Zoo", "Alpha"],
       edges: [["Alpha", "Zoo"]],
@@ -1142,20 +1142,22 @@ describe("S3: Singer's Jewels Scenario", () => {
     const info = res.priv.singers_jewels;
     expect(info.jewel_room).toBe("Alpha");
 
-    // Find who actually visited Alpha first
-    let firstVisitorTime = null;
-    let visitorsAtFirstTime = [];
+    // Find who actually visited Alpha alone first
+    let firstAloneTime = null;
+    let loneVisitor = null;
     for (let t = 0; t < cfg.T; t++) {
-      const visitors = cfg.chars.filter(ch => res.schedule[ch][t] === "Alpha");
-      if (visitors.length > 0) {
-        firstVisitorTime = t + 1;
-        visitorsAtFirstTime = visitors.sort();
+      const visitors = cfg.chars.filter(
+        (ch) => res.schedule[ch][t] === "Alpha",
+      );
+      if (visitors.length === 1) {
+        firstAloneTime = t + 1;
+        loneVisitor = visitors[0];
         break;
       }
     }
 
-    expect(info.first_thief_time).toBe(firstVisitorTime);
-    expect(info.first_thief).toBe(visitorsAtFirstTime[0]);
+    expect(info.first_thief_time).toBe(firstAloneTime);
+    expect(info.first_thief).toBe(loneVisitor);
   });
 
   it("should have final holder be first thief if no passes occur", () => {

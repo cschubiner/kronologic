@@ -86,11 +86,12 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S3: The Singer's Jewels
-**Mystery**: A priceless necklace keeps changing hands. The first thief is the first person alone with it in the alphabetically first room (the “Dance Hall”), and any time the holder meets exactly one other person, the jewels pass.
+**Mystery**: A priceless necklace keeps changing hands. The first thief is the first person to reach the alphabetically first room **alone** (the “Dance Hall”), and any time the holder meets exactly one other person, the jewels pass.
 
 **Rules**:
-- At least one character must visit the alphabetically earliest room in the map during the timeline
-- Beyond the guaranteed visit, schedules remain unconstrained; the passing narrative is left for downstream clue logic
+- The alphabetically earliest room is visited **alone** by some character at least once, ensuring a single, well-defined first thief
+- Group visits to that room (2+ people at the same timestep) are allowed but do **not** steal the jewels
+- Beyond the guaranteed solo visit, schedules remain unconstrained; the passing narrative is left for downstream clue logic
 
 **Goal**: Track who entered the key room and build the story of how the jewels moved.
 

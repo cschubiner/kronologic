@@ -947,7 +947,27 @@ export function buildCNF(config) {
         firstRoomVar.push(X(ci, t, ri));
       }
     }
+
+    // At least one visit
     clauses.push(firstRoomVar);
+
+    // Ensure someone visits the room alone at least once (well-defined first thief)
+    const aloneAtRoom = [];
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T; t++) {
+        const alone = vp.get(`S3Alone_${C[ci]}_${t}`);
+        aloneAtRoom.push(alone);
+
+        // If alone is true, ci is in the alphabetic room and nobody else is
+        clauses.push([-alone, X(ci, t, ri)]);
+        for (let cj = 0; cj < C.length; cj++) {
+          if (cj === ci) continue;
+          clauses.push([-alone, -X(cj, t, ri)]);
+        }
+      }
+    }
+
+    clauses.push(aloneAtRoom);
   }
 
   // S2: Phantom alone at every time
@@ -2150,13 +2170,13 @@ export function solveAndDecode(cfg) {
   if (cfg.scenarios && cfg.scenarios.s3) {
     const jewelRoom = [...R].sort()[0];
 
-    // Find who visits the jewel room first (earliest timestep, then alphabetically)
+    // Find who visits the jewel room alone first (earliest timestep)
     let firstThief = null;
     let firstThiefTime = null;
     for (let t = 0; t < T; t++) {
-      const visitorsAtT = C.filter(ch => schedule[ch][t] === jewelRoom).sort();
-      if (visitorsAtT.length > 0) {
-        firstThief = visitorsAtT[0]; // alphabetically first if tie
+      const visitorsAtT = C.filter((ch) => schedule[ch][t] === jewelRoom);
+      if (visitorsAtT.length === 1) {
+        firstThief = visitorsAtT[0];
         firstThiefTime = t + 1;
         break;
       }
