@@ -4567,12 +4567,48 @@ describe("S17: Triple Alibi", () => {
       for (let t = 0; t < cfg.T; t++) {
         for (const room of cfg.rooms) {
           const inRoom = cfg.chars.filter((ch) => res.schedule[ch][t] === room);
-          if (ta.trio.every((ch) => inRoom.includes(ch))) {
+          if (inRoom.length === 3 && ta.trio.every((ch) => inRoom.includes(ch))) {
             actualMeetings++;
           }
         }
       }
       expect(ta.total_meetings).toBe(actualMeetings);
+    });
+  });
+
+  it("should only treat exclusive gatherings as trio meetings", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["P", "Q", "R", "S", "T"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s17: true },
+      seed: 1706,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const ta = res.priv.triple_alibi;
+      const schedule = res.schedule;
+
+      for (let t = 0; t < cfg.T; t++) {
+        for (const room of cfg.rooms) {
+          const inRoom = cfg.chars.filter((ch) => schedule[ch][t] === room);
+          if (ta.trio.every((ch) => inRoom.includes(ch))) {
+            expect(inRoom.length).toBe(3);
+          }
+        }
+      }
+
+      expect(ta.total_meetings).toBe(ta.exclusive_trio_count);
     });
   });
 
