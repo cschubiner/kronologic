@@ -1658,13 +1658,27 @@
             if (event) event.stopPropagation();
             const placement = state.placements[timestep][roomName].find(p => p.char === charName);
             if (placement) {
+                const wasStruck = placement.strikethrough;
                 placement.strikethrough = !placement.strikethrough;
+                if (wasStruck && !placement.strikethrough) {
+                    const shouldRemove = confirm(`Remove ${charName} from all other rooms at Time ${timestep}?`);
+                    if (shouldRemove) {
+                        removeCharacterFromOtherRooms(timestep, roomName, charName);
+                    }
+                }
                 updateMiniMapVisuals(timestep);
                 saveState();
 
                 // Refresh existing chips display without closing modal
                 refreshExistingChips(timestep, roomName);
             }
+        }
+
+        function removeCharacterFromOtherRooms(timestep, roomName, charName) {
+            state.rooms.forEach(room => {
+                if (room === roomName) return;
+                state.placements[timestep][room] = state.placements[timestep][room].filter(p => p.char !== charName);
+            });
         }
 
         function removeCharacterChip(timestep, roomName, charName, event) {
