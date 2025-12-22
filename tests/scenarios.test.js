@@ -3944,6 +3944,32 @@ describe("S15: World Travelers", () => {
     });
   });
 
+  it("should scale podium targets down when timesteps are limited", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s15: true },
+      seed: 1510,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const wt = res.priv.world_travelers;
+      expect(wt.targets).toEqual({ first: 2, second: 1, third: 1 });
+      expect(wt.visit_counts[wt.first]).toBe(2);
+      expect(wt.visit_counts[wt.second]).toBe(1);
+      expect(wt.visit_counts[wt.third]).toBe(1);
+    });
+  });
+
   it("should reject maps with fewer than 4 rooms", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
