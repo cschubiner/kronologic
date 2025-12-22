@@ -528,7 +528,9 @@ export function buildCNF(config) {
     }
 
     for (let i = 0; i < shuffled.length; i++) {
-      visitCountAssignments[shuffled[i]] = visitCountTargets[i];
+      const cappedTarget = Math.min(visitCountTargets[i], maxDistinctVisits);
+      visitCountAssignments[shuffled[i]] = cappedTarget;
+      visitCountTargets[i] = cappedTarget;
     }
 
     const homebodyIndex = visitCountTargets.indexOf(minReachableCount);

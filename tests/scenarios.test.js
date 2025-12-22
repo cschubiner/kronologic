@@ -4394,4 +4394,31 @@ describe("S16: Homebodies", () => {
       expect(counts).toContain(1);
     });
   });
+
+  it("should cap top travelers to available timesteps when chars exceed time", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E", "F"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "F"],
+      ],
+      chars: ["A", "B", "C", "D", "E", "F"],
+      T: 5,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s16: true },
+      seed: 1613,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      expect(Math.max(...hb.visit_count_targets)).toBeLessThanOrEqual(cfg.T);
+      const counts = Object.values(hb.actual_visit_counts);
+      expect(Math.max(...counts)).toBeLessThanOrEqual(cfg.T);
+    });
+  });
 });
