@@ -609,6 +609,87 @@ export function buildCNF(config) {
     privKeys.S15 = { first, second, third };
   }
 
+  // S16: Homebodies — each character visits a unique number of rooms (1, 2, 3, ...)
+  // Only the character visiting exactly 1 room may stay in place; all others must move
+  if (config.scenarios && config.scenarios.s16) {
+    if (C.length > R.length) {
+      throw new Error("S16 requires at least as many rooms as characters");
+    }
+    if (C.length < 2) {
+      throw new Error("S16 requires at least 2 characters");
+    }
+
+    const rng = mulberry32(resolvedSeed);
+
+    // Shuffle characters to randomly assign visit counts
+    const shuffled = [...C];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Assign visit counts: shuffled[0] visits 1 room, shuffled[1] visits 2 rooms, etc.
+    const visitCountAssignments = {};
+    for (let i = 0; i < shuffled.length; i++) {
+      visitCountAssignments[shuffled[i]] = i + 1; // 1, 2, 3, ...
+    }
+
+    // The homebody (visits exactly 1 room) can stay; others must move
+    const homebody = shuffled[0];
+
+    // Create "visited" helper variables: V_{char}_{room} = true if char visits room at any time
+    const S16V = (ci, ri) => vp.get(`S16_V_${C[ci]}_${R[ri]}`);
+
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const anyTime = [];
+        for (let t = 0; t < T; t++) {
+          anyTime.push(X(ci, t, ri));
+        }
+        // V => at least one X is true
+        clauses.push([-S16V(ci, ri), ...anyTime]);
+        // Each X => V
+        for (let t = 0; t < T; t++) {
+          clauses.push([-X(ci, t, ri), S16V(ci, ri)]);
+        }
+      }
+    }
+
+    // Enforce exact visit counts using totalizer
+    for (let ci = 0; ci < C.length; ci++) {
+      const ch = C[ci];
+      const targetCount = visitCountAssignments[ch];
+      const visitVars = R.map((_, ri) => S16V(ci, ri));
+      const totalizer = buildTotalizer(visitVars, vp, clauses, `S16_${ch}`);
+
+      // Exactly targetCount rooms: at least targetCount AND at most targetCount
+      if (targetCount > 0 && totalizer.length >= targetCount) {
+        clauses.push([totalizer[targetCount - 1]]); // At least targetCount (0-indexed)
+      }
+      if (targetCount < R.length && totalizer.length > targetCount) {
+        clauses.push([-totalizer[targetCount]]); // At most targetCount
+      }
+    }
+
+    // Movement constraints: homebody can stay, all others must move each turn
+    for (let ci = 0; ci < C.length; ci++) {
+      const ch = C[ci];
+      if (ch === homebody) {
+        // Homebody stays in same room always (visits exactly 1 room, so all timesteps same room)
+        // This is already enforced by the exactlyK(1) constraint above
+        continue;
+      }
+      // Others must move: X[ci][t][ri] => NOT X[ci][t+1][ri] for all t, ri
+      for (let t = 0; t < T - 1; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          clauses.push([-X(ci, t, ri), -X(ci, t + 1, ri)]);
+        }
+      }
+    }
+
+    privKeys.S16 = { visitCountAssignments, homebody };
+  }
+
   // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
   if (config.scenarios && config.scenarios.s11) {
     if (!R.length) throw new Error("S11 requires at least one room");
@@ -2024,6 +2105,31 @@ export function solveAndDecode(cfg) {
         second: secondMissed,
         third: thirdMissed,
       },
+    };
+  }
+
+  // S16: Homebodies decoding
+  if (privKeys.S16) {
+    const visitCounts = {};
+    const roomsVisitedByChar = {};
+    for (const ch of C) {
+      const roomsVisited = new Set();
+      for (let t = 0; t < T; t++) {
+        roomsVisited.add(schedule[ch][t]);
+      }
+      visitCounts[ch] = roomsVisited.size;
+      roomsVisitedByChar[ch] = Array.from(roomsVisited).sort();
+    }
+
+    // Sort characters by visit count to create ranking
+    const ranking = [...C].sort((a, b) => visitCounts[a] - visitCounts[b]);
+
+    priv.homebodies = {
+      homebody: privKeys.S16.homebody,
+      visit_count_assignments: privKeys.S16.visitCountAssignments,
+      actual_visit_counts: visitCounts,
+      rooms_visited: roomsVisitedByChar,
+      ranking, // sorted from fewest to most rooms visited
     };
   }
 

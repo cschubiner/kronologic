@@ -154,6 +154,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s15" value="s15" /> S15: World Travelers (rank top 3 by rooms visited)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s16" value="s16" /> S16: Homebodies (each character visits a unique number of rooms)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -559,6 +562,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s13: scenarioValue === 's13',
       s14: scenarioValue === 's14',
       s15: scenarioValue === 's15',
+      s16: scenarioValue === 's16',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }

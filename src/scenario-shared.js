@@ -60,6 +60,10 @@ export function scoreScenario(res, cfg) {
     scores.worldTravelers = scoreWorldTravelers(res, cfg);
     score += scores.worldTravelers;
   }
+  if (cfg.scenarios.s16 && res.priv.homebodies) {
+    scores.homebodies = scoreHomebodies(res, cfg);
+    score += scores.homebodies;
+  }
   return { total: score, breakdown: scores };
 }
 
@@ -368,6 +372,31 @@ function scoreWorldTravelers(res, cfg) {
 
   // Bonus for more characters (more suspects to consider)
   score += (chars.length - 3) * 20;
+
+  return score;
+}
+
+function scoreHomebodies(res, cfg) {
+  const info = res.priv.homebodies;
+  if (!info) return 0;
+
+  let score = 0;
+  const chars = cfg.chars;
+
+  // More characters = more complexity in deducing visit counts
+  score += chars.length * 15;
+
+  // Bonus for each unique visit count that must be deduced
+  score += chars.length * 10;
+
+  // Check for "close calls" - characters whose visit counts are adjacent
+  // These create interesting deduction opportunities
+  const counts = Object.values(info.actual_visit_counts).sort((a, b) => a - b);
+  for (let i = 0; i < counts.length - 1; i++) {
+    if (counts[i + 1] - counts[i] === 1) {
+      score += 5; // Adjacent counts add complexity
+    }
+  }
 
   return score;
 }

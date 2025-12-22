@@ -3552,3 +3552,225 @@ describe("S15: World Travelers", () => {
     });
   });
 });
+
+describe("S16: Homebodies", () => {
+  it("should assign each character a unique visit count", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1600,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const counts = Object.values(hb.actual_visit_counts);
+      const uniqueCounts = new Set(counts);
+      expect(uniqueCounts.size).toBe(cfg.chars.length);
+    });
+  });
+
+  it("should have homebody visit exactly 1 room", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1601,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      expect(hb.actual_visit_counts[hb.homebody]).toBe(1);
+    });
+  });
+
+  it("should have visit counts of 1, 2, 3, ... for each character", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["P", "Q", "R"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1602,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const counts = Object.values(hb.actual_visit_counts).sort((a, b) => a - b);
+      expect(counts).toEqual([1, 2, 3]);
+    });
+  });
+
+  it("should have homebody stay in same room all timesteps", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1603,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const homebodySchedule = res.schedule[hb.homebody];
+      const allSameRoom = homebodySchedule.every((room) => room === homebodySchedule[0]);
+      expect(allSameRoom).toBe(true);
+    });
+  });
+
+  it("should have non-homebodies move every turn", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1604,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      for (const ch of cfg.chars) {
+        if (ch === hb.homebody) continue;
+        const schedule = res.schedule[ch];
+        for (let t = 0; t < cfg.T - 1; t++) {
+          expect(schedule[t]).not.toBe(schedule[t + 1]);
+        }
+      }
+    });
+  });
+
+  it("should reject configs with more characters than rooms", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X", "Y", "Z"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1605,
+    };
+    expect(() => solveAndDecode(cfg)).toThrow("S16 requires at least as many rooms as characters");
+  });
+
+  it("should reject configs with fewer than 2 characters", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+      ],
+      chars: ["X"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1606,
+    };
+    expect(() => solveAndDecode(cfg)).toThrow("S16 requires at least 2 characters");
+  });
+
+  it("should work with 4 characters", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "A"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 8,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1607,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      const counts = Object.values(hb.actual_visit_counts).sort((a, b) => a - b);
+      expect(counts).toEqual([1, 2, 3, 4]);
+    });
+  });
+
+  it("should provide ranking from fewest to most rooms visited", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["X", "Y", "Z"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s16: true },
+      seed: 1608,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const hb = res.priv.homebodies;
+      expect(hb).toBeTruthy();
+      expect(hb.ranking).toHaveLength(cfg.chars.length);
+      // First in ranking should be homebody (visits 1 room)
+      expect(hb.ranking[0]).toBe(hb.homebody);
+      // Verify ranking is sorted by visit count
+      for (let i = 0; i < hb.ranking.length - 1; i++) {
+        expect(hb.actual_visit_counts[hb.ranking[i]]).toBeLessThanOrEqual(
+          hb.actual_visit_counts[hb.ranking[i + 1]]
+        );
+      }
+    });
+  });
+});
