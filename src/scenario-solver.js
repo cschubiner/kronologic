@@ -2026,6 +2026,16 @@ export function buildCNF(config) {
       }
     }
 
+    // Once carrying, the sofa must never revisit a room it already visited
+    for (let ri = 0; ri < R.length; ri++) {
+      for (let t1 = 0; t1 < T; t1++) {
+        for (let t2 = t1 + 1; t2 < T; t2++) {
+          // CARRYING(t1) AND SOFA(t1, ri) => NOT SOFA(t2, ri)
+          clauses.push([-CARRYING(t1), -SOFA(t1, ri), -SOFA(t2, ri)]);
+        }
+      }
+    }
+
     // Pickup condition: CARRYING starts when both carriers are alone with sofa
     // At pickup: exactly carriers in sofa's room (no one else)
     for (let t = 0; t < T; t++) {

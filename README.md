@@ -399,7 +399,7 @@ Players must deduce the secret scenario by combining:
 - The sofa starts in a non-destination room
 - **Pickup**: Both carriers must be alone together (exactly 2 people) in the sofa's room to pick it up
 - **Before pickup**: Sofa stays in place; carriers can be anywhere (separate or together)
-- **During transport**: Carriers must stay together and move the sofa to an adjacent room each timestep
+- **During transport**: Carriers must stay together, move the sofa to an adjacent room each timestep, and never revisit a room
 - The sofa arrives at the alphabetically first room exactly at the final timestep
 - Requires at least 2 rooms and 2 characters
 
