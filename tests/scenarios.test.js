@@ -4920,6 +4920,37 @@ describe("S18: Heavy Sofa", () => {
     });
   });
 
+  it("should never revisit rooms after pickup", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["M", "N", "O"],
+      T: 6,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s18: true },
+      seed: 1810,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const hs = res.priv.heavy_sofa;
+      const journeyAfterPickup = hs.journey.filter(
+        (j) => j.time >= hs.pickup_time,
+      );
+
+      const seen = new Set();
+      journeyAfterPickup.forEach((entry) => {
+        expect(seen.has(entry.room)).toBe(false);
+        seen.add(entry.room);
+      });
+    });
+  });
+
   it("should track journey correctly", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
