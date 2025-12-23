@@ -5052,3 +5052,101 @@ describe("S18: Heavy Sofa", () => {
     );
   });
 });
+
+describe("S19: Crowded Alibi", () => {
+  it("keeps the celebrity in every maximum group and provides a unique reveal", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["Ava", "Bea", "Cal", "Dee"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s19: true },
+      seed: 1901,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const info = res.priv.crowded_alibi;
+      expect(info).toBeTruthy();
+      expect(info.unique_reveal).toBeTruthy();
+
+      const celeb = info.celebrity;
+      for (let t = 0; t < cfg.T; t++) {
+        const counts = {};
+        for (const room of cfg.rooms) counts[room] = 0;
+        for (const ch of cfg.chars) counts[res.schedule[ch][t]]++;
+        const maxSize = Math.max(...Object.values(counts));
+        const maxRooms = Object.keys(counts).filter((r) => counts[r] === maxSize);
+        expect(maxRooms).toContain(res.schedule[celeb][t]);
+      }
+
+      const reveal = info.unique_reveal;
+      expect(info.max_timeline[reveal.time - 1].rooms.length).toBe(1);
+      expect(info.max_timeline[reveal.time - 1].rooms[0]).toBe(
+        res.schedule[celeb][reveal.time - 1],
+      );
+    });
+  });
+
+  it("forces every non-celebrity to miss the maximum crowd at least once", () => {
+    const cfg = {
+      rooms: ["Hall", "Lounge", "Den"],
+      edges: [
+        ["Hall", "Lounge"],
+        ["Lounge", "Den"],
+        ["Hall", "Den"],
+      ],
+      chars: ["Ivy", "Jay", "Kai", "Lou"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s19: true },
+      seed: 1902,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      const info = res.priv.crowded_alibi;
+      const celeb = info.celebrity;
+      for (const ch of cfg.chars) {
+        if (ch === celeb) continue;
+        expect(info.missed_max[ch]?.length || 0).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  it("rejects configs with too few rooms or characters", () => {
+    const tooFewRooms = {
+      rooms: ["Solo"],
+      edges: [],
+      chars: ["A", "B", "C"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s19: true },
+      seed: 1903,
+    };
+
+    const tooFewChars = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["A", "B"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s19: true },
+      seed: 1904,
+    };
+
+    expect(() => solveAndDecode(tooFewRooms)).toThrow(
+      "S19 requires at least 2 rooms",
+    );
+    expect(() => solveAndDecode(tooFewChars)).toThrow(
+      "S19 requires at least 3 characters",
+    );
+  });
+});

@@ -419,6 +419,30 @@ Players must deduce the secret scenario by combining:
 
 ---
 
+### S19: Crowded Alibi
+**Mystery**: One celebrity blends into the biggest crowds. They are always inside a largest group, and at least once they stand in a uniquely biggest room that proves they were there.
+
+**Rules**:
+- A single **celebrity** is always in a room whose size is **at least** as large as every other room (ties allowed)
+- In **at least one timestep**, the celebrity's room is the **only** largest room (unique maximum)
+- No other character can stay in maximum-sized rooms **every** timestep; each other character has at least one turn in a smaller group
+- Requires at least **2 rooms** and **3 characters**
+
+**Goal**: Identify the celebrity who rides the biggest crowd for cover.
+
+**Private Info**:
+- Celebrity identity
+- Timeline of maximum room sizes and rooms
+- The timestep with a unique maximum group
+- Which characters miss the maximum-sized group and when
+
+**Difficulty Factors**:
+- More timesteps create longer maximum-size timelines to analyze
+- Unique maximum happening later makes the reveal subtler
+- Larger casts and maps make it harder to track who avoided the max groups
+
+---
+
 ## Using the Generator
 
 ### Basic Setup
@@ -460,6 +484,7 @@ Enable one scenario:
 - **S16 (Homebodies)**: No configuration needed (requires rooms ≥ characters)
 - **S17 (Triple Alibi)**: No configuration needed (requires at least 3 characters)
 - **S18 (Heavy Sofa)**: No configuration needed (requires at least 2 rooms and 2 characters)
+- **S19 (Crowded Alibi)**: No configuration needed (requires at least 2 rooms and 3 characters)
 
 ### Difficulty Control
 

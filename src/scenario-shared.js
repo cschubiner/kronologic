@@ -72,6 +72,10 @@ export function scoreScenario(res, cfg) {
     scores.heavySofa = scoreHeavySofa(res, cfg);
     score += scores.heavySofa;
   }
+  if (cfg.scenarios.s19 && res.priv.crowded_alibi) {
+    scores.crowdedAlibi = scoreCrowdedAlibi(res, cfg);
+    score += scores.crowdedAlibi;
+  }
   return { total: score, breakdown: scores };
 }
 
@@ -476,6 +480,36 @@ function scoreHeavySofa(res, cfg) {
 
   // More rooms = more possible start locations
   score += cfg.rooms.length * 10;
+
+  return score;
+}
+
+function scoreCrowdedAlibi(res, cfg) {
+  const info = res.priv.crowded_alibi;
+  if (!info) return 0;
+
+  let score = 0;
+
+  // More timesteps = more max-group evidence to sift through
+  score += cfg.T * 10;
+
+  // Unique reveal earlier is slightly easier; later bumps difficulty
+  if (info.unique_reveal) {
+    score += 60 + info.unique_reveal.time * 5;
+  } else {
+    score += 40; // Safety net if unique reveal decoding fails
+  }
+
+  // More misses among non-celeb characters create better elimination paths
+  const missCounts = Object.values(info.missed_max || {}).reduce(
+    (sum, times) => sum + times.length,
+    0,
+  );
+  score += missCounts * 5;
+
+  // Bigger casts and maps increase the search space
+  score += cfg.chars.length * 8;
+  score += cfg.rooms.length * 6;
 
   return score;
 }
