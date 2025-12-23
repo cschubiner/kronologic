@@ -1755,6 +1755,14 @@ export function buildCNF(config) {
     limitAtLeastK(FROZ, frozenMin);
     limitAtMostK(FROZ, frozenMax);
 
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T - 1; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          clauses.push([FROZ[ci], -X(ci, t, ri), -X(ci, t + 1, ri)]);
+        }
+      }
+    }
+
     for (let t = 0; t < T; t++) {
       for (let ri = 0; ri < R.length; ri++) {
         const docAtVar = vp.get(`S9DocAt_${t}_${R[ri]}`);

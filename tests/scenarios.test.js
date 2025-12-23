@@ -3101,7 +3101,7 @@ describe("S9: Doctor freeze scenario", () => {
         ["Lab", "Ward"],
       ],
       chars: ["Dana", "Eli", "Farah", "Gus"],
-      T: 4,
+      T: 5,
       mustMove: false,
       allowStay: true,
       scenarios: { s9: true },
@@ -3135,6 +3135,36 @@ describe("S9: Doctor freeze scenario", () => {
       expect(res.schedule[showcase][cfg.T - 1]).not.toBe(
         res.schedule[showcase][0],
       );
+    });
+  });
+
+  it("forces every unfrozen character to move each timestep", () => {
+    const cfg = {
+      rooms: ["Atrium", "Lab", "Ward", "Roof"],
+      edges: [
+        ["Atrium", "Lab"],
+        ["Lab", "Ward"],
+        ["Ward", "Roof"],
+        ["Roof", "Atrium"],
+      ],
+      chars: ["Ada", "Bev", "Ciro", "Dev", "Ema", "Finn"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 915,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const unfrozen = cfg.chars.filter((ch) => !res.priv.frozen.includes(ch));
+      expect(unfrozen.length).toBeGreaterThan(0);
+      expect(unfrozen).toContain(res.priv.doctor);
+
+      for (const ch of unfrozen) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          expect(res.schedule[ch][t]).not.toBe(res.schedule[ch][t + 1]);
+        }
+      }
     });
   });
 
