@@ -2086,6 +2086,104 @@ export function buildCNF(config) {
     privKeys.S18 = { carrier1, carrier2, startRoom, destRoom };
   }
 
+  // S19: Crowded Alibi — one celebrity is in a max-sized group every timestep
+  if (config.scenarios && config.scenarios.s19) {
+    if (R.length < 2) throw new Error("S19 requires at least 2 rooms");
+    if (C.length < 3) throw new Error("S19 requires at least 3 characters");
+
+    const rng = mulberry32(resolvedSeed);
+    const celeb = C[Math.floor(rng() * C.length)];
+    const celebIdx = C.indexOf(celeb);
+
+    // Build occupancy counters for each (t, room)
+    const occ = Array.from({ length: T }, () => Array(R.length).fill(null));
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const vars = C.map((_, ci) => X(ci, t, ri));
+        occ[t][ri] = buildTotalizer(vars, vp, clauses, `S19_OCC_${t}_${R[ri]}`);
+      }
+    }
+
+    // Cache for strict greater-than comparisons between rooms
+    const gtCache = new Map();
+    function roomGreaterThan(t, ri, rj) {
+      const key = `${t}_${ri}_${rj}`;
+      if (gtCache.has(key)) return gtCache.get(key);
+
+      const base = vp.get(`S19_GT_${t}_${R[ri]}_${R[rj]}`);
+      const witnesses = [];
+      const limit = Math.min(occ[t][ri].length, occ[t][rj].length);
+      for (let k = 0; k < limit; k++) {
+        const w = vp.get(`S19_GT_${t}_${R[ri]}_${R[rj]}_${k + 1}`);
+        witnesses.push(w);
+        clauses.push([-w, occ[t][ri][k]]);
+        clauses.push([-w, -occ[t][rj][k]]);
+        clauses.push([-w, base]);
+      }
+      clauses.push([-base, ...witnesses]);
+
+      gtCache.set(key, base);
+      return base;
+    }
+
+    // Celebrity must be in a largest group each timestep (ties allowed)
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        for (let rj = 0; rj < R.length; rj++) {
+          for (let k = 0; k < occ[t][rj].length; k++) {
+            clauses.push([-X(celebIdx, t, ri), -occ[t][rj][k], occ[t][ri][k]]);
+          }
+        }
+      }
+    }
+
+    // Require at least one timestep where the celebrity's room is the unique maximum
+    const uniqueMaxChoices = [];
+    for (let t = 0; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const uniq = vp.get(`S19_UNIQUE_${t}_${R[ri]}`);
+        uniqueMaxChoices.push(uniq);
+        clauses.push([-uniq, X(celebIdx, t, ri)]);
+        for (let rj = 0; rj < R.length; rj++) {
+          if (rj === ri) continue;
+          const gt = roomGreaterThan(t, ri, rj);
+          clauses.push([-uniq, gt]);
+        }
+      }
+    }
+    if (uniqueMaxChoices.length) clauses.push(uniqueMaxChoices);
+
+    // No other character can be in a max-sized room every timestep
+    for (let ci = 0; ci < C.length; ci++) {
+      if (ci === celebIdx) continue;
+      const escapeMoments = [];
+      for (let t = 0; t < T; t++) {
+        const notMax = vp.get(`S19_NOTMAX_${C[ci]}_${t}`);
+        escapeMoments.push(notMax);
+
+        const witnesses = [];
+        for (let ri = 0; ri < R.length; ri++) {
+          for (let rj = 0; rj < R.length; rj++) {
+            if (ri === rj) continue;
+            const w = vp.get(
+              `S19_DIFF_${C[ci]}_${t}_${R[ri]}_${R[rj]}`,
+            );
+            witnesses.push(w);
+            clauses.push([-w, X(celebIdx, t, ri)]);
+            clauses.push([-w, X(ci, t, rj)]);
+            const gt = roomGreaterThan(t, ri, rj);
+            clauses.push([-w, gt]);
+            clauses.push([-w, notMax]);
+          }
+        }
+        if (witnesses.length) clauses.push([-notMax, ...witnesses]);
+      }
+      if (escapeMoments.length) clauses.push(escapeMoments);
+    }
+
+    privKeys.S19 = { celebrity: celeb };
+  }
+
   return { vp, clauses, privKeys };
 }
 
@@ -2622,6 +2720,57 @@ export function solveAndDecode(cfg) {
       pickup_time: pickupTime,
       journey: journey,
       path: journey.map((j) => j.room),
+    };
+  }
+
+  // S19: Crowded Alibi decoding
+  if (privKeys.S19) {
+    const celebrity = privKeys.S19.celebrity;
+
+    const maxTimeline = [];
+    const missedMax = {};
+    for (const ch of C) {
+      if (ch !== celebrity) missedMax[ch] = [];
+    }
+
+    let uniqueReveal = null;
+
+    for (let t = 0; t < T; t++) {
+      const counts = {};
+      for (const room of R) counts[room] = 0;
+      for (const ch of C) {
+        const room = schedule[ch][t];
+        counts[room] = (counts[room] ?? 0) + 1;
+      }
+
+      const maxSize = Math.max(...Object.values(counts));
+      const maxRooms = Object.keys(counts).filter((r) => counts[r] === maxSize);
+      const celebRoom = schedule[celebrity][t];
+      const celebInMax = maxRooms.includes(celebRoom);
+
+      for (const ch of C) {
+        if (ch === celebrity) continue;
+        if (!maxRooms.includes(schedule[ch][t])) missedMax[ch].push(t + 1);
+      }
+
+      if (!uniqueReveal && maxRooms.length === 1 && celebRoom === maxRooms[0]) {
+        uniqueReveal = { time: t + 1, room: maxRooms[0], size: maxSize };
+      }
+
+      maxTimeline.push({
+        time: t + 1,
+        size: maxSize,
+        rooms: maxRooms,
+        celebrity_room: celebRoom,
+        celebrity_in_max: celebInMax,
+      });
+    }
+
+    priv.crowded_alibi = {
+      celebrity,
+      max_timeline: maxTimeline,
+      unique_reveal: uniqueReveal,
+      missed_max: missedMax,
     };
   }
 

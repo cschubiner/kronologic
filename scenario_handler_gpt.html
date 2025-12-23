@@ -204,6 +204,9 @@
     <div class="row">
       <label><input type="radio" name="scenario" id="s18" value="s18" /> S18: Heavy Sofa (identify carriers and sofa's journey)</label>
     </div>
+    <div class="row">
+      <label><input type="radio" name="scenario" id="s19" value="s19" /> S19: Crowded Alibi (find the celebrity hiding in the biggest groups)</label>
+    </div>
 
     <div class="row">
       <label>Difficulty percentile (0-100):</label>
@@ -597,6 +600,20 @@ function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, so
       `path: ${info.path.join(' → ')}`,
     );
   }
+  if (res.priv.crowded_alibi) {
+    const info = res.priv.crowded_alibi;
+    const unique = info.unique_reveal
+      ? `unique max at t=${info.unique_reveal.time} in ${info.unique_reveal.room}`
+      : 'unique max time not decoded';
+    const misses = Object.entries(info.missed_max || {})
+      .map(([ch, times]) => `${ch}: missed @ t=${times.join(',') || '—'}`)
+      .join('; ');
+    pf.push(
+      `Crowded Alibi: celebrity <b>${info.celebrity}</b>; ${unique}; ` +
+      `max sizes per turn: ${info.max_timeline.map(m => `t${m.time}:${m.size}`).join(', ')}; ` +
+      `others miss max at least once: ${misses}`,
+    );
+  }
   if (pf.length===0) pf.push(`<div class="muted">None</div>`);
   qs("privateFacts").innerHTML = pf.join("");
 
@@ -738,6 +755,7 @@ qs("genBtn").addEventListener("click", async ()=>{
       s16: scenarioValue === 's16',
       s17: scenarioValue === 's17',
       s18: scenarioValue === 's18',
+      s19: scenarioValue === 's19',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }

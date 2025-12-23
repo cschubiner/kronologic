@@ -671,7 +671,8 @@ const SCENARIOS = [
   { id: 's15', name: 'World Travelers', desc: 'Rank top 3 travelers by rooms visited.' },
   { id: 's16', name: 'Homebodies', desc: 'Each character visits a unique number of rooms.' },
   { id: 's17', name: 'Triple Alibi', desc: 'Which three characters always meet together?' },
-  { id: 's18', name: 'Heavy Sofa', desc: 'Who carried the sofa and where did it start?' }
+  { id: 's18', name: 'Heavy Sofa', desc: 'Who carried the sofa and where did it start?' },
+  { id: 's19', name: 'Crowded Alibi', desc: 'Identify the celebrity who always rides the largest group.' }
 ];
 
 /* ===========================
@@ -903,6 +904,31 @@ function renderPrivateFacts(res, cfg) {
     facts.push({
       type: 'sofa',
       text: `Path: ${info.path.join(' → ')}`
+    });
+  }
+
+  if (res.priv.crowded_alibi) {
+    const info = res.priv.crowded_alibi;
+    facts.push({
+      type: 'crowd',
+      char: info.celebrity,
+      text: 'Celebrity always in a largest group'
+    });
+    if (info.unique_reveal) {
+      facts.push({
+        type: 'crowd',
+        text: `Unique max @ t=${info.unique_reveal.time} in ${info.unique_reveal.room}`
+      });
+    }
+    const missPieces = Object.entries(info.missed_max || {})
+      .map(([ch, times]) => `${ch} misses @ t=${times.join(',') || '—'}`);
+    facts.push({
+      type: 'crowd',
+      text: `Max sizes: ${info.max_timeline.map(m => `t${m.time}:${m.size}`).join(', ')}`
+    });
+    facts.push({
+      type: 'crowd',
+      text: `Non-celebs skip max: ${missPieces.join('; ')}`
     });
   }
 
@@ -1337,6 +1363,7 @@ qs("genBtn").addEventListener("click", async () => {
       s16: scenarioValue === 's16',
       s17: scenarioValue === 's17',
       s18: scenarioValue === 's18',
+      s19: scenarioValue === 's19',
       s1_room: qs("s1_room").value.trim() || null,
       s1_time: qs("s1_time").value.trim() || null
     }
