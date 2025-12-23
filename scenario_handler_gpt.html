@@ -87,6 +87,7 @@
   .tv-question-count { font-size: 16px; color: var(--muted); }
   .tv-timer { font-size: 16px; color: var(--accent); font-weight: 600; flex: 1; text-align: center; }
   .tv-exit-fs { font-size: 14px; }
+  .tv-inline-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 16px; }
   .tv-question-type { font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
   .tv-question-text { font-size: 48px; font-weight: 700; color: var(--fg); margin-bottom: 40px; line-height: 1.2; }
   .tv-public { font-size: 36px; color: var(--good); font-weight: 600; margin-bottom: 16px; }
@@ -337,8 +338,8 @@
       <div class="tv-controls" id="tvControls">
         <div class="row">
           <label>Question Interval:</label>
-          <input type="range" id="questionInterval" min="30" max="240" value="60" />
-          <span id="intervalValue">60s</span>
+          <input type="range" id="questionInterval" min="10" max="180" value="30" />
+          <span id="intervalValue">30s</span>
         </div>
         <div class="row">
           <label>Private Info Chance:</label>
@@ -360,6 +361,10 @@
           <span class="tv-question-count" id="tvQuestionCount">Question 0</span>
           <span class="tv-timer" id="tvTimer"></span>
           <button class="ghost tv-exit-fs" id="exitFullscreenBtn" style="display:none;">✕ Exit Fullscreen</button>
+        </div>
+        <div class="tv-inline-controls">
+          <button class="ghost" id="inlineAskNowBtn">⚡ Ask Now</button>
+          <button class="ghost" id="inlinePauseTvMode" disabled>⏸ Pause</button>
         </div>
         <div class="tv-question">
           <div class="tv-question-type" id="tvQuestionType"></div>
@@ -998,6 +1003,17 @@ let tvModeState = {
   cfg: null
 };
 
+function getPauseButtons() {
+  return [qs("pauseTvMode"), qs("inlinePauseTvMode")].filter(Boolean);
+}
+
+function setPauseButtons(text, disabled) {
+  getPauseButtons().forEach(btn => {
+    btn.textContent = text;
+    btn.disabled = disabled;
+  });
+}
+
 function formatTimestamp() {
   const now = new Date();
   return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1011,20 +1027,30 @@ function setupTvMode(res, cfg) {
   qs("tvModeSection").style.display = "block";
 
   // Slider value displays
-  qs("questionInterval").oninput = () => {
-    qs("intervalValue").textContent = qs("questionInterval").value + "s";
+  const updateIntervalValue = () => {
+    const slider = qs("questionInterval");
+    qs("intervalValue").textContent = slider.value + "s";
   };
-  qs("privateChance").oninput = () => {
+  qs("questionInterval").oninput = updateIntervalValue;
+  updateIntervalValue();
+
+  const updatePrivateChance = () => {
     qs("privateChanceValue").textContent = qs("privateChance").value + "%";
   };
+  qs("privateChance").oninput = updatePrivateChance;
+  updatePrivateChance();
 
   // Button handlers
   qs("startTvMode").onclick = startTvMode;
   qs("pauseTvMode").onclick = pauseTvMode;
   qs("stopTvMode").onclick = stopTvMode;
   qs("askNowBtn").onclick = askNow;
+  qs("inlineAskNowBtn").onclick = askNow;
+  qs("inlinePauseTvMode").onclick = pauseTvMode;
   qs("fullscreenBtn").onclick = toggleFullscreen;
   qs("exitFullscreenBtn").onclick = toggleFullscreen;
+
+  setPauseButtons("⏸ Pause", true);
 
   // Toggle panel visibility
   qs("toggleTvPanel").onclick = () => {
@@ -1055,7 +1081,7 @@ function startTvMode() {
   tvModeState.allQuestions = generateAllQuestions(cfg);
 
   qs("startTvMode").disabled = true;
-  qs("pauseTvMode").disabled = false;
+  setPauseButtons("⏸ Pause", false);
   qs("stopTvMode").disabled = false;
   qs("tvDisplay").style.display = "flex";
   qs("historyList").innerHTML = '';
@@ -1086,11 +1112,11 @@ function generateAllQuestions(cfg) {
 function pauseTvMode() {
   if (tvModeState.paused) {
     tvModeState.paused = false;
-    qs("pauseTvMode").textContent = "⏸ Pause";
+    setPauseButtons("⏸ Pause", false);
     scheduleNextQuestion();
   } else {
     tvModeState.paused = true;
-    qs("pauseTvMode").textContent = "▶ Resume";
+    setPauseButtons("▶ Resume", false);
     clearInterval(tvModeState.countdownId);
     qs("tvTimer").textContent = "Paused";
   }
@@ -1102,8 +1128,7 @@ function stopTvMode() {
   clearInterval(tvModeState.countdownId);
 
   qs("startTvMode").disabled = false;
-  qs("pauseTvMode").disabled = true;
-  qs("pauseTvMode").textContent = "⏸ Pause";
+  setPauseButtons("⏸ Pause", true);
   qs("stopTvMode").disabled = true;
   qs("tvDisplay").style.display = "none";
 
