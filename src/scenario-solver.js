@@ -1148,9 +1148,15 @@ export function buildCNF(config) {
   // S3: Ensure alphabetically first room is visited at least once
   if (config.scenarios.s3) {
     if (!R.length) throw new Error("S3 requires at least one room");
+    const rng = mulberry32(resolvedSeed);
+    const pickupStart = 1 + Math.floor(rng() * 3);
+    if (T < pickupStart) {
+      throw new Error("S3 requires at least " + pickupStart + " timesteps");
+    }
     const alphabeticRoom = [...R].sort()[0];
     const ri = Ridx.get(alphabeticRoom);
     if (ri == null) throw new Error("S3 alphabetic room missing");
+    const aloneAtPickup = [];
     const firstRoomVar = [];
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
@@ -1161,12 +1167,26 @@ export function buildCNF(config) {
     // At least one visit
     clauses.push(firstRoomVar);
 
-    // Ensure someone visits the room alone at least once (well-defined first thief)
-    const aloneAtRoom = [];
+    // Ensure someone visits the room alone at the pickup time (well-defined first thief)
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
         const alone = vp.get(`S3Alone_${C[ci]}_${t}`);
-        aloneAtRoom.push(alone);
+
+        if (t + 1 === pickupStart) {
+          aloneAtPickup.push(alone);
+        } else if (t + 1 < pickupStart) {
+          // No solo visits to the jewel room before the pickup window
+          clauses.push([-alone]);
+
+          if (C.length > 1) {
+            const withCompanion = [-X(ci, t, ri)];
+            for (let cj = 0; cj < C.length; cj++) {
+              if (cj === ci) continue;
+              withCompanion.push(X(cj, t, ri));
+            }
+            clauses.push(withCompanion);
+          }
+        }
 
         // If alone is true, ci is in the alphabetic room and nobody else is
         clauses.push([-alone, X(ci, t, ri)]);
@@ -1177,7 +1197,9 @@ export function buildCNF(config) {
       }
     }
 
-    clauses.push(aloneAtRoom);
+    clauses.push(aloneAtPickup);
+
+    privKeys.S3 = { pickupStart };
   }
 
   // S2: Phantom alone at every time
@@ -2606,11 +2628,13 @@ export function solveAndDecode(cfg) {
   // S3: Singer's Jewels decoding - compute jewel passing chain
   if (cfg.scenarios && cfg.scenarios.s3) {
     const jewelRoom = [...R].sort()[0];
+    const pickupStart = privKeys.S3?.pickupStart ?? 1;
+    const searchStart = Math.max(0, pickupStart - 1);
 
     // Find who visits the jewel room alone first (earliest timestep)
     let firstThief = null;
     let firstThiefTime = null;
-    for (let t = 0; t < T; t++) {
+    for (let t = searchStart; t < T; t++) {
       const visitorsAtT = C.filter((ch) => schedule[ch][t] === jewelRoom);
       if (visitorsAtT.length === 1) {
         firstThief = visitorsAtT[0];
@@ -2660,6 +2684,7 @@ export function solveAndDecode(cfg) {
       jewel_room: jewelRoom,
       first_thief: firstThief,
       first_thief_time: firstThiefTime,
+      pickup_start: pickupStart,
       passing_chain: passingChain,
       final_holder: finalHolder,
       total_passes: passingChain.filter((p) => p.event === "pass").length,

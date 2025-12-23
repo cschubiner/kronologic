@@ -847,6 +847,40 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(visitedAlone).toBe(true);
   });
 
+  it("should not allow a solo jewel-room visit before pickupStart", () => {
+    const cfg = {
+      rooms: ["Vault", "Jewel"],
+      edges: [["Vault", "Jewel"]],
+      chars: ["A", "B", "C"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s3: true },
+      seed: 5150,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+
+    const info = res.priv.singers_jewels;
+    expect(info).toBeTruthy();
+
+    const jewelRoom = [...cfg.rooms].sort()[0];
+    const pickupStart = info.pickup_start;
+
+    let earliestSolo = null;
+    for (let t = 0; t < cfg.T; t++) {
+      const visitors = cfg.chars.filter((c) => res.schedule[c][t] === jewelRoom);
+      if (visitors.length === 1) {
+        earliestSolo = t + 1; // human-readable
+        break;
+      }
+    }
+
+    expect(earliestSolo).not.toBeNull();
+    expect(earliestSolo).toBeGreaterThanOrEqual(pickupStart);
+  });
+
   it("should work with mustMove constraint using alphabetic room", () => {
     const cfg = {
       rooms: ["Study", "Kitchen", "Hall"],
@@ -1140,10 +1174,12 @@ describe("S3: Singer's Jewels Scenario", () => {
     const info = res.priv.singers_jewels;
     expect(info.jewel_room).toBe("Alpha");
 
-    // Find who actually visited Alpha alone first
+    const pickupStart = info.pickup_start;
+
+    // Find who actually visited Alpha alone first at or after pickupStart
     let firstAloneTime = null;
     let loneVisitor = null;
-    for (let t = 0; t < cfg.T; t++) {
+    for (let t = Math.max(0, pickupStart - 1); t < cfg.T; t++) {
       const visitors = cfg.chars.filter(
         (ch) => res.schedule[ch][t] === "Alpha",
       );
