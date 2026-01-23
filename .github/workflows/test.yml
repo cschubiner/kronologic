@@ -9,8 +9,16 @@ on:
 
 jobs:
   test:
-    name: Run Bun Tests
+    name: Run Bun Tests (shard ${{ matrix.shard }} of ${{ matrix.total }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: 1
+            total: 2
+          - shard: 2
+            total: 2
 
     steps:
       - name: Checkout code
@@ -25,14 +33,54 @@ jobs:
         run: bun install
 
       - name: Run tests
-        run: bun test
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_TOTAL: ${{ matrix.total }}
+        run: |
+          set -euo pipefail
+
+          shard_index="${SHARD_INDEX}"
+          shard_total="${SHARD_TOTAL}"
+
+          mapfile -t test_files < <(
+            find tests -type f \
+              \( -name '*.test.js' -o -name '*.test.jsx' -o -name '*.test.ts' -o -name '*.test.tsx' \
+                 -o -name '*.spec.js' -o -name '*.spec.jsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) \
+              | sort
+          )
+
+          if [ "${#test_files[@]}" -eq 0 ]; then
+            echo "No test files found; skipping shard ${shard_index}/${shard_total}."
+            exit 0
+          fi
+
+          selected=()
+          for i in "${!test_files[@]}"; do
+            file="${test_files[$i]}"
+            shard=$(( (i % shard_total) + 1 ))
+            if [ "${shard}" -eq "${shard_index}" ]; then
+              selected+=("${file}")
+            fi
+          done
+
+          if [ "${#selected[@]}" -eq 0 ]; then
+            echo "No tests selected for shard ${shard_index}/${shard_total}; skipping."
+            exit 0
+          fi
+
+          echo "Running shard ${shard_index}/${shard_total} for the following test files:"
+          printf ' - %s\n' "${selected[@]}"
+
+          bun test "${selected[@]}"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.shard }}-of-${{ matrix.total }}
           path: |
             test-results/
             coverage/
+          if-no-files-found: warn
           retention-days: 7
