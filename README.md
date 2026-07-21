@@ -277,11 +277,13 @@ Players must deduce the secret scenario by combining:
 - The Vault is always the alphabetically first room on the map
 - The key holder is randomly chosen among the characters
 - Nobody may enter The Vault unless the key holder is present at that timestep
+- The key holder is never alone in The Vault
 - The key holder must enter The Vault **with company** on at least two different timesteps, and those visits must include at least two distinct companions across the night
+- Every non-key-holder misses at least one Vault visit, making the key holder the only character present at every opening
 
-**Requirements**: At least 3 characters and 3 timesteps.
+**Requirements**: At least 3 characters, 3 rooms, and 3 timesteps.
 
-**Goal**: Identify the key holder and list everyone who ever entered The Vault.
+**Goal**: Using the known Vault room, identify the key holder and list everyone who ever entered it.
 
 **Difficulty Factors**:
 - More Vault entrants create more data to track
@@ -295,9 +297,10 @@ Players must deduce the secret scenario by combining:
 
 **Rules**:
 - The glue room is selected randomly (seeded) from the map's rooms
+- Starting in the glue room at the first timestep counts as entering it and forces the extra turn
 - Whenever a character enters the glue room before the final timestep, they must remain there for the next timestep as well (two turns in a row)
 - After the forced extra turn, they must leave the glue room immediately (no three-turn streaks in the glue room)
-- If the first time a character arrives is the final timestep, they only appear once (no future turn to show they were stuck)
+- A character may not enter the glue room for the first time on the final timestep because there is no future turn to demonstrate the effect
 - The scenario guarantees at least one glue-room entry that is not on the final timestep
 - The forced extra turn is the only exception to the normal movement rule
 
@@ -487,7 +490,7 @@ Enable one scenario:
 - **S8 (The Freeze)**: No configuration needed
 - **S9 (Doctor's Cure)**: No configuration needed
 - **S10 (Contagion)**: No configuration needed
-- **S11 (The Vault)**: Requires at least 3 characters and 3 timesteps
+- **S11 (The Vault)**: Requires at least 3 characters, 3 rooms, and 3 timesteps
 - **S12 (Glue Room)**: No configuration needed
 - **S13 (Glue Shoes)**: No configuration needed
 - **S14 (Curse of Amarinta)**: No configuration needed

@@ -3789,7 +3789,7 @@ describe("S11: The Vault", () => {
     });
   });
 
-  it("ensures the key holder visits the vault with a companion", () => {
+  it("makes the key holder the unique common visitor across accompanied Vault visits", () => {
     const cfg = {
       rooms: ["Conservatory", "Vault", "Attic"],
       edges: [
@@ -3825,9 +3825,14 @@ describe("S11: The Vault", () => {
         }
       }
 
-      expect(khVisits).toBeGreaterThan(0);
-      expect(sharedVisits.length).toBeGreaterThanOrEqual(1);
-      expect(companions.size).toBeGreaterThanOrEqual(1);
+      expect(khVisits).toBe(sharedVisits.length);
+      expect(sharedVisits.length).toBeGreaterThanOrEqual(2);
+      expect(companions.size).toBeGreaterThanOrEqual(2);
+
+      const commonVisitors = cfg.chars.filter((ch) =>
+        sharedVisits.every((t) => res.schedule[ch][t] === vaultRoom),
+      );
+      expect(commonVisitors).toEqual([keyHolder]);
     });
   });
 
@@ -3941,6 +3946,13 @@ describe("S11: The Vault", () => {
     expect(() => solveAndDecode({ ...base, chars: ["A", "B"] })).toThrow(
       "S11 requires at least three characters",
     );
+    expect(() =>
+      solveAndDecode({
+        ...base,
+        rooms: ["Atrium", "Gallery"],
+        edges: [["Atrium", "Gallery"]],
+      }),
+    ).toThrow("S11 requires at least three rooms");
     expect(() => solveAndDecode({ ...base, T: 2 })).toThrow(
       "S11 requires at least three timesteps",
     );
@@ -4086,6 +4098,51 @@ describe("S12: Glue Room", () => {
         }
       }
     });
+  });
+
+  it("treats a starting position in the glue room as an entry", () => {
+    const cfg = {
+      rooms: ["Atrium", "Study", "Garden"],
+      edges: [
+        ["Atrium", "Study"],
+        ["Study", "Garden"],
+        ["Garden", "Atrium"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 4,
+      scenarios: { s12: true },
+      seed: 13,
+    };
+
+    const { vp, clauses, privKeys } = buildCNF(cfg);
+    const glueRoom = privKeys.S12.glueRoom;
+    clauses.push([vp.getExisting(`X_A_0_${glueRoom}`)]);
+
+    const solution = satSolve(clauses, vp.count(), cfg.seed);
+    expect(solution).not.toBeNull();
+    expect(solution[vp.getExisting(`X_A_1_${glueRoom}`)]).toBe(true);
+  });
+
+  it("forbids a first-time glue-room entry on the final timestep", () => {
+    const cfg = {
+      rooms: ["Atrium", "Study", "Garden"],
+      edges: [
+        ["Atrium", "Study"],
+        ["Study", "Garden"],
+        ["Garden", "Atrium"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 4,
+      scenarios: { s12: true },
+      seed: 14,
+    };
+
+    const { vp, clauses, privKeys } = buildCNF(cfg);
+    const glueRoom = privKeys.S12.glueRoom;
+    clauses.push([-vp.getExisting(`X_A_2_${glueRoom}`)]);
+    clauses.push([vp.getExisting(`X_A_3_${glueRoom}`)]);
+
+    expect(satSolve(clauses, vp.count(), cfg.seed)).toBeNull();
   });
 });
 

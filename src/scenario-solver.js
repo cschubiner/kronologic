@@ -44,6 +44,9 @@ export function validateScenarioConfig(config) {
     if ((config.chars?.length ?? 0) < 3) {
       throw new Error("S11 requires at least three characters");
     }
+    if ((config.rooms?.length ?? 0) < 3) {
+      throw new Error("S11 requires at least three rooms");
+    }
     if (!Number.isInteger(config.T) || config.T < 3) {
       throw new Error("S11 requires at least three timesteps");
     }
@@ -935,7 +938,7 @@ export function buildCNF(config) {
     privKeys.S17 = { trio };
   }
 
-  // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
+  // S11: The Vault — the key holder must be present whenever the Vault is occupied
   if (config.scenarios && config.scenarios.s11) {
     if (!R.length) throw new Error("S11 requires at least one room");
 
@@ -950,7 +953,7 @@ export function buildCNF(config) {
     clauses.push(...exactlyOne(KH));
     clauses.push([KH[keyHolderIdx]]);
 
-    // Only the key holder may be in the vault (others require the key holder present)
+    // Every other Vault occupant requires the key holder to be present.
     for (let ci = 0; ci < C.length; ci++) {
       for (let cj = 0; cj < C.length; cj++) {
         if (ci === cj) continue;
@@ -960,9 +963,9 @@ export function buildCNF(config) {
       }
     }
 
-    // Track vault co-visits to enforce two distinct companions across two timesteps
+    // Track Vault co-visits so the holder is uniquely identifiable from a
+    // non-trivial pattern of accompanied visits.
     const withOther = Array.from({ length: C.length }, () => []);
-    const khVaultVisits = Array.from({ length: C.length }, () => []);
     const khWithoutCompanion = Array.from({ length: C.length }, () =>
       Array.from({ length: C.length }, () => []),
     );
@@ -975,12 +978,6 @@ export function buildCNF(config) {
 
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
-        const khVisit = vp.get(`S11_khVisit_${C[ci]}_${t}`);
-        khVaultVisits[ci].push(khVisit);
-        clauses.push([-khVisit, KH[ci]]);
-        clauses.push([-khVisit, X(ci, t, vr)]);
-        clauses.push([-KH[ci], -X(ci, t, vr), khVisit]);
-
         const otherVars = [];
         for (let cj = 0; cj < C.length; cj++) {
           if (ci === cj) continue;
@@ -994,6 +991,10 @@ export function buildCNF(config) {
         } else {
           clauses.push([-someOther]);
         }
+
+        // A solo Vault visit would reveal the holder immediately, so every
+        // holder visit must include at least one companion.
+        clauses.push([-KH[ci], -X(ci, t, vr), someOther]);
 
         const withO = vp.get(`S11_withOther_${C[ci]}_${t}`);
         withOther[ci].push(withO);
@@ -1036,29 +1037,29 @@ export function buildCNF(config) {
         }
       }
 
-      if (withOther[ci].length === 0) {
-        clauses.push([-KH[ci]]);
+      const accompaniedVisitCount = buildTotalizer(
+        withOther[ci],
+        vp,
+        clauses,
+        `S11_${C[ci]}_AccompaniedVisitTotal`,
+      );
+      if (accompaniedVisitCount.length >= 2) {
+        clauses.push([-KH[ci], accompaniedVisitCount[1]]);
       } else {
-        clauses.push([-KH[ci], ...withOther[ci]]);
+        clauses.push([-KH[ci]]);
       }
 
       const companions = compVars[ci].filter(
         (v, idx) => idx !== ci && v !== null,
       );
-      if (companions.length === 0) {
-        clauses.push([-KH[ci]]);
-      } else {
-        clauses.push([-KH[ci], ...companions]);
-      }
-
-      const visitCount = buildTotalizer(
-        khVaultVisits[ci],
+      const companionCount = buildTotalizer(
+        companions,
         vp,
         clauses,
-        `S11_${C[ci]}_VisitTotal`,
+        `S11_${C[ci]}_CompanionTotal`,
       );
-      if (visitCount.length >= 2) {
-        clauses.push([-KH[ci], visitCount[1]]);
+      if (companionCount.length >= 2) {
+        clauses.push([-KH[ci], companionCount[1]]);
       } else {
         clauses.push([-KH[ci]]);
       }
