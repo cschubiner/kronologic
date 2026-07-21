@@ -373,9 +373,8 @@ function scoreCurseOfAmarinta(res, cfg) {
     }
     return count;
   };
-  let prevSet = new Set(timeline[0].cursed || []);
-  totalCursed += prevSet.size;
-  for (let i = 1; i < timeline.length; i++) {
+  let prevSet = new Set(info.origin ? [info.origin] : []);
+  for (let i = 0; i < timeline.length; i++) {
     const currentSet = new Set(timeline[i].cursed || []);
     totalCursed += currentSet.size;
     handoffs += symmetricDiffCount(prevSet, currentSet);

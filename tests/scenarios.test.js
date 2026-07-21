@@ -4195,7 +4195,7 @@ describe("S13: Glue Shoes", () => {
       expect(res.priv.glue_shoes.glue_person).toBe(expectedGlue);
 
       const firstStuck = new Map();
-      for (let t = 0; t < cfg.T; t++) {
+      for (let t = 0; t < cfg.T - 1; t++) {
         const room = res.schedule[expectedGlue][t];
         for (const ch of cfg.chars) {
           if (ch === expectedGlue) continue;
@@ -4205,11 +4205,36 @@ describe("S13: Glue Shoes", () => {
         }
       }
 
-      for (const record of res.priv.glue_shoes.stuck) {
-        const expected = firstStuck.get(record.character);
-        expect(record).toEqual(expected);
-      }
+      expect(res.priv.glue_shoes.stuck).toEqual(
+        Array.from(firstStuck.values()).sort((a, b) => a.time - b.time),
+      );
     });
+  });
+
+  it("does not label a final-timestep meeting as a stuck event", () => {
+    const cfg = {
+      rooms: ["Foyer", "Stairs", "Gallery", "Masks", "DanceRoom", "MusicRoom"],
+      edges: [
+        ["Foyer", "Stairs"],
+        ["Foyer", "Gallery"],
+        ["Gallery", "Stairs"],
+        ["Gallery", "Masks"],
+        ["Masks", "DanceRoom"],
+        ["Masks", "MusicRoom"],
+        ["MusicRoom", "DanceRoom"],
+      ],
+      chars: ["Alice", "Bob", "Carol", "Dave"],
+      T: 6,
+      scenarios: { s13: true },
+      seed: 74,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res.priv.glue_shoes.glue_person).toBe("Alice");
+    expect(res.schedule.Carol[5]).toBe(res.schedule.Alice[5]);
+    expect(
+      res.priv.glue_shoes.stuck.some((record) => record.character === "Carol"),
+    ).toBe(false);
   });
 
   it("guarantees at least one non-final stuck victim", () => {
@@ -4357,7 +4382,7 @@ describe("S14: The Curse of Amarinta", () => {
         .sort();
 
       expect(curse.possible_origins).toEqual(expectedOrigins);
-      expect(expectedOrigins).toContain(curse.origin);
+      expect(expectedOrigins).toEqual([curse.origin]);
     });
   });
 });
@@ -4481,7 +4506,39 @@ describe("S15: World Travelers", () => {
     });
   });
 
-  it("should scale podium targets down when timesteps are limited", () => {
+  it("should keep every podium rank distinct from every lower rank", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D", "E"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "A"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 5,
+      scenarios: { s15: true },
+      seed: 1510,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const wt = res.priv.world_travelers;
+      expect(wt.targets).toEqual({ first: 5, second: 4, third: 3 });
+      expect(wt.visit_counts[wt.first]).toBeGreaterThan(
+        wt.visit_counts[wt.second],
+      );
+      expect(wt.visit_counts[wt.second]).toBeGreaterThan(
+        wt.visit_counts[wt.third],
+      );
+      for (const ch of cfg.chars) {
+        if (ch === wt.first || ch === wt.second || ch === wt.third) continue;
+        expect(wt.visit_counts[ch]).toBeLessThan(wt.visit_counts[wt.third]);
+      }
+    });
+  });
+
+  it("should reject timelines too short for first place to visit every room", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -4491,17 +4548,77 @@ describe("S15: World Travelers", () => {
         ["D", "A"],
       ],
       chars: ["X", "Y", "Z"],
-      T: 2,
+      T: 3,
       scenarios: { s15: true },
-      seed: 1510,
+      seed: 1511,
     };
 
-    testWithThreshold(cfg, (res) => {
-      const wt = res.priv.world_travelers;
-      expect(wt.targets).toEqual({ first: 2, second: 2, third: 2 });
-      expect(wt.visit_counts[wt.first]).toBe(2);
-      expect(wt.visit_counts[wt.second]).toBe(2);
-      expect(wt.visit_counts[wt.third]).toBe(2);
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S15 requires at least 4 timesteps so first place can visit every room",
+    );
+  });
+
+  it("should reject four-room maps with non-podium characters", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 4,
+      scenarios: { s15: true },
+      seed: 1512,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S15 requires at least 5 rooms when there are non-podium characters",
+    );
+  });
+
+  it("should reject maps that cannot cover every room in the timeline", () => {
+    const cfg = {
+      rooms: ["Center", "A", "B", "C", "D"],
+      edges: [
+        ["Center", "A"],
+        ["Center", "B"],
+        ["Center", "C"],
+        ["Center", "D"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 5,
+      scenarios: { s15: true },
+      seed: 1513,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S15 map must allow a route through every room within 5 timesteps",
+    );
+  });
+
+  it("should accept a topology once the timeline is long enough to cover it", () => {
+    const cfg = {
+      rooms: ["Center", "A", "B", "C", "D"],
+      edges: [
+        ["Center", "A"],
+        ["Center", "B"],
+        ["Center", "C"],
+        ["Center", "D"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 7,
+      scenarios: { s15: true },
+      seed: 1514,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.world_travelers.targets).toEqual({
+      first: 5,
+      second: 4,
+      third: 3,
     });
   });
 

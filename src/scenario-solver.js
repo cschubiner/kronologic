@@ -25,6 +25,66 @@ function hasConfiguredValue(value) {
   return value !== null && value !== undefined && value !== "";
 }
 
+function canVisitEveryRoomWithin(rooms, edges, timesteps) {
+  if (!rooms.length || timesteps < rooms.length) return false;
+
+  const { nbr } = neighbors(rooms, edges ?? [], false);
+  const reachable = new Set([0]);
+  const queue = [0];
+  while (queue.length) {
+    const room = queue.shift();
+    for (const next of nbr[room]) {
+      if (reachable.has(next)) continue;
+      reachable.add(next);
+      queue.push(next);
+    }
+  }
+  if (reachable.size !== rooms.length) return false;
+
+  // A depth-first traversal can cover any connected map in at most 2R-1
+  // timesteps. Only shorter timelines need the exact bounded search below.
+  if (timesteps >= 2 * rooms.length - 1) return true;
+
+  const fullMask = (1n << BigInt(rooms.length)) - 1n;
+  const memo = new Set();
+
+  function search(room, stepsRemaining, visitedMask, visitedCount) {
+    if (visitedMask === fullMask) return true;
+    if (visitedCount + stepsRemaining < rooms.length) return false;
+
+    const key = `${room}|${stepsRemaining}|${visitedMask}`;
+    if (memo.has(key)) return false;
+    memo.add(key);
+
+    const orderedNeighbors = [...nbr[room]].sort((a, b) => {
+      const aVisited = (visitedMask & (1n << BigInt(a))) !== 0n;
+      const bVisited = (visitedMask & (1n << BigInt(b))) !== 0n;
+      return Number(aVisited) - Number(bVisited);
+    });
+
+    for (const next of orderedNeighbors) {
+      const bit = 1n << BigInt(next);
+      const isNew = (visitedMask & bit) === 0n;
+      if (
+        search(
+          next,
+          stepsRemaining - 1,
+          visitedMask | bit,
+          visitedCount + Number(isNew),
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  for (let start = 0; start < rooms.length; start++) {
+    if (search(start, timesteps - 1, 1n << BigInt(start), 1)) return true;
+  }
+  return false;
+}
+
 export function validateScenarioConfig(config) {
   const scenarios = config.scenarios ?? {};
 
@@ -49,6 +109,33 @@ export function validateScenarioConfig(config) {
     }
     if (!Number.isInteger(config.T) || config.T < 3) {
       throw new Error("S11 requires at least three timesteps");
+    }
+  }
+
+  if (scenarios.s15) {
+    const roomCount = config.rooms?.length ?? 0;
+    const characterCount = config.chars?.length ?? 0;
+
+    if (roomCount < 4) {
+      throw new Error("S15 requires at least 4 rooms");
+    }
+    if (characterCount < 3) {
+      throw new Error("S15 requires at least 3 characters");
+    }
+    if (characterCount > 3 && roomCount < 5) {
+      throw new Error(
+        "S15 requires at least 5 rooms when there are non-podium characters",
+      );
+    }
+    if (!Number.isInteger(config.T) || config.T < roomCount) {
+      throw new Error(
+        `S15 requires at least ${roomCount} timesteps so first place can visit every room`,
+      );
+    }
+    if (!canVisitEveryRoomWithin(config.rooms, config.edges, config.T)) {
+      throw new Error(
+        `S15 map must allow a route through every room within ${config.T} timesteps`,
+      );
     }
   }
 
@@ -666,9 +753,6 @@ export function buildCNF(config) {
 
   // S15: World Travelers — rank top 3 travelers by unique rooms visited
   if (config.scenarios && config.scenarios.s15) {
-    if (R.length < 4) throw new Error("S15 requires at least 4 rooms");
-    if (C.length < 3) throw new Error("S15 requires at least 3 characters");
-
     const rng = mulberry32(resolvedSeed);
 
     // Randomly assign top 3 travelers by shuffling chars
@@ -681,13 +765,7 @@ export function buildCNF(config) {
     const second = shuffled[1];
     const third = shuffled[2];
 
-    const maxUniqueVisits = Math.min(R.length, T);
-    const minimumMobileVisits = T > 1 ? Math.min(2, R.length) : 1;
-    const podiumTargets = [
-      maxUniqueVisits,
-      Math.max(minimumMobileVisits, maxUniqueVisits - 1),
-      Math.max(minimumMobileVisits, maxUniqueVisits - 2),
-    ];
+    const podiumTargets = [R.length, R.length - 1, R.length - 2];
 
     // Create "visited" helper variables: V_{char}_{room} = true if char visits room at any time
     const S15V = (ci, ri) => vp.get(`S15_V_${C[ci]}_${R[ri]}`);
@@ -718,7 +796,7 @@ export function buildCNF(config) {
       }
     }
 
-    // 1st place: visits the maximum feasible distinct rooms
+    // 1st place visits every room.
     const firstIdx = C.indexOf(first);
     const firstVars = R.map((_, ri) => S15V(firstIdx, ri));
     const firstTotalizer = buildTotalizer(
@@ -729,7 +807,7 @@ export function buildCNF(config) {
     );
     enforceExactVisits(firstTotalizer, podiumTargets[0]);
 
-    // 2nd place: visits the next highest feasible count
+    // 2nd place visits exactly one fewer room.
     const secondIdx = C.indexOf(second);
     const secondVars = R.map((_, ri) => S15V(secondIdx, ri));
     const secondTotalizer = buildTotalizer(
@@ -740,7 +818,7 @@ export function buildCNF(config) {
     );
     enforceExactVisits(secondTotalizer, podiumTargets[1]);
 
-    // 3rd place: visits the third highest feasible count
+    // 3rd place visits exactly two fewer rooms.
     const thirdIdx = C.indexOf(third);
     const thirdVars = R.map((_, ri) => S15V(thirdIdx, ri));
     const thirdTotalizer = buildTotalizer(
@@ -751,8 +829,8 @@ export function buildCNF(config) {
     );
     enforceExactVisits(thirdTotalizer, podiumTargets[2]);
 
-    // Others (4th+): visit fewer rooms than third place where possible
-    const othersMax = Math.max(minimumMobileVisits, podiumTargets[2] - 1);
+    // Others (4th+) must rank strictly below third place.
+    const othersMax = podiumTargets[2] - 1;
     for (let ci = 0; ci < C.length; ci++) {
       if (C[ci] === first || C[ci] === second || C[ci] === third) continue;
       const otherVars = R.map((_, ri) => S15V(ci, ri));
@@ -2485,7 +2563,7 @@ export function solveAndDecode(cfg) {
     const stuckRecords = [];
     if (gluePerson) {
       const firstStuck = new Map();
-      for (let t = 0; t < T; t++) {
+      for (let t = 0; t < T - 1; t++) {
         const room = schedule[gluePerson][t];
         for (const ch of C) {
           if (ch === gluePerson) continue;
@@ -2562,8 +2640,10 @@ export function solveAndDecode(cfg) {
     const uniqueOutcomes = outcomes.filter(
       (outcome) => finalKeyCounts[outcome.finalKey] === 1,
     );
-    const pool = uniqueOutcomes.length ? uniqueOutcomes : outcomes;
-    const chosen = pool[Math.floor(rng() * pool.length)];
+    if (uniqueOutcomes.length !== outcomes.length) {
+      throw new Error("S14 final clue does not identify a unique origin");
+    }
+    const chosen = outcomes[Math.floor(rng() * outcomes.length)];
 
     const possibleOrigins = outcomes
       .filter((o) => o.finalKey === chosen.finalKey)

@@ -337,19 +337,19 @@ Players must deduce the secret scenario by combining:
 
 **Rules**:
 - Exactly one character starts cursed at **Time 1**
-- The curse only changes hands when a cursed and uncursed character share a room in the same timestep
-  - During that meeting, **everyone in the room is cursed** for that time
-  - Starting next timestep, the previously cursed attendees are freed and the previously uncursed attendees now carry the curse
-- If a cursed character is alone or only meets other cursed characters, nothing changes
-- Players learn which characters are cursed at **Time 6** and must work backward to find the original carrier
+- At the end of each timestep, every room containing both cursed and uncursed characters swaps the curse
+  - Previously cursed occupants become uncursed
+  - Previously uncursed occupants become cursed
+- Rooms containing only cursed characters or only uncursed characters do not change
+- Players learn which characters are cursed **after the Time 6 handoffs** and must work backward to find the original carrier
 - Requires at least six timesteps so the Time 6 snapshot is meaningful
 
-**Goal**: Use the Time 6 cursed list and the meeting pattern to deduce who was cursed in Time 1.
+**Goal**: Use the post-handoff Time 6 cursed list and the meeting pattern to deduce who began Time 1 cursed.
 
 **Difficulty Factors**:
 - Multiple handoff events in quick succession create red herrings about when the curse flipped
-- Rooms hosting mixed groups (cursed and uncursed) make the Time 6 snapshot compatible with fewer origins
-- Long stretches without meetings keep the initial carrier cursed longer, widening the search space
+- Mixed rooms can flip several characters at once, making the reverse bookkeeping harder
+- Long stretches without meetings make it harder to remember which carrier state persisted
 
 ---
 
@@ -360,9 +360,10 @@ Players must deduce the secret scenario by combining:
 - **1st place** visits ALL rooms (the "greatest world traveler")
 - **2nd place** visits exactly R-1 rooms (misses one room)
 - **3rd place** visits exactly R-2 rooms (misses two rooms)
-- All other characters visit at most R-3 rooms (loose constraint, ties allowed among non-top-3)
-- When the timeline is shorter than those targets, visit counts scale down to what is reachable, but moving characters still visit at least two rooms
-- Requires at least 4 rooms and 3 characters
+- All other characters visit at most R-3 rooms, so nobody can tie with 3rd place (ties are allowed among non-top-3 characters)
+- The timeline and map must allow 1st place to visit every room; tied podium targets are never scaled down
+- Requires at least 3 characters, at least 4 rooms, and at least one timestep per room
+- With more than 3 characters, requires at least 5 rooms so moving non-podium characters can remain strictly below 3rd place
 
 **Goal**: Deduce who is 1st, 2nd, and 3rd place by analyzing which rooms each character visited.
 
@@ -494,7 +495,7 @@ Enable one scenario:
 - **S12 (Glue Room)**: No configuration needed
 - **S13 (Glue Shoes)**: No configuration needed
 - **S14 (Curse of Amarinta)**: No configuration needed
-- **S15 (World Travelers)**: No configuration needed (requires 4+ rooms, 3+ characters)
+- **S15 (World Travelers)**: Requires 3+ characters, 4+ rooms, at least one timestep per room, and a map route that can visit every room (5+ rooms with non-podium characters)
 - **S16 (Homebodies)**: No configuration needed (requires rooms ≥ characters)
 - **S17 (Triple Alibi)**: No configuration needed (requires at least 3 characters)
 - **S18 (Heavy Sofa)**: No configuration needed (requires at least 2 rooms and 2 characters)

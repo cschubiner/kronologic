@@ -756,8 +756,8 @@ const SCENARIOS = [
   { id: 's11', name: 'The Vault', desc: 'The Vault opens only when its key holder is present.' },
   { id: 's12', name: 'Glue Room', desc: 'Sticky room forces two-turn visits.' },
   { id: 's13', name: 'Glue Shoes', desc: 'Glue carrier makes co-occupants stay an extra turn.' },
-  { id: 's14', name: 'Curse of Amarinta', desc: 'Trace the original curse carrier.' },
-  { id: 's15', name: 'World Travelers', desc: 'Rank top 3 travelers by rooms visited.' },
+  { id: 's14', name: 'Curse of Amarinta', desc: 'Reverse end-of-turn curse swaps to find the original carrier.' },
+  { id: 's15', name: 'World Travelers', desc: 'Strictly rank the top 3 travelers by unique rooms visited.' },
   { id: 's16', name: 'Homebodies', desc: 'Each character visits a unique number of rooms.' },
   { id: 's17', name: 'Triple Alibi', desc: 'Which three characters always meet together?' },
   { id: 's18', name: 'Heavy Sofa', desc: 'Who carried the sofa and where did it start?' },
@@ -926,7 +926,7 @@ function renderPrivateFacts(res, cfg) {
 
   if (res.priv.curse_of_amarinta) {
     const info = res.priv.curse_of_amarinta;
-    facts.push({ type: 'curse', char: info.origin, text: `Origin; Cursed @ t=6: ${info.final_cursed?.join(', ') || 'none'}` });
+    facts.push({ type: 'curse', char: info.origin, text: `Origin; Cursed after t=6: ${info.final_cursed?.join(', ') || 'none'}` });
   }
 
   if (res.priv.world_travelers) {
@@ -1097,12 +1097,24 @@ function updateStartingInfoNote(res, cfg) {
     const cursedAtSix = curseInfo.final_cursed || [];
     const cursedLabel = cursedAtSix.length ? cursedAtSix.join(', ') : 'no one';
     const verb = cursedAtSix.length === 1 ? 'is' : 'are';
-    noteEl.innerHTML = `Scenario 14 clue: <b>${cursedLabel}</b> ${verb} cursed at t=6.`;
+    noteEl.innerHTML = `Scenario 14 clue: <b>${cursedLabel}</b> ${verb} cursed after the t=6 handoffs.`;
     noteEl.style.display = "block";
   } else if (noteEl) {
     noteEl.textContent = "";
     noteEl.style.display = "none";
   }
+}
+
+function clearRenderedScenario() {
+  qs("results").style.display = "none";
+  qs("resultsHint").style.display = "block";
+  qs("toggleResultsBtn").style.display = "none";
+  qs("toggleResultsBtn").textContent = "Collapse";
+  qs("startingInfoAnswer").style.display = "none";
+  qs("startingInfoShared").textContent = "";
+  qs("locTimeAnswer").style.display = "none";
+  qs("locCharAnswer").style.display = "none";
+  updateStartingInfoNote(null, null);
 }
 
 function renderSelectedScenario({ res, cfg, percentile, sampleCount, skipped, solutions, targetIdx, source }) {
@@ -1711,6 +1723,7 @@ qs("genBtn").addEventListener("click", async () => {
   const difficulty = percentile / 100;
   const s9FrozenRatio = 0.2 + (1 - difficulty) * 0.5;
 
+  clearRenderedScenario();
   qs("status").textContent = `Generating ${sampleCount} scenarios...`;
 
   const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
