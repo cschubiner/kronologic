@@ -1262,10 +1262,15 @@
 
                 return { elements, roomNames: Array.from(nodes) };
             } catch (error) {
-                errorDiv.textContent = `Error parsing graph: ${error.message}`;
-                errorDiv.classList.add('show');
+                showSheetError(`Error parsing graph: ${error.message}`);
                 return null;
             }
+        }
+
+        function showSheetError(message) {
+            const errorDiv = document.getElementById('graphError');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
         }
 
         function generateRandomEdges(roomNames) {
@@ -1331,15 +1336,27 @@
                 return; // Error message already shown
             }
 
+            const characterNames = characterInput
+                .split(',')
+                .map(name => name.trim())
+                .filter(Boolean);
+            if (characterNames.length === 0) {
+                showSheetError('Enter at least one character name.');
+                return;
+            }
+            if (new Set(characterNames).size !== characterNames.length) {
+                showSheetError('Character names must be unique.');
+                return;
+            }
+
             graphElements = parsed.elements;
             state.rooms = parsed.roomNames;
 
             state.timesteps = timestepCount;
-            state.characters = characterInput.split(',').map((name, idx) => {
-                const trimmed = name.trim();
+            state.characters = characterNames.map((name, idx) => {
                 return {
-                    name: trimmed,
-                    initial: trimmed[0].toUpperCase(),
+                    name,
+                    initial: name[0].toUpperCase(),
                     color: characterColors[idx % characterColors.length]
                 };
             });

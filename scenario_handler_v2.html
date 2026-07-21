@@ -636,7 +636,8 @@ import {
   parseMermaid,
   neighbors,
   buildCNF,
-  solveAndDecode
+  solveAndDecode,
+  validateScenarioConfig
 } from './src/scenario-solver.js';
 import {
   clampPercentile,
@@ -1370,6 +1371,7 @@ qs("genBtn").addEventListener("click", async () => {
   };
 
   try {
+    validateScenarioConfig(cfg);
     const solutions = [];
     let skipped = 0;
     const randomSeed = () => {

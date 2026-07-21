@@ -21,6 +21,38 @@ export function resolveSeed(seed) {
     : Math.floor(Math.random() * 0xffffffff);
 }
 
+function hasConfiguredValue(value) {
+  return value !== null && value !== undefined && value !== "";
+}
+
+export function validateScenarioConfig(config) {
+  if (!config.scenarios?.s1) return;
+
+  const requestedRoom = config.scenarios.s1_room;
+  if (
+    hasConfiguredValue(requestedRoom) &&
+    !config.rooms?.includes(requestedRoom)
+  ) {
+    throw new Error(
+      `S1 poison room must match a configured room: ${requestedRoom}`,
+    );
+  }
+
+  const requestedTimeValue = config.scenarios.s1_time;
+  if (hasConfiguredValue(requestedTimeValue)) {
+    const requestedTime = Number(requestedTimeValue);
+    if (
+      !Number.isInteger(requestedTime) ||
+      requestedTime < 1 ||
+      requestedTime > config.T
+    ) {
+      throw new Error(
+        `S1 poison time must be an integer from 1 to ${config.T}`,
+      );
+    }
+  }
+}
+
 function shuffleWithSeed(list, seed) {
   const out = [...list];
   const rng = mulberry32(seed);
@@ -473,6 +505,7 @@ export function neighbors(rooms, edges, includeSelf) {
    =========================== */
 export function buildCNF(config) {
   // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5}, seed}
+  validateScenarioConfig(config);
   const resolvedSeed = resolveSeed(config.seed);
   const shuffledRooms = Array.isArray(config.rooms)
     ? shuffleWithSeed(config.rooms, resolvedSeed)
@@ -483,7 +516,7 @@ export function buildCNF(config) {
   const R = shuffledRooms,
     C = config.chars,
     T = config.T;
-  const baseStay = config.allowStay && !config.mustMove;
+  const baseStay = !!config.allowStay;
   const stickyStay = !!(
     config.scenarios &&
     (config.scenarios.s8 ||
@@ -1328,13 +1361,13 @@ export function buildCNF(config) {
 
     clauses.push([-V[assassinIdx]]);
 
-    if (config.scenarios.s1_room) {
+    if (hasConfiguredValue(config.scenarios.s1_room)) {
       const ri = Ridx.get(config.scenarios.s1_room);
-      if (ri != null) clauses.push([PR[ri]]);
+      clauses.push([PR[ri]]);
     }
-    if (config.scenarios.s1_time) {
-      const t = Number(config.scenarios.s1_time) - 1;
-      if (!Number.isNaN(t) && t >= 0 && t < T) clauses.push([PT[t]]);
+    if (hasConfiguredValue(config.scenarios.s1_time)) {
+      const requestedTime = Number(config.scenarios.s1_time);
+      clauses.push([PT[requestedTime - 1]]);
     }
 
     for (let t = 0; t < T; t++) {
@@ -1675,7 +1708,7 @@ export function buildCNF(config) {
       }
     }
 
-    if (config.mustMove) {
+    if (config.mustMove && !config.allowStay) {
       const freezeSupports = Array.from({ length: C.length }, () =>
         Array.from({ length: T }, () =>
           Array.from({ length: R.length }, () => []),

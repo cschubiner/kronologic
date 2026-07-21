@@ -318,6 +318,53 @@ describe("S1: Poison Scenario", () => {
     expect(res.priv.poison_time).toBe(3);
   });
 
+  it("should reject an unknown fixed poison room", () => {
+    const cfg = {
+      rooms: ["Kitchen", "Library"],
+      edges: [["Kitchen", "Library"]],
+      chars: ["A", "B", "C"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: {
+        s1: true,
+        s1_room: "NotARoom",
+      },
+      seed: 223,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S1 poison room must match a configured room: NotARoom",
+    );
+  });
+
+  it.each([
+    ["string zero", "0"],
+    ["above range", "4"],
+    ["fractional", "1.5"],
+    ["non-numeric", "later"],
+    ["numeric zero", 0],
+    ["NaN", Number.NaN],
+  ])("should reject invalid fixed poison time: %s", (_, s1Time) => {
+    const cfg = {
+      rooms: ["Kitchen", "Library"],
+      edges: [["Kitchen", "Library"]],
+      chars: ["A", "B", "C"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: {
+        s1: true,
+        s1_time: s1Time,
+      },
+      seed: 224,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S1 poison time must be an integer from 1 to 3",
+    );
+  });
+
   it("should ensure victim is distinct from assassin", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
@@ -2655,6 +2702,28 @@ describe("S8: Freeze Scenario", () => {
     });
   });
 
+  it("should let allowStay override mustMove", () => {
+    const baseCfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 6,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 8001,
+    };
+
+    const withMustMove = solveAndDecode({ ...baseCfg, mustMove: true });
+    const withoutMustMove = solveAndDecode({ ...baseCfg, mustMove: false });
+
+    expect(withMustMove).not.toBeNull();
+    expect(withoutMustMove).not.toBeNull();
+    expect(withMustMove.schedule).toEqual(withoutMustMove.schedule);
+  });
+
   it("should keep frozen victims locked in their freeze room", () => {
     const cfg = {
       rooms: ["Hall", "Lab", "Vault"],
@@ -3085,6 +3154,23 @@ describe("Movement Constraints", () => {
     const res = solveAndDecode(cfg);
     expect(res).not.toBeNull();
     expect(res.schedule["X"]).toHaveLength(cfg.T);
+  });
+
+  it("should let allowStay override mustMove", () => {
+    const cfg = {
+      rooms: ["Only Room"],
+      edges: [],
+      chars: ["X"],
+      T: 3,
+      mustMove: true,
+      allowStay: true,
+      scenarios: {},
+      seed: 901,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.schedule.X).toEqual(["Only Room", "Only Room", "Only Room"]);
   });
 });
 
