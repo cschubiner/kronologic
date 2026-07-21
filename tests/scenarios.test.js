@@ -178,12 +178,17 @@ describe("parseMermaid", () => {
 describe("S1: Poison Scenario", () => {
   it("should always make first character the assassin", () => {
     const cfg = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
-      chars: ["Alice", "Bob", "Charlie"],
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["Alice", "Bob", "Charlie", "Dana"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 0,
     };
@@ -202,8 +207,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 100,
     };
@@ -232,8 +235,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 400,
     };
@@ -266,12 +267,14 @@ describe("S1: Poison Scenario", () => {
 
   it("should not allow victim to be assassin", () => {
     const cfg = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
-      chars: ["X", "Y", "Z"],
-      T: 3,
-      mustMove: false,
-      allowStay: true,
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
+      chars: ["W", "X", "Y", "Z"],
+      T: 4,
       scenarios: { s1: true },
       seed: 789,
     };
@@ -290,8 +293,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["A", "B", "C"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: {
         s1: true,
         s1_room: "Kitchen",
@@ -313,8 +314,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: {
         s1: true,
         s1_time: "3",
@@ -333,8 +332,6 @@ describe("S1: Poison Scenario", () => {
       edges: [["Kitchen", "Library"]],
       chars: ["A", "B", "C"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: {
         s1: true,
         s1_room: "NotARoom",
@@ -360,8 +357,6 @@ describe("S1: Poison Scenario", () => {
       edges: [["Kitchen", "Library"]],
       chars: ["A", "B", "C"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: {
         s1: true,
         s1_time: s1Time,
@@ -383,8 +378,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["Assassin", "Victim1", "Victim2", "Bystander"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 300,
     };
@@ -405,8 +398,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 310,
     };
@@ -450,8 +441,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["Assassin", "V", "X", "Y"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 320,
     };
@@ -483,11 +472,10 @@ describe("S1: Poison Scenario", () => {
       edges: [
         ["Office", "Hallway"],
         ["Hallway", "Closet"],
+        ["Closet", "Office"],
       ],
       chars: ["A", "B", "C"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: {
         s1: true,
         s1_room: "Hallway",
@@ -522,8 +510,6 @@ describe("S1: Poison Scenario", () => {
       ],
       chars: ["Assassin", "V1", "V2", "V3", "V4"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s1: true },
       seed: 220,
     };
@@ -554,12 +540,17 @@ describe("S1: Poison Scenario", () => {
 
   it("should permit exactly two companions at a non-poison moment", () => {
     const cfg = {
-      rooms: ["PoisonRoom", "OtherRoom"],
-      edges: [["PoisonRoom", "OtherRoom"]],
+      rooms: ["PoisonRoom", "OtherRoom", "ThirdRoom", "FourthRoom"],
+      edges: [
+        ["PoisonRoom", "OtherRoom"],
+        ["PoisonRoom", "ThirdRoom"],
+        ["PoisonRoom", "FourthRoom"],
+        ["OtherRoom", "ThirdRoom"],
+        ["OtherRoom", "FourthRoom"],
+        ["ThirdRoom", "FourthRoom"],
+      ],
       chars: ["Assassin", "B", "C", "D"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: {
         s1: true,
         s1_room: "PoisonRoom",
@@ -572,7 +563,11 @@ describe("S1: Poison Scenario", () => {
       "X_Assassin_0_OtherRoom",
       "X_B_0_OtherRoom",
       "X_C_0_OtherRoom",
-      "X_D_0_PoisonRoom",
+      "X_D_0_ThirdRoom",
+      "X_Assassin_1_PoisonRoom",
+      "X_B_1_ThirdRoom",
+      "X_C_1_FourthRoom",
+      "X_D_1_PoisonRoom",
     ]);
   });
 });
@@ -588,8 +583,6 @@ describe("Randomness Guarantees", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 4,
-      mustMove: true,
-      allowStay: false,
       scenarios: {},
     };
 
@@ -614,8 +607,6 @@ describe("Randomness Guarantees", () => {
       ],
       chars: ["Freeze", "Alpha", "Bravo", "Charlie", "Delta"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s8: true },
     };
 
@@ -649,8 +640,6 @@ describe("S2: Phantom Scenario", () => {
       ],
       chars: ["P1", "P2", "P3", "P4"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true },
       seed: 150,
     };
@@ -685,11 +674,10 @@ describe("S2: Phantom Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["P1", "P2", "P3", "P4"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true },
       seed: 100,
     };
@@ -717,8 +705,6 @@ describe("S2: Phantom Scenario", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true },
       seed: 200,
     };
@@ -755,8 +741,6 @@ describe("S2: Phantom Scenario", () => {
       ],
       chars: ["A", "B", "C", "D", "E"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true },
       seed: 220,
     };
@@ -789,8 +773,6 @@ describe("S2: Phantom Scenario", () => {
       ],
       chars: ["Phantom", "Other1", "Other2"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true },
       seed: 230,
     };
@@ -819,8 +801,6 @@ describe("S2: Phantom Scenario", () => {
       ],
       chars: ["P", "N1", "N2", "N3", "N4"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true },
       seed: 240,
     };
@@ -846,7 +826,7 @@ describe("S2: Phantom Scenario", () => {
     });
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should obey mandatory movement", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -856,8 +836,6 @@ describe("S2: Phantom Scenario", () => {
       ],
       chars: ["P", "X", "Y", "Z"],
       T: 4,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s2: true },
       seed: 250,
     };
@@ -898,8 +876,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       edges: [["Atrium", "Library"]],
       chars: ["A", "B"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5000,
     };
@@ -927,8 +903,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       edges: [["Vault", "Jewel"]],
       chars: ["A", "B", "C"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5150,
     };
@@ -961,12 +935,14 @@ describe("S3: Singer's Jewels Scenario", () => {
     for (const T of [1, 2]) {
       for (let seed = 0; seed < 30; seed++) {
         const cfg = {
-          rooms: ["Alpha", "Beta"],
-          edges: [["Alpha", "Beta"]],
-          chars: ["A", "B"],
+          rooms: ["Alpha", "Beta", "Gamma"],
+          edges: [
+            ["Alpha", "Beta"],
+            ["Beta", "Gamma"],
+            ["Gamma", "Alpha"],
+          ],
+          chars: ["A", "B", "C"],
           T,
-          mustMove: false,
-          allowStay: true,
           scenarios: { s3: true },
           seed,
         };
@@ -978,7 +954,7 @@ describe("S3: Singer's Jewels Scenario", () => {
     }
   });
 
-  it("should work with mustMove constraint using alphabetic room", () => {
+  it("should obey mandatory movement using the alphabetic room", () => {
     const cfg = {
       rooms: ["Study", "Kitchen", "Hall"],
       edges: [
@@ -988,8 +964,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["A", "B", "C"],
       T: 4,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s3: true },
       seed: 5010,
     };
@@ -1015,8 +989,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["X", "Y"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5020,
     };
@@ -1040,8 +1012,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       edges: [["Room1", "Room2"]],
       chars: ["Solo"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5030,
     };
@@ -1070,8 +1040,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["P", "Q", "R", "S"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5040,
     };
@@ -1097,8 +1065,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["A", "B"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
     };
 
@@ -1118,7 +1084,7 @@ describe("S3: Singer's Jewels Scenario", () => {
     }
   });
 
-  it("should work with mustMove when alphabetic room is not directly connected to all rooms", () => {
+  it("should obey mandatory movement when the alphabetic room is not directly connected to all rooms", () => {
     const cfg = {
       rooms: ["Zeta", "Alpha", "Beta", "Gamma"],
       edges: [
@@ -1129,8 +1095,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s3: true },
       seed: 5070,
     };
@@ -1158,8 +1122,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["P", "Q"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5080,
     };
@@ -1177,14 +1139,12 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(visited).toBe(true);
   });
 
-  it("should work with minimum configuration (1 room)", () => {
+  it("should support a one-room, one-timestep configuration", () => {
     const cfg = {
       rooms: ["OnlyRoom"],
       edges: [],
       chars: ["A"],
-      T: 2,
-      mustMove: false,
-      allowStay: true,
+      T: 1,
       scenarios: { s3: true },
       seed: 5090,
     };
@@ -1194,7 +1154,6 @@ describe("S3: Singer's Jewels Scenario", () => {
 
     // With only one room, everyone must be in it
     expect(res.schedule["A"][0]).toBe("OnlyRoom");
-    expect(res.schedule["A"][1]).toBe("OnlyRoom");
   });
 
   it("should populate private facts with jewel room and first thief", () => {
@@ -1207,8 +1166,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5100,
     };
@@ -1234,8 +1191,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["P", "Q", "R"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 0,
     };
@@ -1284,8 +1239,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       edges: [["Alpha", "Zoo"]],
       chars: ["B", "A", "C"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5120,
     };
@@ -1346,8 +1299,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       edges: [["X", "Y"]],
       chars: ["Solo"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5130,
     };
@@ -1372,8 +1323,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5140,
     };
@@ -1397,8 +1346,6 @@ describe("S3: Singer's Jewels Scenario", () => {
       ],
       chars: ["P", "Q", "R", "S"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s3: true },
       seed: 5150,
     };
@@ -1436,8 +1383,6 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 400,
     };
@@ -1471,8 +1416,6 @@ describe("S4: Bomb Duo Scenario", () => {
       edges: [["A", "B"]],
       chars: ["M", "N", "O"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 500,
     };
@@ -1484,15 +1427,17 @@ describe("S4: Bomb Duo Scenario", () => {
 
   it("should allow bombers to be alone individually", () => {
     const cfg = {
-      rooms: ["A", "B", "C"],
+      rooms: ["A", "B", "C", "D"],
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
       ],
       chars: ["X", "Y", "Z", "W"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 510,
     };
@@ -1504,24 +1449,26 @@ describe("S4: Bomb Duo Scenario", () => {
       "X_Y_0_B",
       "X_Z_0_B",
       "X_W_0_B",
-      "X_X_1_A",
-      "X_Y_1_A",
-      "X_Z_1_B",
-      "X_W_1_C",
+      "X_X_1_C",
+      "X_Y_1_C",
+      "X_Z_1_A",
+      "X_W_1_D",
     ]);
   });
 
   it("should allow bombers to be in groups of 3+", () => {
     const cfg = {
-      rooms: ["A", "B", "C"],
+      rooms: ["A", "B", "C", "D"],
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
       ],
       chars: ["X", "Y", "Z", "W"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 520,
     };
@@ -1533,10 +1480,10 @@ describe("S4: Bomb Duo Scenario", () => {
       "X_Y_0_A",
       "X_Z_0_A",
       "X_W_0_B",
-      "X_X_1_A",
-      "X_Y_1_A",
+      "X_X_1_C",
+      "X_Y_1_C",
       "X_Z_1_B",
-      "X_W_1_C",
+      "X_W_1_D",
     ]);
   });
 
@@ -1549,8 +1496,6 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 530,
     };
@@ -1586,8 +1531,6 @@ describe("S4: Bomb Duo Scenario", () => {
       edges: [["A", "B"]],
       chars: ["X", "Y", "Z"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 540,
     };
@@ -1627,8 +1570,6 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["A", "B", "C", "D", "E"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 550,
     };
@@ -1653,7 +1594,7 @@ describe("S4: Bomb Duo Scenario", () => {
     });
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should obey mandatory movement", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -1664,8 +1605,6 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s4: true },
       seed: 560,
     };
@@ -1718,8 +1657,6 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["P", "Q", "R", "S", "T"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 570,
     };
@@ -1787,8 +1724,6 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["Ada", "Bea", "Cal", "Dex"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 575,
     };
@@ -1806,7 +1741,7 @@ describe("S4: Bomb Duo Scenario", () => {
     });
   });
 
-  it("should respect graph adjacency when staying is allowed", () => {
+  it("should respect graph adjacency and change rooms every turn", () => {
     const cfg = {
       rooms: ["North", "East", "South", "West"],
       edges: [
@@ -1817,14 +1752,12 @@ describe("S4: Bomb Duo Scenario", () => {
       ],
       chars: ["Hunter", "Iris", "Jules", "Kara"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 580,
     };
 
     testWithThreshold(cfg, (res, cfg) => {
-      const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, true);
+      const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false);
 
       for (const char of cfg.chars) {
         const path = res.schedule[char];
@@ -1837,19 +1770,18 @@ describe("S4: Bomb Duo Scenario", () => {
           expect(nextIdx).toBeDefined();
           expect(currentIdx).toBeDefined();
           expect(nbr[currentIdx]).toContain(nextIdx);
+          expect(current).not.toBe(next);
         }
       }
     });
   });
 
-  it("should work with the true minimum and keep byTime counts aligned", () => {
+  it("should work with the two-room movement minimum and keep byTime counts aligned", () => {
     const cfg = {
-      rooms: ["Workshop"],
-      edges: [],
+      rooms: ["Workshop", "Gallery"],
+      edges: [["Workshop", "Gallery"]],
       chars: ["X", "Y"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s4: true },
       seed: 42,
     };
@@ -1861,7 +1793,7 @@ describe("S4: Bomb Duo Scenario", () => {
     expect(bombers).toEqual(["X", "Y"]);
 
     for (let t = 0; t < cfg.T; t++) {
-      const counts = { Workshop: 0 };
+      const counts = { Workshop: 0, Gallery: 0 };
       for (const char of cfg.chars) {
         const room = res.schedule[char][t];
         counts[room]++;
@@ -1906,11 +1838,10 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["Garden", "Ballroom"],
         ["Ballroom", "Terrace"],
+        ["Terrace", "Garden"],
       ],
       chars: ["Romeo", "Juliet", "Paris", "Nurse"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 600,
     };
@@ -1944,11 +1875,10 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["L1", "L2", "N1", "N2"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 650,
     };
@@ -1969,11 +1899,10 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["Garden", "Ballroom"],
         ["Ballroom", "Terrace"],
+        ["Terrace", "Garden"],
       ],
       chars: ["Romeo", "Juliet", "Paris", "Nurse"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 610,
     };
@@ -1991,12 +1920,14 @@ describe("S5: Lovers Scenario", () => {
 
   it("should have distinct lovers", () => {
     const cfg = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
       chars: ["L1", "L2", "L3"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 700,
     };
@@ -2012,8 +1943,6 @@ describe("S5: Lovers Scenario", () => {
       edges: [["A", "B"]],
       chars: ["X", "Y"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 800,
     };
@@ -2038,12 +1967,11 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
         ["C", "D"],
       ],
       chars: ["L1", "L2", "N1", "N2", "N3", "N4"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 900,
     };
@@ -2082,11 +2010,10 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["X", "Y", "Z"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 1000,
     };
@@ -2097,13 +2024,13 @@ describe("S5: Lovers Scenario", () => {
       "X_X_0_A",
       "X_Y_0_B",
       "X_Z_0_B",
-      "X_X_1_A",
-      "X_Y_1_B",
-      "X_Z_1_A",
+      "X_X_1_C",
+      "X_Y_1_A",
+      "X_Z_1_C",
     ]);
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should obey mandatory movement", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -2113,8 +2040,6 @@ describe("S5: Lovers Scenario", () => {
       ],
       chars: ["L1", "L2", "N1", "N2"],
       T: 4,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s5: true },
       seed: 1100,
     };
@@ -2145,12 +2070,14 @@ describe("S5: Lovers Scenario", () => {
 
   it("should verify lovers can be in adjacent rooms", () => {
     const cfg = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
       chars: ["L1", "L2", "N1"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 1200,
     };
@@ -2161,7 +2088,7 @@ describe("S5: Lovers Scenario", () => {
     const [lover1, lover2] = res.priv.lovers;
 
     // Lovers can be in adjacent rooms (just not the same room)
-    // With only 2 rooms, they should often be in adjacent rooms
+    const { idx, nbr } = neighbors(cfg.rooms, cfg.edges, false);
     let adjacentCount = 0;
     for (let t = 0; t < cfg.T; t++) {
       const room1 = res.schedule[lover1][t];
@@ -2170,8 +2097,7 @@ describe("S5: Lovers Scenario", () => {
       // Never in same room
       expect(room1).not.toBe(room2);
 
-      // Count when they're in different rooms (which means adjacent with only 2 rooms)
-      if (room1 !== room2) adjacentCount++;
+      if (nbr[idx.get(room1)].includes(idx.get(room2))) adjacentCount++;
     }
 
     // They should be in different rooms at all times
@@ -2191,8 +2117,6 @@ describe("S5: Lovers Scenario", () => {
       ],
       chars: ["L1", "L2", "N1", "N2", "N3"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 1300,
     };
@@ -2234,8 +2158,6 @@ describe("S5: Lovers Scenario", () => {
       ],
       chars: ["L1", "L2", "N1", "N2", "N3"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 710,
     };
@@ -2277,11 +2199,10 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["Room1", "Room2"],
         ["Room2", "Room3"],
+        ["Room3", "Room1"],
       ],
       chars: ["A", "B", "C", "D"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
       seed: 720,
     };
@@ -2311,11 +2232,10 @@ describe("S5: Lovers Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["C1", "C2", "C3", "C4"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s5: true },
     };
 
@@ -2370,8 +2290,6 @@ describe("S6: Phantom + Lovers Scenario (S2 + S5)", () => {
       ],
       chars: ["P", "L1", "L2", "N1", "N2"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true, s5: true },
       seed: 1500,
     };
@@ -2399,11 +2317,10 @@ describe("S6: Phantom + Lovers Scenario (S2 + S5)", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["P", "L", "N1", "N2"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true, s5: true },
       seed: 1510,
     };
@@ -2431,8 +2348,6 @@ describe("S6: Phantom + Lovers Scenario (S2 + S5)", () => {
       ],
       chars: ["P", "L", "N1", "N2", "N3"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true, s5: true },
       seed: 1520,
     };
@@ -2456,8 +2371,6 @@ describe("S6: Phantom + Lovers Scenario (S2 + S5)", () => {
       ],
       chars: ["P", "L1", "L2", "N1", "N2"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true, s5: true },
       seed: 1530,
     };
@@ -2509,8 +2422,6 @@ describe("S6: Phantom + Lovers Scenario (S2 + S5)", () => {
         ["A", "B"],
         ["B", "C"],
       ],
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true, s5: true },
       seed: 1540,
     };
@@ -2549,11 +2460,10 @@ describe("S7: Aggrosassin Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["X", "Y", "Z", "W"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7000,
     };
@@ -2570,11 +2480,10 @@ describe("S7: Aggrosassin Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["X", "Y", "Z", "W"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7010,
     };
@@ -2618,8 +2527,6 @@ describe("S7: Aggrosassin Scenario", () => {
       ],
       chars: ["P", "Q", "R", "S", "T"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7020,
     };
@@ -2696,12 +2603,14 @@ describe("S7: Aggrosassin Scenario", () => {
 
   it("should work with minimum configuration", () => {
     const cfg = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
       chars: ["X", "Y", "Z"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7030,
     };
@@ -2714,12 +2623,14 @@ describe("S7: Aggrosassin Scenario", () => {
 
   it("should enforce the minimum-two kill quota when T=2", () => {
     const cfg = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
       chars: ["X", "Y", "Z"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7031,
     };
@@ -2735,8 +2646,6 @@ describe("S7: Aggrosassin Scenario", () => {
       edges: [["A", "B"]],
       chars: ["X", "Y"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7032,
     };
@@ -2752,11 +2661,10 @@ describe("S7: Aggrosassin Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7040,
     };
@@ -2806,7 +2714,7 @@ describe("S7: Aggrosassin Scenario", () => {
     });
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should obey mandatory movement", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -2817,8 +2725,6 @@ describe("S7: Aggrosassin Scenario", () => {
       ],
       chars: ["P", "Q", "R", "S", "T"],
       T: 6,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s7: true },
       seed: 7050,
     };
@@ -2890,11 +2796,10 @@ describe("S7: Aggrosassin Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
       chars: ["First", "Second", "Third", "Fourth"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s7: true },
       seed: 7060,
     };
@@ -2938,8 +2843,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8000,
     };
@@ -2967,8 +2870,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Ari", "Bea", "Cal", "Dee", "Eli", "Flo"],
       T: 7,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8005,
     };
@@ -3007,8 +2908,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Ari", "Bea", "Cal", "Dee", "Eli", "Flo"],
       T: 7,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 0,
     };
@@ -3021,26 +2920,33 @@ describe("S8: Freeze Scenario", () => {
     ]);
   });
 
-  it("should let allowStay override mustMove", () => {
-    const baseCfg = {
+  it("should keep characters moving until a Freeze effect locks them", () => {
+    const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
-      chars: ["W", "X", "Y", "Z"],
-      T: 6,
-      allowStay: true,
+      chars: ["W", "X", "Y", "Z", "V"],
+      T: 7,
       scenarios: { s8: true },
       seed: 8001,
     };
 
-    const withMustMove = solveAndDecode({ ...baseCfg, mustMove: true });
-    const withoutMustMove = solveAndDecode({ ...baseCfg, mustMove: false });
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    const frozenAt = new Map(
+      (res.priv.freeze_kills || []).map((kill) => [kill.victim, kill.time]),
+    );
 
-    expect(withMustMove).not.toBeNull();
-    expect(withoutMustMove).not.toBeNull();
-    expect(withMustMove.schedule).toEqual(withoutMustMove.schedule);
+    for (const ch of cfg.chars) {
+      for (let t = 0; t < cfg.T - 1; t++) {
+        if (res.schedule[ch][t] !== res.schedule[ch][t + 1]) continue;
+        expect(frozenAt.has(ch)).toBe(true);
+        expect(frozenAt.get(ch)).toBeLessThanOrEqual(t + 1);
+      }
+    }
   });
 
   it("should keep frozen victims locked in their freeze room", () => {
@@ -3052,8 +2958,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Freeze", "Alpha", "Bravo", "Charlie"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s8: true },
       seed: 8100,
     };
@@ -3081,8 +2985,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Freeze", "Delta", "Echo", "Foxtrot"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s8: true },
       seed: 8200,
     };
@@ -3127,8 +3029,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["X", "Y", "Z", "W"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8300,
     };
@@ -3156,8 +3056,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["F", "V1", "V2", "V3"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8400,
     };
@@ -3196,8 +3094,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Freeze", "V1", "V2"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s8: true },
       seed: 8500,
     };
@@ -3229,8 +3125,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Freeze", "V1", "V2", "V3", "V4"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8600,
     };
@@ -3269,8 +3163,6 @@ describe("S8: Freeze Scenario", () => {
       edges: [["A", "B"]],
       chars: ["Freeze", "Victim"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8700,
     };
@@ -3293,8 +3185,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["F", "V1", "V2"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 8800,
     };
@@ -3317,8 +3207,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Other", "Freeze", "Victim", "Visitor"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 0,
     };
@@ -3345,8 +3233,6 @@ describe("S8: Freeze Scenario", () => {
       ],
       chars: ["Freeze", "A", "B", "C"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s8: true },
       seed: 9000,
     };
@@ -3410,11 +3296,10 @@ describe("S6 Verification Tests", () => {
       edges: [
         ["X", "Y"],
         ["Y", "Z"],
+        ["Z", "X"],
       ],
       chars: ["Phantom", "Lover1", "Lover2", "Other"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s2: true, s5: true },
       seed: 50,
     };
@@ -3435,8 +3320,8 @@ describe("S6 Verification Tests", () => {
   });
 });
 
-describe("Movement Constraints", () => {
-  it("should enforce adjacent movement when mustMove=true", () => {
+describe("Movement invariant", () => {
+  it("always requires adjacent movement to a different room", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -3445,8 +3330,6 @@ describe("Movement Constraints", () => {
       ],
       chars: ["X", "Y"],
       T: 4,
-      mustMove: true,
-      allowStay: false,
       scenarios: {},
       seed: 800,
     };
@@ -3470,14 +3353,12 @@ describe("Movement Constraints", () => {
     }
   });
 
-  it("should allow staying when allowStay=true", () => {
+  it("supports the smallest map that still permits movement", () => {
     const cfg = {
       rooms: ["A", "B"],
       edges: [["A", "B"]],
       chars: ["X"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: {},
       seed: 900,
     };
@@ -3485,23 +3366,22 @@ describe("Movement Constraints", () => {
     const res = solveAndDecode(cfg);
     expect(res).not.toBeNull();
     expect(res.schedule["X"]).toHaveLength(cfg.T);
+    expect(res.schedule.X[0]).not.toBe(res.schedule.X[1]);
+    expect(res.schedule.X[1]).not.toBe(res.schedule.X[2]);
   });
 
-  it("should let allowStay override mustMove", () => {
+  it("cannot build a multi-timestep schedule without a legal move", () => {
     const cfg = {
       rooms: ["Only Room"],
       edges: [],
       chars: ["X"],
       T: 3,
-      mustMove: true,
-      allowStay: true,
       scenarios: {},
       seed: 901,
     };
 
     const res = solveAndDecode(cfg);
-    expect(res).not.toBeNull();
-    expect(res.schedule.X).toEqual(["Only Room", "Only Room", "Only Room"]);
+    expect(res).toBeNull();
   });
 });
 
@@ -3512,8 +3392,6 @@ describe("Edge Cases", () => {
       edges: [["A", "B"]],
       chars: ["X", "Y"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: {},
       seed: 1100,
     };
@@ -3524,12 +3402,14 @@ describe("Edge Cases", () => {
 
   it("should handle S1 with both fixed room and time", () => {
     const cfg = {
-      rooms: ["Kitchen", "Library"],
-      edges: [["Kitchen", "Library"]],
-      chars: ["A", "B", "C"],
-      T: 3,
-      mustMove: false,
-      allowStay: true,
+      rooms: ["Kitchen", "Library", "Gallery"],
+      edges: [
+        ["Kitchen", "Library"],
+        ["Library", "Gallery"],
+        ["Gallery", "Kitchen"],
+      ],
+      chars: ["A", "B", "C", "D"],
+      T: 4,
       scenarios: {
         s1: true,
         s1_room: "Kitchen",
@@ -3555,8 +3435,6 @@ describe("S9: Doctor freeze scenario", () => {
       ],
       chars: ["Dana", "Eli", "Farah", "Gus"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s9: true },
       seed: 500,
     };
@@ -3600,8 +3478,6 @@ describe("S9: Doctor freeze scenario", () => {
       ],
       chars: ["Doc", "P1", "P2", "P3"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s9: true },
       seed: 1,
     };
@@ -3621,8 +3497,6 @@ describe("S9: Doctor freeze scenario", () => {
       edges: [["A", "B"]],
       chars: ["Doctor", "Patient"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s9: true },
       seed: 2,
     };
@@ -3638,7 +3512,7 @@ describe("S9: Doctor freeze scenario", () => {
     );
   });
 
-  it("honors mustMove before and after frozen characters thaw", () => {
+  it("enforces movement before and after frozen characters thaw", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -3649,8 +3523,6 @@ describe("S9: Doctor freeze scenario", () => {
       ],
       chars: ["Ari", "Bea", "Cal", "Dee", "Eli", "Flo"],
       T: 6,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s9: true, s9FrozenRatio: 0.5 },
       seed: 510,
     };
@@ -3683,8 +3555,6 @@ describe("S9: Doctor freeze scenario", () => {
       ],
       chars: ["Ada", "Bev", "Ciro", "Dev", "Ema", "Finn"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s9: true },
       seed: 820,
     };
@@ -3709,8 +3579,6 @@ describe("S9: Doctor freeze scenario", () => {
       ],
       chars: ["Doc", "A", "B", "C", "D", "E", "F", "G"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s9: true, s9FrozenRatio: 0.6 },
       seed: 905,
     };
@@ -3737,8 +3605,6 @@ describe("S9: Doctor freeze scenario", () => {
       ],
       chars: ["Ari", "Bea", "Cal", "Dee"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s9: true },
       seed: 520,
     };
@@ -3801,8 +3667,6 @@ describe("S10: Contagion scenario", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s10: true },
       seed: 42,
     };
@@ -3830,8 +3694,6 @@ describe("S10: Contagion scenario", () => {
       ],
       chars: ["Ana", "Ben", "Cate"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s10: true },
       seed: 5,
     };
@@ -3888,8 +3750,6 @@ describe("S11: The Vault", () => {
       ],
       chars: ["Dana", "Inez", "Carl", "Bert"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s11: true },
       seed: 9,
     };
@@ -3910,8 +3770,6 @@ describe("S11: The Vault", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s11: true },
       seed: 3,
     };
@@ -3941,8 +3799,6 @@ describe("S11: The Vault", () => {
       ],
       chars: ["Keyer", "Locke", "Nina", "Omar"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s11: true },
       seed: 15,
     };
@@ -3985,8 +3841,6 @@ describe("S11: The Vault", () => {
       ],
       chars: ["Ava", "Ben", "Cora", "Dina"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s11: true },
       seed: 7,
     };
@@ -4016,8 +3870,6 @@ describe("S11: The Vault", () => {
       ],
       chars: ["Keyer", "Echo", "Ford", "Gray"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s11: true },
       seed: 33,
     };
@@ -4055,8 +3907,6 @@ describe("S11: The Vault", () => {
       ],
       chars: ["A", "B", "C"],
       T: 5,
-      mustMove: true,
-      allowStay: true,
       scenarios: { s11: true },
       seed: 21,
     };
@@ -4073,6 +3923,28 @@ describe("S11: The Vault", () => {
       expect(res.priv.vault.vault_room).toBe(vaultRoom);
     });
   });
+
+  it("rejects configurations that cannot support mandatory Vault movement", () => {
+    const base = {
+      rooms: ["Atrium", "Gallery", "Vault"],
+      edges: [
+        ["Atrium", "Gallery"],
+        ["Gallery", "Vault"],
+        ["Vault", "Atrium"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 3,
+      scenarios: { s11: true },
+      seed: 1,
+    };
+
+    expect(() => solveAndDecode({ ...base, chars: ["A", "B"] })).toThrow(
+      "S11 requires at least three characters",
+    );
+    expect(() => solveAndDecode({ ...base, T: 2 })).toThrow(
+      "S11 requires at least three timesteps",
+    );
+  });
 });
 
 describe("S12: Glue Room", () => {
@@ -4085,8 +3957,6 @@ describe("S12: Glue Room", () => {
       ],
       chars: ["A", "B", "C"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s12: true },
       seed: 4,
     };
@@ -4121,8 +3991,6 @@ describe("S12: Glue Room", () => {
       edges: [["North", "South"]],
       chars: ["A", "B", "C"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s12: true },
       seed: 9,
     };
@@ -4169,8 +4037,6 @@ describe("S12: Glue Room", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s12: true },
       seed: 11,
     };
@@ -4191,6 +4057,36 @@ describe("S12: Glue Room", () => {
       }
     });
   });
+
+  it("allows stationary turns only when a glue-room entry forces them", () => {
+    const cfg = {
+      rooms: ["Atrium", "Study", "Garden"],
+      edges: [
+        ["Atrium", "Study"],
+        ["Study", "Garden"],
+        ["Garden", "Atrium"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 6,
+      scenarios: { s12: true },
+      seed: 12,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const glueRoom = res.priv.glue_room.glue_room;
+      for (const ch of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const current = res.schedule[ch][t];
+          const next = res.schedule[ch][t + 1];
+          if (current !== next) continue;
+
+          expect(current).toBe(glueRoom);
+          const justEntered = t === 0 || res.schedule[ch][t - 1] !== glueRoom;
+          expect(justEntered).toBe(true);
+        }
+      }
+    });
+  });
 });
 
 describe("S13: Glue Shoes", () => {
@@ -4203,8 +4099,6 @@ describe("S13: Glue Shoes", () => {
       ],
       chars: ["A", "B", "C", "D"],
       T: 6,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s13: true },
       seed: 3,
     };
@@ -4234,8 +4128,6 @@ describe("S13: Glue Shoes", () => {
       edges: [["A", "B"]],
       chars: ["G1", "G2", "G3"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s13: true },
       seed: 7,
     };
@@ -4272,8 +4164,6 @@ describe("S13: Glue Shoes", () => {
       ],
       chars: ["A", "B", "C"],
       T: 4,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s13: true },
       seed: 12,
     };
@@ -4300,14 +4190,12 @@ describe("S13: Glue Shoes", () => {
     });
   });
 
-  it("keeps the glue carrier moving when mustMove is enforced", () => {
+  it("keeps the glue carrier moving while victims are stuck", () => {
     const cfg = {
       rooms: ["Alpha", "Beta"],
       edges: [["Alpha", "Beta"]],
       chars: ["G", "V1", "V2"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s13: true },
       seed: 2,
     };
@@ -4319,7 +4207,7 @@ describe("S13: Glue Shoes", () => {
         const stuckRoom = res.schedule[glueCarrier][t];
         const nextRoom = res.schedule[glueCarrier][t + 1];
 
-        // Glue carrier should never be forced to stay; mustMove keeps them traveling.
+        // The glue carrier is never affected by their own glue.
         expect(nextRoom).not.toBe(stuckRoom);
       }
 
@@ -4335,14 +4223,12 @@ describe("S13: Glue Shoes", () => {
     });
   });
 
-  it("keeps the glue carrier moving even when staying is allowed", () => {
+  it("keeps the glue carrier moving throughout the scenario", () => {
     const cfg = {
       rooms: ["North", "South"],
       edges: [["North", "South"]],
       chars: ["Gluey", "Traveler"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s13: true },
       seed: 1,
     };
@@ -4366,8 +4252,6 @@ describe("S14: The Curse of Amarinta", () => {
       edges: [["Hall", "Garden"]],
       chars: ["A", "B", "C"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s14: true },
       seed: 14,
     };
@@ -4395,8 +4279,6 @@ describe("S14: The Curse of Amarinta", () => {
       ],
       chars: ["Inez", "Jade", "Kari", "Lark"],
       T: 6,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s14: true },
       seed: 21,
     };
@@ -4435,8 +4317,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1500,
     };
@@ -4459,8 +4339,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1501,
     };
@@ -4483,8 +4361,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1502,
     };
@@ -4508,8 +4384,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["P", "Q", "R", "S", "T"],
       T: 8,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1503,
     };
@@ -4524,7 +4398,7 @@ describe("S15: World Travelers", () => {
     });
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should obey mandatory movement", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D", "E"],
       edges: [
@@ -4537,8 +4411,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z", "W"],
       T: 8,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s15: true },
       seed: 1504,
     };
@@ -4563,18 +4435,16 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1510,
     };
 
     testWithThreshold(cfg, (res) => {
       const wt = res.priv.world_travelers;
-      expect(wt.targets).toEqual({ first: 2, second: 1, third: 1 });
+      expect(wt.targets).toEqual({ first: 2, second: 2, third: 2 });
       expect(wt.visit_counts[wt.first]).toBe(2);
-      expect(wt.visit_counts[wt.second]).toBe(1);
-      expect(wt.visit_counts[wt.third]).toBe(1);
+      expect(wt.visit_counts[wt.second]).toBe(2);
+      expect(wt.visit_counts[wt.third]).toBe(2);
     });
   });
 
@@ -4587,8 +4457,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1505,
     };
@@ -4606,8 +4474,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1506,
     };
@@ -4627,8 +4493,6 @@ describe("S15: World Travelers", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s15: true },
       seed: 1507,
     };
@@ -4655,8 +4519,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["W", "X", "Y", "Z", "Q"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1600,
     };
@@ -4699,8 +4561,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1601,
     };
@@ -4723,8 +4583,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["P", "Q", "R"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1602,
     };
@@ -4751,8 +4609,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["L", "M", "N", "O", "P", "Q"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 16001,
     };
@@ -4779,8 +4635,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1603,
     };
@@ -4807,8 +4661,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1604,
     };
@@ -4826,7 +4678,7 @@ describe("S16: Homebodies", () => {
     });
   });
 
-  it("should allow the homebody to stay even when movement is forced globally", () => {
+  it("should keep the homebody as the explicit movement exception", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -4837,8 +4689,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 5,
-      mustMove: true,
-      allowStay: false,
       scenarios: { s16: true },
       seed: 1609,
     };
@@ -4866,8 +4716,6 @@ describe("S16: Homebodies", () => {
       edges: [["A", "B"]],
       chars: ["X", "Y", "Z"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1605,
     };
@@ -4892,8 +4740,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["X"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1606,
     };
@@ -4914,8 +4760,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 8,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1607,
     };
@@ -4940,8 +4784,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1608,
     };
@@ -4976,8 +4818,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["L", "M", "N"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1610,
     };
@@ -5001,8 +4841,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["O", "P", "Q"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1611,
     };
@@ -5028,8 +4866,6 @@ describe("S16: Homebodies", () => {
       ],
       chars: ["R", "S"],
       T: 2,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s16: true },
       seed: 1612,
     };
@@ -5055,8 +4891,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s17: true },
       seed: 1700,
     };
@@ -5080,8 +4914,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["P", "Q", "R", "S", "T"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s17: true },
       seed: 1707,
     };
@@ -5121,8 +4953,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["P", "Q", "R", "S"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s17: true },
       seed: 1701,
     };
@@ -5167,7 +4997,7 @@ describe("S17: Triple Alibi", () => {
     });
   });
 
-  it("should work with mustMove constraint", () => {
+  it("should obey mandatory movement", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -5178,7 +5008,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["W", "X", "Y", "Z"],
       T: 6,
-      mustMove: true,
       scenarios: { s17: true },
       seed: 1703,
     };
@@ -5213,8 +5042,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s17: true },
       seed: 1704,
     };
@@ -5251,8 +5078,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["P", "Q", "R", "S", "T"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s17: true },
       seed: 1706,
     };
@@ -5299,8 +5124,6 @@ describe("S17: Triple Alibi", () => {
       ],
       chars: ["P", "Q", "R", "S"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s17: true },
       seed: 1705,
     };
@@ -5344,8 +5167,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1800,
     };
@@ -5372,8 +5193,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["P", "Q", "R", "S"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1801,
     };
@@ -5403,8 +5222,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["P", "Q", "R", "S"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1802,
     };
@@ -5427,8 +5244,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["X", "Y"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1803,
     };
@@ -5459,8 +5274,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["X", "Y"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1804,
     };
@@ -5489,8 +5302,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["X", "Y", "Z"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1805,
     };
@@ -5528,8 +5339,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["M", "N", "O"],
       T: 6,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1810,
     };
@@ -5561,8 +5370,6 @@ describe("S18: Heavy Sofa", () => {
       ],
       chars: ["P", "Q"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1806,
     };
@@ -5587,8 +5394,6 @@ describe("S18: Heavy Sofa", () => {
       edges: [],
       chars: ["X", "Y"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1807,
     };
@@ -5602,8 +5407,6 @@ describe("S18: Heavy Sofa", () => {
       edges: [["A", "B"]],
       chars: ["X"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s18: true },
       seed: 1808,
     };
@@ -5625,8 +5428,6 @@ describe("S19: Crowded Alibi", () => {
       ],
       chars: ["Ava", "Bea", "Cal", "Dee"],
       T: 4,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s19: true },
       seed: 1901,
     };
@@ -5666,8 +5467,6 @@ describe("S19: Crowded Alibi", () => {
       ],
       chars: ["Ivy", "Jay", "Kai", "Lou"],
       T: 5,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s19: true },
       seed: 1902,
     };
@@ -5688,8 +5487,6 @@ describe("S19: Crowded Alibi", () => {
       edges: [],
       chars: ["A", "B", "C"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s19: true },
       seed: 1903,
     };
@@ -5699,8 +5496,6 @@ describe("S19: Crowded Alibi", () => {
       edges: [["A", "B"]],
       chars: ["A", "B"],
       T: 3,
-      mustMove: false,
-      allowStay: true,
       scenarios: { s19: true },
       seed: 1904,
     };

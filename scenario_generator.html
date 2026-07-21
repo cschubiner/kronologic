@@ -510,11 +510,7 @@
       </label>
       <input id="steps" type="number" min="2" max="10" class="pill" value="6" style="width:80px;" />
     </div>
-    <div class="row">
-      <label>Movement:</label>
-      <label><input type="checkbox" id="mustMove" checked /> Must move each time</label>
-      <label><input type="checkbox" id="allowStay" /> Allow stay</label>
-    </div>
+    <div class="hint tiny">Characters move to a connected room every timestep unless the selected scenario temporarily forces them to stay.</div>
     <div class="row">
       <label for="seed">Seed (optional):</label>
       <input id="seed" type="text" class="pill" placeholder="blank = random" style="width:120px;" />
@@ -1720,8 +1716,6 @@ qs("genBtn").addEventListener("click", async () => {
   const {rooms, edges} = parseMermaid(qs("mermaidInput").value);
   const chars = qs("chars").value.split(",").map(s => s.trim()).filter(Boolean);
   const T = Math.max(2, Math.min(10, Number(qs("steps").value) || 6));
-  const mustMove = qs("mustMove").checked;
-  const allowStay = qs("allowStay").checked;
 
   if (rooms.length < 2 || edges.length < 1) { qs("status").innerHTML = `<span class="warn">Map too small.</span>`; return; }
   if (chars.length < 2) { qs("status").innerHTML = `<span class="warn">Add at least 2 characters.</span>`; return; }
@@ -1735,7 +1729,7 @@ qs("genBtn").addEventListener("click", async () => {
   }
 
   const cfg = {
-    rooms, edges, chars, T, mustMove, allowStay,
+    rooms, edges, chars, T,
     scenarios: {
       s1: scenarioValue === 's1',
       s2: scenarioValue === 's2' || scenarioValue === 's6',
@@ -1763,6 +1757,13 @@ qs("genBtn").addEventListener("click", async () => {
 
   try {
     validateScenarioConfig(cfg);
+  } catch (e) {
+    console.warn(e.message);
+    qs("status").innerHTML = `<span class="warn">Error: ${e.message}</span>`;
+    return;
+  }
+
+  try {
     const solutions = [];
     let skipped = 0;
     const randomSeed = () => {

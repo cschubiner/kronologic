@@ -40,6 +40,15 @@ export function validateScenarioConfig(config) {
     }
   }
 
+  if (scenarios.s11) {
+    if ((config.chars?.length ?? 0) < 3) {
+      throw new Error("S11 requires at least three characters");
+    }
+    if (!Number.isInteger(config.T) || config.T < 3) {
+      throw new Error("S11 requires at least three timesteps");
+    }
+  }
+
   if (!scenarios.s1) return;
 
   const requestedRoom = scenarios.s1_room;
@@ -541,7 +550,8 @@ export function neighbors(rooms, edges, includeSelf) {
    Problem Encoding
    =========================== */
 export function buildCNF(config) {
-  // config: {rooms[], edges[], chars[], T, mustMove, allowStay, scenarios: {s1:{room?,time?}, s2, s4:{room?}, s5}, seed}
+  // Characters always move to an adjacent room. Scenario rules may create
+  // narrowly scoped exceptions for characters who are forced to remain put.
   validateScenarioConfig(config);
   const resolvedSeed = resolveSeed(config.seed);
   const shuffledRooms = Array.isArray(config.rooms)
@@ -553,8 +563,7 @@ export function buildCNF(config) {
   const R = shuffledRooms,
     C = config.chars,
     T = config.T;
-  const baseStay = !!config.allowStay;
-  const stickyStay = !!(
+  const hasForcedStayScenario = !!(
     config.scenarios &&
     (config.scenarios.s8 ||
       config.scenarios.s9 ||
@@ -609,7 +618,7 @@ export function buildCNF(config) {
     };
   }
 
-  const { idx: Ridx, nbr } = neighbors(R, config.edges, baseStay || stickyStay);
+  const { idx: Ridx, nbr } = neighbors(R, config.edges, hasForcedStayScenario);
 
   // Helper to get variable IDs
   const X = (ci, t, ri) => vp.get(`X_${C[ci]}_${t}_${R[ri]}`);
@@ -670,10 +679,11 @@ export function buildCNF(config) {
     const third = shuffled[2];
 
     const maxUniqueVisits = Math.min(R.length, T);
+    const minimumMobileVisits = T > 1 ? Math.min(2, R.length) : 1;
     const podiumTargets = [
       maxUniqueVisits,
-      Math.max(1, maxUniqueVisits - 1),
-      Math.max(1, maxUniqueVisits - 2),
+      Math.max(minimumMobileVisits, maxUniqueVisits - 1),
+      Math.max(minimumMobileVisits, maxUniqueVisits - 2),
     ];
 
     // Create "visited" helper variables: V_{char}_{room} = true if char visits room at any time
@@ -739,7 +749,7 @@ export function buildCNF(config) {
     enforceExactVisits(thirdTotalizer, podiumTargets[2]);
 
     // Others (4th+): visit fewer rooms than third place where possible
-    const othersMax = Math.max(1, podiumTargets[2] - 1);
+    const othersMax = Math.max(minimumMobileVisits, podiumTargets[2] - 1);
     for (let ci = 0; ci < C.length; ci++) {
       if (C[ci] === first || C[ci] === second || C[ci] === third) continue;
       const otherVars = R.map((_, ri) => S15V(ci, ri));
@@ -928,13 +938,6 @@ export function buildCNF(config) {
   // S11: The Vault — earliest alphabetical room is locked, only the key holder may enter
   if (config.scenarios && config.scenarios.s11) {
     if (!R.length) throw new Error("S11 requires at least one room");
-    if (C.length < 3) throw new Error("S11 requires at least three characters");
-    if (T < 2) throw new Error("S11 requires at least two timesteps");
-    if (config.mustMove && !config.allowStay && T < 3) {
-      throw new Error(
-        "S11 requires at least three timesteps when movement is forced",
-      );
-    }
 
     const vaultRoom = [...R].sort()[0];
     const vr = Ridx.get(vaultRoom);
@@ -1102,10 +1105,14 @@ export function buildCNF(config) {
     if (gr == null) throw new Error("S12 glue room missing from map");
 
     const entriesBeforeFinal = [];
+    const entryVars = Array.from({ length: C.length }, () =>
+      Array(T).fill(null),
+    );
 
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
         const entry = vp.get(`S12Entry_${C[ci]}_${t}`);
+        entryVars[ci][t] = entry;
 
         clauses.push([-entry, X(ci, t, gr)]);
         if (t === 0) {
@@ -1123,6 +1130,18 @@ export function buildCNF(config) {
         }
         if (t < T - 2) {
           clauses.push([-entry, -X(ci, t + 2, gr)]);
+        }
+      }
+    }
+
+    // Staying is legal only for the one transition forced by entering the
+    // glue room. Everyone otherwise follows the normal always-move rule.
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T - 1; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          const clause = [-X(ci, t, ri), -X(ci, t + 1, ri)];
+          if (ri === gr) clause.push(entryVars[ci][t]);
+          clauses.push(clause);
         }
       }
     }
@@ -1190,15 +1209,13 @@ export function buildCNF(config) {
       }
     }
 
-    if (config.mustMove && !config.allowStay) {
-      for (let ci = 0; ci < C.length; ci++) {
-        for (let t = 0; t < T - 1; t++) {
-          for (let ri = 0; ri < R.length; ri++) {
-            const clause = [-X(ci, t, ri), -X(ci, t + 1, ri)];
-            const support = stuckSupports[ci][t + 1][ri];
-            if (support.length) clause.push(...support);
-            clauses.push(clause);
-          }
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let t = 0; t < T - 1; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          const clause = [-X(ci, t, ri), -X(ci, t + 1, ri)];
+          const support = stuckSupports[ci][t + 1][ri];
+          if (support.length) clause.push(...support);
+          clauses.push(clause);
         }
       }
     }
@@ -1716,35 +1733,33 @@ export function buildCNF(config) {
       clauses.push(requiredFirstFreezes);
     }
 
-    if (config.mustMove && !config.allowStay) {
-      const freezeSupports = Array.from({ length: C.length }, () =>
-        Array.from({ length: T }, () =>
-          Array.from({ length: R.length }, () => []),
-        ),
-      );
+    const freezeSupports = Array.from({ length: C.length }, () =>
+      Array.from({ length: T }, () =>
+        Array.from({ length: R.length }, () => []),
+      ),
+    );
 
-      for (let vi = 0; vi < C.length; vi++) {
-        for (let ri = 0; ri < R.length; ri++) {
-          const seen = new Set();
-          for (let t = 0; t < T; t++) {
-            for (const detail of freezeDetailByVictim[vi][t][ri]) {
-              seen.add(detail);
-            }
-            freezeSupports[vi][t][ri] = Array.from(seen);
+    for (let vi = 0; vi < C.length; vi++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        const seen = new Set();
+        for (let t = 0; t < T; t++) {
+          for (const detail of freezeDetailByVictim[vi][t][ri]) {
+            seen.add(detail);
           }
+          freezeSupports[vi][t][ri] = Array.from(seen);
         }
       }
+    }
 
-      for (let vi = 0; vi < C.length; vi++) {
-        for (let t = 0; t < T - 1; t++) {
-          for (let ri = 0; ri < R.length; ri++) {
-            const clause = [-X(vi, t, ri), -X(vi, t + 1, ri)];
-            const support = freezeSupports[vi][t][ri];
-            if (support.length) {
-              clause.push(...support);
-            }
-            clauses.push(clause);
+    for (let vi = 0; vi < C.length; vi++) {
+      for (let t = 0; t < T - 1; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          const clause = [-X(vi, t, ri), -X(vi, t + 1, ri)];
+          const support = freezeSupports[vi][t][ri];
+          if (support.length) {
+            clause.push(...support);
           }
+          clauses.push(clause);
         }
       }
     }
@@ -1845,9 +1860,7 @@ export function buildCNF(config) {
             ]);
             clauses.push([-healVar, -X(ci, t, ri), -X(ci, t + 1, ri)]);
 
-            if (config.mustMove && !config.allowStay) {
-              clauses.push([-X(ci, t, ri), -X(ci, t + 1, ri), frozenVar]);
-            }
+            clauses.push([-X(ci, t, ri), -X(ci, t + 1, ri), frozenVar]);
           }
         }
       }

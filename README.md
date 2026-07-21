@@ -207,7 +207,7 @@ Players must deduce the secret scenario by combining:
 **Rules**:
 - Exactly one character is the Freeze (randomly chosen from all characters)
 - Whenever the Freeze shares a room with exactly **one** other person, that person is frozen
-- Frozen characters remain in that room for all remaining timesteps (even if `mustMove=true`)
+- Frozen characters remain in that room for all remaining timesteps, overriding the normal movement rule
 - **Randomized kill constraints**: The scenario randomly requires:
   - Between 1-3 distinct, first-time freezes (capped by the available victims and non-final timesteps)
   - Specific timesteps where those first-time freezes must happen (excluding the final timestep)
@@ -237,8 +237,8 @@ Players must deduce the secret scenario by combining:
 - Every character who begins frozen remains in their starting room until the doctor heals them
 - Every frozen character is healed exactly once, and heals never happen on the first or last timestep
 - Healing happens in-room: a frozen victim must share the room with the doctor when healed
-- A healed character must **leave their starting room on the immediately following timestep**, even if `mustMove` was disabled
-- With `mustMove=true`, unfrozen and already-thawed characters must move normally; only characters who are still frozen may stay in place
+- A healed character must **leave their starting room on the immediately following timestep**
+- Unfrozen and already-thawed characters move normally; only characters who are still frozen may stay in place
 
 **Goal**: Identify the doctor, list who started frozen, and note the heal times/rooms when they were thawed.
 
@@ -279,6 +279,8 @@ Players must deduce the secret scenario by combining:
 - Nobody may enter The Vault unless the key holder is present at that timestep
 - The key holder must enter The Vault **with company** on at least two different timesteps, and those visits must include at least two distinct companions across the night
 
+**Requirements**: At least 3 characters and 3 timesteps.
+
 **Goal**: Identify the key holder and list everyone who ever entered The Vault.
 
 **Difficulty Factors**:
@@ -297,7 +299,7 @@ Players must deduce the secret scenario by combining:
 - After the forced extra turn, they must leave the glue room immediately (no three-turn streaks in the glue room)
 - If the first time a character arrives is the final timestep, they only appear once (no future turn to show they were stuck)
 - The scenario guarantees at least one glue-room entry that is not on the final timestep
-- Movement rules automatically allow sticking in place, even if "must move" is enabled
+- The forced extra turn is the only exception to the normal movement rule
 
 **Goal**: Identify which room is the glue room and when each character first entered it.
 
@@ -316,7 +318,7 @@ Players must deduce the secret scenario by combining:
 - Whenever the glue carrier shares a room with others (before the final timestep), every other occupant must stay in that room for exactly one additional turn and then leave
 - The glue carrier is never stuck by their own glue and may move freely on the next timestep
 - At least one character must get stuck before the final timestep (so the extra-turn effect is visible)
-- Movement constraints allow stuck victims to remain in place even if "must move" is enabled
+- A stuck victim's forced extra turn is the only exception to the normal movement rule
 
 **Goal**: Identify which character has the glue shoes and when each affected character was first stuck by them.
 
@@ -356,6 +358,7 @@ Players must deduce the secret scenario by combining:
 - **2nd place** visits exactly R-1 rooms (misses one room)
 - **3rd place** visits exactly R-2 rooms (misses two rooms)
 - All other characters visit at most R-3 rooms (loose constraint, ties allowed among non-top-3)
+- When the timeline is shorter than those targets, visit counts scale down to what is reachable, but moving characters still visit at least two rooms
 - Requires at least 4 rooms and 3 characters
 
 **Goal**: Deduce who is 1st, 2nd, and 3rd place by analyzing which rooms each character visited.
@@ -467,9 +470,9 @@ Players must deduce the secret scenario by combining:
 
 3. **Choose Timesteps**: How many time periods (2-10, typically 6)
 
-4. **Movement Rules**:
-   - "Must move each time": Characters can't stay in the same room
-   - "Allow stay": Characters can remain in their current room
+4. **Movement Rule**:
+   - Characters move to a connected room every timestep
+   - Scenario effects may temporarily force an affected character to stay, such as being frozen, waiting to be healed, or being stuck by glue
 
 ### Scenario Selection
 
@@ -484,7 +487,7 @@ Enable one scenario:
 - **S8 (The Freeze)**: No configuration needed
 - **S9 (Doctor's Cure)**: No configuration needed
 - **S10 (Contagion)**: No configuration needed
-- **S11 (The Vault)**: No configuration needed
+- **S11 (The Vault)**: Requires at least 3 characters and 3 timesteps
 - **S12 (Glue Room)**: No configuration needed
 - **S13 (Glue Shoes)**: No configuration needed
 - **S14 (Curse of Amarinta)**: No configuration needed
