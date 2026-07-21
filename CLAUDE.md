@@ -11,8 +11,9 @@ Kronologic is a deduction game scenario generator that uses SAT solving to creat
 - **`src/scenario-solver.js`**: Core SAT solver, CNF builder (`buildCNF()`), decoder (`solveAndDecode()`)
 - **`src/scenario-shared.js`**: Scoring functions, shared utilities
 - **`tests/scenarios.test.js`**: All test cases using Vitest/Bun
-- **`scenario_handler_gpt.html`**: Main scenario generator UI
-- **`scenario_handler_v2.html`**: Alternative UI with grid layout
+- **`scenario_generator.html`**: Canonical scenario generator UI
+- **`scenario_handler_gpt.html`**: Legacy redirect kept for old shared links
+- **`scenario_handler_v2.html`**: Legacy redirect kept for old shared links
 - **`digital-note-sheet.html`**: Player note-taking interface
 
 ## Adding New Scenarios (Condensed)
@@ -21,8 +22,7 @@ When adding a new scenario (e.g., S18), update all of these:
 
 - `src/scenario-solver.js`: add CNF constraints in `buildCNF()`, store `privKeys.SXX`, decode in `solveAndDecode()`. Use `mulberry32(resolvedSeed)` and room names in SAT variable keys.
 - `src/scenario-shared.js`: add `scoreMyScenario()` and hook it in `computeScenarioScore()`.
-- `scenario_handler_gpt.html`: add radio button, `sXX: scenarioValue === 'sXX'` in config, private facts display.
-- `scenario_handler_v2.html`: add to `SCENARIOS`, add `sXX: scenarioValue === 'sXX'`, private facts display.
+- `scenario_generator.html`: add to `SCENARIOS`, add `sXX: scenarioValue === 'sXX'`, and update the private facts display. Both `scenario_handler_*.html` files are legacy redirects and need no scenario-specific changes.
 - `tests/scenarios.test.js`: add `describe("SXX: ...")`, use `testWithThreshold`, include invalid-config throw tests.
 - `README.md`: update Scenarios documentation and Scenario Selection list.
 - Run `bun test`.

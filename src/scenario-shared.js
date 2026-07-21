@@ -102,6 +102,7 @@ function scorePhantom(res, cfg) {
 
 function scoreLovers(res, cfg) {
   const [lover1, lover2] = res.priv.lovers;
+  const phantom = res.priv.phantom;
   const T = cfg.T;
   const chars = cfg.chars;
   let score = 0;
@@ -111,13 +112,13 @@ function scoreLovers(res, cfg) {
         c2 = chars[j];
       if ((c1 === lover1 && c2 === lover2) || (c1 === lover2 && c2 === lover1))
         continue;
+      if (c1 === phantom || c2 === phantom) continue;
       let meetings = 0;
       for (let t = 0; t < T; t++) {
         if (res.schedule[c1][t] === res.schedule[c2][t]) meetings++;
       }
-      if (meetings === 0) score += 100;
-      else if (meetings === 1) score += 80;
-      else if (meetings <= 2) score += 40;
+      if (meetings === 1) score += 80;
+      else if (meetings === 2) score += 40;
     }
   }
   return score;
@@ -157,7 +158,7 @@ function scoreJewels(res, cfg) {
   const T = cfg.T;
   const rooms = cfg.rooms;
   const chars = cfg.chars;
-  const jewelRoom = rooms[0];
+  const jewelRoom = res.priv.singers_jewels?.jewel_room ?? [...rooms].sort()[0];
   let score = 0;
   for (let t = 0; t < T; t++) {
     for (const room of rooms) {
@@ -196,6 +197,7 @@ function scoreBomb(res, cfg) {
 }
 
 function scoreAggrosassin(res, cfg) {
+  const aggrosassin = res.priv.aggrosassin;
   const T = cfg.T;
   const chars = cfg.chars;
   let score = 0;
@@ -204,7 +206,9 @@ function scoreAggrosassin(res, cfg) {
   for (let t = 0; t < T; t++) {
     for (const room of cfg.rooms) {
       const charsInRoom = chars.filter((c) => res.schedule[c][t] === room);
-      if (charsInRoom.length === 2) score += 1;
+      if (charsInRoom.includes(aggrosassin) && charsInRoom.length >= 3) {
+        score += charsInRoom.length - 2;
+      }
     }
   }
   return score;
@@ -229,19 +233,17 @@ function scoreFreeze(res, cfg) {
   return score;
 }
 
-function scoreDoctor(res, cfg) {
+function scoreDoctor(res) {
   const frozen = res.priv.frozen || [];
   const heals = res.priv.heals || [];
-  const frozenRatio = frozen.length / Math.max(1, cfg.chars.length - 1);
-  let score = 80 + (1 - frozenRatio) * 140;
-  const healTimes = new Set();
+  let score = 80 + frozen.length * 40;
+  const healsByTime = new Map();
   for (const heal of heals) {
-    healTimes.add(heal.time);
-    score += 30;
-    if (heal.time > 1 && heal.time < cfg.T) score += 10;
+    healsByTime.set(heal.time, (healsByTime.get(heal.time) || 0) + 1);
   }
-  if (healTimes.size > 1) score += healTimes.size * 15;
-  if (heals.length && frozen.length > 1) score += 25;
+  for (const count of healsByTime.values()) {
+    score += Math.max(0, count - 1) * 15;
+  }
   return score;
 }
 

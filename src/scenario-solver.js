@@ -26,9 +26,23 @@ function hasConfiguredValue(value) {
 }
 
 export function validateScenarioConfig(config) {
-  if (!config.scenarios?.s1) return;
+  const scenarios = config.scenarios ?? {};
 
-  const requestedRoom = config.scenarios.s1_room;
+  if (scenarios.s2 && scenarios.s5) {
+    if ((config.chars?.length ?? 0) < 4) {
+      throw new Error("S6 requires at least 4 characters");
+    }
+    if ((config.rooms?.length ?? 0) < 3) {
+      throw new Error("S6 requires at least 3 rooms");
+    }
+    if (!Number.isInteger(config.T) || config.T < 2) {
+      throw new Error("S6 requires at least 2 timesteps");
+    }
+  }
+
+  if (!scenarios.s1) return;
+
+  const requestedRoom = scenarios.s1_room;
   if (
     hasConfiguredValue(requestedRoom) &&
     !config.rooms?.includes(requestedRoom)
@@ -38,7 +52,7 @@ export function validateScenarioConfig(config) {
     );
   }
 
-  const requestedTimeValue = config.scenarios.s1_time;
+  const requestedTimeValue = scenarios.s1_time;
   if (hasConfiguredValue(requestedTimeValue)) {
     const requestedTime = Number(requestedTimeValue);
     if (
@@ -180,7 +194,7 @@ export function satSolve(clauses, numVars, randSeed = 0, timeoutMs = 12000) {
       if (!assignLiteral(lit, trail)) return false;
       const falseLit = -lit;
       const watchList = getWatchList(falseLit);
-      for (let i = 0; i < watchList.length; ) {
+      for (let i = 0; i < watchList.length;) {
         const ci = watchList[i];
         const clause = clauses[ci];
         const pair = watchers[ci];
@@ -321,6 +335,10 @@ export function varPool() {
       }
       return id.get(name);
     },
+    getExisting(name) {
+      if (!id.has(name)) throw new Error(`Unknown SAT variable: ${name}`);
+      return id.get(name);
+    },
     count() {
       return next - 1;
     },
@@ -348,9 +366,9 @@ export function exactlyOne(vars) {
 }
 
 export function atLeastK(vars, k) {
-  if (k <= 0) return [[]];
+  if (k <= 0) return [];
   const n = vars.length;
-  if (k > n) return [];
+  if (k > n) return [[]];
   const targetSize = n - k + 1;
   const combos = [];
   function backtrack(start, chosen) {
@@ -359,6 +377,25 @@ export function atLeastK(vars, k) {
       return;
     }
     for (let i = start; i < n; i++) {
+      chosen.push(vars[i]);
+      backtrack(i + 1, chosen);
+      chosen.pop();
+    }
+  }
+  backtrack(0, []);
+  return combos;
+}
+
+export function atMostK(vars, k) {
+  if (k < 0) return [[]];
+  if (k >= vars.length) return [];
+  const combos = [];
+  function backtrack(start, chosen) {
+    if (chosen.length === k + 1) {
+      combos.push(chosen.map((v) => -v));
+      return;
+    }
+    for (let i = start; i < vars.length; i++) {
       chosen.push(vars[i]);
       backtrack(i + 1, chosen);
       chosen.pop();
@@ -1182,10 +1219,9 @@ export function buildCNF(config) {
   if (config.scenarios.s3) {
     if (!R.length) throw new Error("S3 requires at least one room");
     const rng = mulberry32(resolvedSeed);
-    const pickupStart = 1 + Math.floor(rng() * 3);
-    if (T < pickupStart) {
-      throw new Error("S3 requires at least " + pickupStart + " timesteps");
-    }
+    const pickupWindow = Math.min(3, T);
+    const pickupStart =
+      C.length === 1 ? 1 : 1 + Math.floor(rng() * pickupWindow);
     const alphabeticRoom = [...R].sort()[0];
     const ri = Ridx.get(alphabeticRoom);
     if (ri == null) throw new Error("S3 alphabetic room missing");
@@ -1304,8 +1340,8 @@ export function buildCNF(config) {
       }
     }
 
-    // Every pair of non-lovers must meet at least once
-    // (Phantom is excluded from this - they're neither lover nor non-lover)
+    // Every pair except the lover pair must meet at least once.
+    // In S6, pairs containing the phantom are excluded.
     for (let ci = 0; ci < C.length; ci++) {
       for (let cj = ci + 1; cj < C.length; cj++) {
         // Create variable: ci and cj meet at least once
@@ -1321,18 +1357,18 @@ export function buildCNF(config) {
           }
         }
 
-        // If neither ci nor cj is a lover AND neither is phantom (if S2 enabled), they must meet
-        // (L1[ci] ∨ L2[ci] ∨ L1[cj] ∨ L2[cj] ∨ PH[ci] ∨ PH[cj]) ∨ (at least one pairMeets is true)
+        // Require regular pairs to meet; lover/regular requirements are below.
         const meetLits = [...pairMeets];
         if (config.scenarios.s2 && PH) {
           meetLits.push(PH[ci], PH[cj]);
-          // S6 scenario: exclude phantom from meeting requirement
+          // S6: exclude pairs containing the phantom.
           clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...meetLits]);
         } else {
-          // S5 only: all non-lovers must meet
+          // S5: every regular pair must meet.
           clauses.push([L1[ci], L2[ci], L1[cj], L2[cj], ...meetLits]);
         }
 
+        // Each lover must also meet every regular character.
         clauses.push([-L1[ci], L2[cj], ...meetLits]);
         clauses.push([-L2[ci], L1[cj], ...meetLits]);
         clauses.push([-L1[cj], L2[ci], ...meetLits]);
@@ -1403,38 +1439,6 @@ export function buildCNF(config) {
         clauses.push([-isPoisonMoment, ...poisonClauses]);
         for (const tp of poisonClauses) {
           clauses.push([-tp, isPoisonMoment]);
-        }
-
-        for (let ci = 0; ci < C.length; ci++) {
-          if (ci === assassinIdx) continue;
-          for (let cj = ci + 1; cj < C.length; cj++) {
-            if (cj === assassinIdx) continue;
-
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
-
-            clauses.push([-exactlyTwo, X(assassinIdx, t, ri)]);
-            clauses.push([-exactlyTwo, X(ci, t, ri)]);
-            clauses.push([-exactlyTwo, X(cj, t, ri)]);
-            for (let ck = 0; ck < C.length; ck++) {
-              if (ck === assassinIdx || ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck, t, ri)]);
-            }
-
-            const others = [];
-            for (let ck = 0; ck < C.length; ck++) {
-              if (ck === assassinIdx || ck === ci || ck === cj) continue;
-              others.push(X(ck, t, ri));
-            }
-            clauses.push([
-              exactlyTwo,
-              -X(assassinIdx, t, ri),
-              -X(ci, t, ri),
-              -X(cj, t, ri),
-              ...others,
-            ]);
-
-            clauses.push([-exactlyTwo, isPoisonMoment]);
-          }
         }
 
         for (let ci = 0; ci < C.length; ci++) {
@@ -1641,9 +1645,10 @@ export function buildCNF(config) {
       ),
     );
 
-    // Randomize freeze constraints based on seed (reuse RNG from freeze selection)
-    // Randomly choose number of required kills (1-3)
-    const numRequiredKills = Math.floor(rng() * 3) + 1; // 1, 2, or 3
+    // Randomize required first-time freezes based on seed. Extra freezes may
+    // still occur outside this required set.
+    const maxRequiredKills = Math.min(3, C.length - 1, T - 1);
+    const numRequiredKills = Math.floor(rng() * maxRequiredKills) + 1;
 
     // Randomly choose which timesteps must have kills (excluding final timestep)
     const availableTimesteps = Array.from({ length: T - 1 }, (_, i) => i);
@@ -1658,54 +1663,57 @@ export function buildCNF(config) {
       availableTimesteps.splice(idx, 1);
     }
 
-    const freezeKillsByTimestep = Array.from({ length: C.length }, () =>
-      Array.from({ length: T }, () => []),
-    );
+    const ci = freezeIdx;
+    for (let vj = 0; vj < C.length; vj++) {
+      if (ci === vj) continue;
+      for (let t = 0; t < T; t++) {
+        for (let ri = 0; ri < R.length; ri++) {
+          const detail = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
+          freezeDetailByVictim[vj][t][ri].push(detail);
 
-    for (let ci = 0; ci < C.length; ci++) {
-      for (let vj = 0; vj < C.length; vj++) {
-        if (ci === vj) continue;
-        for (let t = 0; t < T; t++) {
-          for (let ri = 0; ri < R.length; ri++) {
-            const detail = vp.get(`FRZKill_${C[ci]}_${C[vj]}_${t}_${R[ri]}`);
-            freezeDetailByVictim[vj][t][ri].push(detail);
-            freezeKillsByTimestep[ci][t].push(detail);
+          clauses.push([-detail, X(ci, t, ri)]);
+          clauses.push([-detail, X(vj, t, ri)]);
+          for (let ck = 0; ck < C.length; ck++) {
+            if (ck === ci || ck === vj) continue;
+            clauses.push([-detail, -X(ck, t, ri)]);
+          }
 
-            clauses.push([-detail, FRZ[ci]]);
-            clauses.push([-detail, X(ci, t, ri)]);
-            clauses.push([-detail, X(vj, t, ri)]);
-            for (let ck = 0; ck < C.length; ck++) {
-              if (ck === ci || ck === vj) continue;
-              clauses.push([-detail, -X(ck, t, ri)]);
-            }
+          const reverse = [-X(ci, t, ri), -X(vj, t, ri)];
+          for (let ck = 0; ck < C.length; ck++) {
+            if (ck === ci || ck === vj) continue;
+            reverse.push(X(ck, t, ri));
+          }
+          reverse.push(detail);
+          clauses.push(reverse);
 
-            const reverse = [-FRZ[ci], -X(ci, t, ri), -X(vj, t, ri)];
-            for (let ck = 0; ck < C.length; ck++) {
-              if (ck === ci || ck === vj) continue;
-              reverse.push(X(ck, t, ri));
-            }
-            reverse.push(detail);
-            clauses.push(reverse);
-
-            for (let u = t; u < T; u++) {
-              clauses.push([-detail, X(vj, u, ri)]);
-            }
+          for (let u = t; u < T; u++) {
+            clauses.push([-detail, X(vj, u, ri)]);
           }
         }
       }
     }
 
-    // Require kills at the randomly chosen timesteps
-    for (let ci = 0; ci < C.length; ci++) {
-      for (const t of requiredKillTimesteps) {
-        const killsAtTime = freezeKillsByTimestep[ci][t];
-        if (killsAtTime.length === 0) {
-          throw new Error(
-            `S8 requires a kill opportunity at timestep ${t + 1}`,
-          );
+    // Each selected timestep must introduce a distinct, newly frozen victim.
+    for (const t of requiredKillTimesteps) {
+      const requiredFirstFreezes = [];
+      for (let vj = 0; vj < C.length; vj++) {
+        if (vj === freezeIdx) continue;
+        const requiredFirstFreeze = vp.get(`FRZRequiredFirst_${C[vj]}_${t}`);
+        const detailsAtTime = freezeDetailByVictim[vj][t].flat();
+        requiredFirstFreezes.push(requiredFirstFreeze);
+        clauses.push([-requiredFirstFreeze, ...detailsAtTime]);
+
+        for (let earlier = 0; earlier < t; earlier++) {
+          for (const detail of freezeDetailByVictim[vj][earlier].flat()) {
+            clauses.push([-requiredFirstFreeze, -detail]);
+          }
         }
-        clauses.push([-FRZ[ci], ...killsAtTime]);
       }
+
+      if (requiredFirstFreezes.length === 0) {
+        throw new Error(`S8 requires a kill opportunity at timestep ${t + 1}`);
+      }
+      clauses.push(requiredFirstFreezes);
     }
 
     if (config.mustMove && !config.allowStay) {
@@ -1742,6 +1750,10 @@ export function buildCNF(config) {
     }
 
     privKeys.FRZ = FRZ;
+    privKeys.S8 = {
+      requiredKillCount: requiredKillTimesteps.length,
+      requiredKillTimes: requiredKillTimesteps.map((t) => t + 1),
+    };
   }
 
   // S9: Doctor heals frozen characters
@@ -1749,35 +1761,6 @@ export function buildCNF(config) {
     if (T < 3) throw new Error("S9 requires at least three timesteps");
     if (C.length < 2) throw new Error("S9 requires at least two characters");
     if (R.length < 2) throw new Error("S9 requires at least two rooms");
-
-    const limitAtMostK = (vars, k) => {
-      if (k >= vars.length) return;
-      const combo = (start, chosen) => {
-        if (chosen.length === k + 1) {
-          clauses.push(chosen.map((v) => -v));
-          return;
-        }
-        for (let i = start; i < vars.length; i++) {
-          chosen.push(vars[i]);
-          combo(i + 1, chosen);
-          chosen.pop();
-        }
-      };
-      combo(0, []);
-    };
-
-    const limitAtLeastK = (vars, k) => {
-      if (k <= 0) return;
-      const maxFalse = Math.max(0, vars.length - k);
-      if (maxFalse === 0) {
-        for (const v of vars) clauses.push([v]);
-        return;
-      }
-      limitAtMostK(
-        vars.map((v) => -v),
-        maxFalse,
-      );
-    };
 
     const targetFrozenRatio = Math.max(
       0.2,
@@ -1797,18 +1780,14 @@ export function buildCNF(config) {
       Array(T).fill(null),
     );
     const DocAt = Array.from({ length: T }, () => Array(R.length).fill(null));
-    const LeftStart = C.map((_, ci) => vp.get(`S9Left_${C[ci]}`));
-    const FrozenMoved = C.map((_, ci) => vp.get(`S9FrozenMoved_${C[ci]}`));
-    const diffDetails = Array.from({ length: C.length }, () => []);
-
     clauses.push(...exactlyOne(DOC));
 
     for (let ci = 0; ci < C.length; ci++) {
       clauses.push([-DOC[ci], -FROZ[ci]]);
     }
 
-    limitAtLeastK(FROZ, frozenMin);
-    limitAtMostK(FROZ, frozenMax);
+    clauses.push(...atLeastK(FROZ, frozenMin));
+    clauses.push(...atMostK(FROZ, frozenMax));
 
     for (let t = 0; t < T; t++) {
       for (let ri = 0; ri < R.length; ri++) {
@@ -1820,9 +1799,6 @@ export function buildCNF(config) {
         }
       }
     }
-
-    const healNotFirst = [];
-    const healNotLast = [];
 
     for (let ci = 0; ci < C.length; ci++) {
       for (let t = 0; t < T; t++) {
@@ -1853,8 +1829,7 @@ export function buildCNF(config) {
         clauses.push([-healVar, frozenVar]);
         if (nextFrozenVar) clauses.push([-healVar, -nextFrozenVar]);
 
-        if (t > 0) healNotFirst.push(healVar);
-        if (t < T - 1) healNotLast.push(healVar);
+        if (t === 0 || t === T - 1) clauses.push([-healVar]);
 
         for (let ri = 0; ri < R.length; ri++) {
           clauses.push([-healVar, -X(ci, t, ri), DocAt[t][ri]]);
@@ -1862,47 +1837,23 @@ export function buildCNF(config) {
 
         if (t < T - 1) {
           for (let ri = 0; ri < R.length; ri++) {
-            clauses.push([-frozenVar, -X(ci, t, ri), X(ci, t + 1, ri)]);
+            clauses.push([
+              -frozenVar,
+              healVar,
+              -X(ci, t, ri),
+              X(ci, t + 1, ri),
+            ]);
+            clauses.push([-healVar, -X(ci, t, ri), -X(ci, t + 1, ri)]);
+
+            if (config.mustMove && !config.allowStay) {
+              clauses.push([-X(ci, t, ri), -X(ci, t + 1, ri), frozenVar]);
+            }
           }
         }
       }
+
+      clauses.push([-FROZ[ci], ...Heal[ci].slice(1, T - 1)]);
     }
-
-    clauses.push(healNotFirst);
-    clauses.push(healNotLast);
-
-    for (let ci = 0; ci < C.length; ci++) {
-      for (let ri = 0; ri < R.length; ri++) {
-        for (let rj = 0; rj < R.length; rj++) {
-          if (ri === rj) continue;
-          const detail = vp.get(`S9LeftDetail_${C[ci]}_${R[ri]}_${R[rj]}`);
-          diffDetails[ci].push(detail);
-          clauses.push([-detail, X(ci, 0, ri)]);
-          clauses.push([-detail, X(ci, T - 1, rj)]);
-          clauses.push([-X(ci, 0, ri), -X(ci, T - 1, rj), detail]);
-          clauses.push([-detail, LeftStart[ci]]);
-        }
-      }
-      if (diffDetails[ci].length) {
-        clauses.push([-LeftStart[ci], ...diffDetails[ci]]);
-      } else {
-        clauses.push([-LeftStart[ci]]);
-      }
-      clauses.push([-LeftStart[ci], FROZ[ci]]);
-      clauses.push([-FrozenMoved[ci], FROZ[ci]]);
-      clauses.push([-FrozenMoved[ci], LeftStart[ci]]);
-      clauses.push([-FROZ[ci], -LeftStart[ci], FrozenMoved[ci]]);
-      const healsAfterFirst = [];
-      for (let t = 1; t < T; t++) healsAfterFirst.push(Heal[ci][t]);
-      if (healsAfterFirst.length) {
-        clauses.push([-FrozenMoved[ci], ...healsAfterFirst]);
-      } else {
-        clauses.push([-FrozenMoved[ci]]);
-      }
-      clauses.push([-Heal[ci][0], -FrozenMoved[ci]]);
-    }
-
-    clauses.push(FrozenMoved.slice());
 
     privKeys.S9 = true;
   }
@@ -1924,49 +1875,54 @@ export function buildCNF(config) {
     const bomberAloneChoices = Array.from({ length: C.length }, () =>
       Array.from({ length: C.length }, () => []),
     );
+    const bomberPairs = [];
+
+    for (let ci = 0; ci < C.length; ci++) {
+      for (let cj = ci + 1; cj < C.length; cj++) {
+        const pair1 = vp.get(`pair1_${ci}_${cj}`);
+        const pair2 = vp.get(`pair2_${ci}_${cj}`);
+
+        clauses.push([-pair1, A1[ci]]);
+        clauses.push([-pair1, A2[cj]]);
+        clauses.push([-A1[ci], -A2[cj], pair1]);
+
+        clauses.push([-pair2, A1[cj]]);
+        clauses.push([-pair2, A2[ci]]);
+        clauses.push([-A1[cj], -A2[ci], pair2]);
+
+        bomberPairs.push({ ci, cj, pair1, pair2 });
+      }
+    }
 
     for (let t = 0; t < T; t++) {
       for (let ri = 0; ri < R.length; ri++) {
-        for (let ci = 0; ci < C.length; ci++) {
-          for (let cj = ci + 1; cj < C.length; cj++) {
-            const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
+        for (const { ci, cj, pair1, pair2 } of bomberPairs) {
+          const exactlyTwo = vp.get(`exactlyTwo_${t}_${ri}_${ci}_${cj}`);
 
-            bomberAloneChoices[ci][cj].push(exactlyTwo);
-            bomberAloneChoices[cj][ci].push(exactlyTwo);
+          bomberAloneChoices[ci][cj].push(exactlyTwo);
+          bomberAloneChoices[cj][ci].push(exactlyTwo);
 
-            clauses.push([-exactlyTwo, X(ci, t, ri)]);
-            clauses.push([-exactlyTwo, X(cj, t, ri)]);
+          clauses.push([-exactlyTwo, X(ci, t, ri)]);
+          clauses.push([-exactlyTwo, X(cj, t, ri)]);
 
-            for (let ck = 0; ck < C.length; ck++) {
-              if (ck === ci || ck === cj) continue;
-              clauses.push([-exactlyTwo, -X(ck, t, ri)]);
-            }
-
-            const someoneElse = [];
-            for (let ck = 0; ck < C.length; ck++) {
-              if (ck === ci || ck === cj) continue;
-              someoneElse.push(X(ck, t, ri));
-            }
-            clauses.push([
-              exactlyTwo,
-              -X(ci, t, ri),
-              -X(cj, t, ri),
-              ...someoneElse,
-            ]);
-
-            const pair1 = vp.get(`pair1_${ci}_${cj}`);
-            const pair2 = vp.get(`pair2_${ci}_${cj}`);
-
-            clauses.push([-pair1, A1[ci]]);
-            clauses.push([-pair1, A2[cj]]);
-            clauses.push([-A1[ci], -A2[cj], pair1]);
-
-            clauses.push([-pair2, A1[cj]]);
-            clauses.push([-pair2, A2[ci]]);
-            clauses.push([-A1[cj], -A2[ci], pair2]);
-
-            clauses.push([-exactlyTwo, pair1, pair2]);
+          for (let ck = 0; ck < C.length; ck++) {
+            if (ck === ci || ck === cj) continue;
+            clauses.push([-exactlyTwo, -X(ck, t, ri)]);
           }
+
+          const someoneElse = [];
+          for (let ck = 0; ck < C.length; ck++) {
+            if (ck === ci || ck === cj) continue;
+            someoneElse.push(X(ck, t, ri));
+          }
+          clauses.push([
+            exactlyTwo,
+            -X(ci, t, ri),
+            -X(cj, t, ri),
+            ...someoneElse,
+          ]);
+
+          clauses.push([-exactlyTwo, pair1, pair2]);
         }
       }
     }
@@ -2198,9 +2154,7 @@ export function buildCNF(config) {
         for (let ri = 0; ri < R.length; ri++) {
           for (let rj = 0; rj < R.length; rj++) {
             if (ri === rj) continue;
-            const w = vp.get(
-              `S19_DIFF_${C[ci]}_${t}_${R[ri]}_${R[rj]}`,
-            );
+            const w = vp.get(`S19_DIFF_${C[ci]}_${t}_${R[ri]}_${R[rj]}`);
             witnesses.push(w);
             clauses.push([-w, X(celebIdx, t, ri)]);
             clauses.push([-w, X(ci, t, rj)]);
@@ -2365,6 +2319,10 @@ export function solveAndDecode(cfg) {
       priv.freeze = freezeChar;
       priv.freeze_victims = Array.from(victims);
       priv.freeze_kills = killRecords;
+      if (privKeys.S8) {
+        priv.freeze_required_kills = privKeys.S8.requiredKillCount;
+        priv.freeze_required_times = privKeys.S8.requiredKillTimes;
+      }
     }
   }
   if (privKeys.S9) {
@@ -2811,12 +2769,11 @@ export function solveAndDecode(cfg) {
   if (cfg.scenarios && cfg.scenarios.s3) {
     const jewelRoom = [...R].sort()[0];
     const pickupStart = privKeys.S3?.pickupStart ?? 1;
-    const searchStart = Math.max(0, pickupStart - 1);
 
     // Find who visits the jewel room alone first (earliest timestep)
     let firstThief = null;
     let firstThiefTime = null;
-    for (let t = searchStart; t < T; t++) {
+    for (let t = 0; t < T; t++) {
       const visitorsAtT = C.filter((ch) => schedule[ch][t] === jewelRoom);
       if (visitorsAtT.length === 1) {
         firstThief = visitorsAtT[0];

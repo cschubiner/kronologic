@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildCNF,
   parseMermaid,
+  satSolve,
   solveAndDecode,
   neighbors,
   resolveSeed,
 } from "../src/scenario-solver.js";
+import { scoreScenario } from "../src/scenario-shared.js";
 
 // Helper function to run tests with 70% success threshold
 function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
@@ -40,6 +43,12 @@ function testWithThreshold(cfg, testFn, minSuccessRate = 0.7) {
   }
 
   return { successful, total: results.length, successRate };
+}
+
+function expectForcedVariablesToBeSatisfiable(cfg, variableNames) {
+  const { vp, clauses } = buildCNF(cfg);
+  for (const name of variableNames) clauses.push([vp.getExisting(name)]);
+  expect(satSolve(clauses, vp.count(), cfg.seed)).not.toBeNull();
 }
 
 function computeInfections(schedule, cfg) {
@@ -504,7 +513,7 @@ describe("S1: Poison Scenario", () => {
     });
   });
 
-  it("should allow assassin to be alone or with 3+ people at non-poison times", () => {
+  it("should only allow the assassin alone or with 3+ people at non-poison times", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -524,9 +533,6 @@ describe("S1: Poison Scenario", () => {
       const poisonTime = res.priv.poison_time - 1;
       const poisonRoom = res.priv.poison_room;
 
-      let foundAlone = false;
-      let foundWithMany = false;
-
       for (let t = 0; t < cfg.T; t++) {
         const room = res.schedule[assassin][t];
         const charsInRoom = cfg.chars.filter(
@@ -538,15 +544,36 @@ describe("S1: Poison Scenario", () => {
           expect(charsInRoom).toHaveLength(2);
         } else {
           // Non-poison moment - can be 1 or 3+
-          if (charsInRoom.length === 1) foundAlone = true;
-          if (charsInRoom.length >= 3) foundWithMany = true;
-          expect(charsInRoom.length).not.toBe(2);
+          expect(charsInRoom.length === 1 || charsInRoom.length >= 3).toBe(
+            true,
+          );
         }
       }
-
-      // At least one of these patterns should exist (not strictly required, but likely)
-      expect(foundAlone || foundWithMany).toBe(true);
     });
+  });
+
+  it("should permit exactly two companions at a non-poison moment", () => {
+    const cfg = {
+      rooms: ["PoisonRoom", "OtherRoom"],
+      edges: [["PoisonRoom", "OtherRoom"]],
+      chars: ["Assassin", "B", "C", "D"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: {
+        s1: true,
+        s1_room: "PoisonRoom",
+        s1_time: 2,
+      },
+      seed: 221,
+    };
+
+    expectForcedVariablesToBeSatisfiable(cfg, [
+      "X_Assassin_0_OtherRoom",
+      "X_B_0_OtherRoom",
+      "X_C_0_OtherRoom",
+      "X_D_0_PoisonRoom",
+    ]);
   });
 });
 
@@ -917,7 +944,9 @@ describe("S3: Singer's Jewels Scenario", () => {
 
     let earliestSolo = null;
     for (let t = 0; t < cfg.T; t++) {
-      const visitors = cfg.chars.filter((c) => res.schedule[c][t] === jewelRoom);
+      const visitors = cfg.chars.filter(
+        (c) => res.schedule[c][t] === jewelRoom,
+      );
       if (visitors.length === 1) {
         earliestSolo = t + 1; // human-readable
         break;
@@ -925,7 +954,28 @@ describe("S3: Singer's Jewels Scenario", () => {
     }
 
     expect(earliestSolo).not.toBeNull();
-    expect(earliestSolo).toBeGreaterThanOrEqual(pickupStart);
+    expect(earliestSolo).toBe(pickupStart);
+  });
+
+  it("should support every short-timeline pickup seed", () => {
+    for (const T of [1, 2]) {
+      for (let seed = 0; seed < 30; seed++) {
+        const cfg = {
+          rooms: ["Alpha", "Beta"],
+          edges: [["Alpha", "Beta"]],
+          chars: ["A", "B"],
+          T,
+          mustMove: false,
+          allowStay: true,
+          scenarios: { s3: true },
+          seed,
+        };
+
+        const res = solveAndDecode(cfg);
+        expect(res, `T=${T}, seed=${seed}`).not.toBeNull();
+        expect(res.priv.singers_jewels.pickup_start).toBeLessThanOrEqual(T);
+      }
+    }
   });
 
   it("should work with mustMove constraint using alphabetic room", () => {
@@ -1004,6 +1054,8 @@ describe("S3: Singer's Jewels Scenario", () => {
 
     const visited = res.schedule["Solo"].includes("Room1");
     expect(visited).toBe(true);
+    expect(res.priv.singers_jewels.pickup_start).toBe(1);
+    expect(res.priv.singers_jewels.first_thief_time).toBe(1);
   });
 
   it("should work with many rooms and characters", () => {
@@ -1172,7 +1224,7 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(info.final_holder).toBeTruthy();
   });
 
-  it("should track jewel passing when holder meets exactly one person", () => {
+  it("should track every jewel pass when the holder meets exactly one person", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -1185,7 +1237,7 @@ describe("S3: Singer's Jewels Scenario", () => {
       mustMove: false,
       allowStay: true,
       scenarios: { s3: true },
-      seed: 5110,
+      seed: 0,
     };
 
     const res = solveAndDecode(cfg);
@@ -1193,13 +1245,37 @@ describe("S3: Singer's Jewels Scenario", () => {
     expect(res.priv.singers_jewels).toBeTruthy();
 
     const info = res.priv.singers_jewels;
-    expect(info.passing_chain).toBeTruthy();
-    expect(Array.isArray(info.passing_chain)).toBe(true);
-    expect(info.passing_chain.length).toBeGreaterThanOrEqual(1); // at least the pickup
+    const expectedChain = [
+      {
+        holder: info.first_thief,
+        time: info.first_thief_time,
+        room: info.jewel_room,
+        event: "pickup",
+      },
+    ];
+    let holder = info.first_thief;
+    for (let t = info.first_thief_time - 1; t < cfg.T; t++) {
+      const room = res.schedule[holder][t];
+      const occupants = cfg.chars.filter(
+        (char) => res.schedule[char][t] === room,
+      );
+      if (occupants.length === 2) {
+        const nextHolder = occupants.find((char) => char !== holder);
+        expectedChain.push({
+          from: holder,
+          to: nextHolder,
+          time: t + 1,
+          room,
+          event: "pass",
+        });
+        holder = nextHolder;
+      }
+    }
 
-    // First event should be a pickup
-    expect(info.passing_chain[0].event).toBe("pickup");
-    expect(info.passing_chain[0].holder).toBe(info.first_thief);
+    expect(expectedChain.length).toBeGreaterThan(1);
+    expect(info.passing_chain).toEqual(expectedChain);
+    expect(info.final_holder).toBe(holder);
+    expect(info.total_passes).toBe(expectedChain.length - 1);
   });
 
   it("should identify the first lone visitor as the first thief", () => {
@@ -1223,10 +1299,10 @@ describe("S3: Singer's Jewels Scenario", () => {
 
     const pickupStart = info.pickup_start;
 
-    // Find who actually visited Alpha alone first at or after pickupStart
+    // Find who actually visited Alpha alone first.
     let firstAloneTime = null;
     let loneVisitor = null;
-    for (let t = Math.max(0, pickupStart - 1); t < cfg.T; t++) {
+    for (let t = 0; t < cfg.T; t++) {
       const visitors = cfg.chars.filter(
         (ch) => res.schedule[ch][t] === "Alpha",
       );
@@ -1239,6 +1315,28 @@ describe("S3: Singer's Jewels Scenario", () => {
 
     expect(info.first_thief_time).toBe(firstAloneTime);
     expect(info.first_thief).toBe(loneVisitor);
+    expect(info.first_thief_time).toBe(pickupStart);
+  });
+
+  it("should score the alphabetically first room regardless of input order", () => {
+    const cfg = {
+      rooms: ["Zebra", "Alpha"],
+      chars: ["A", "B", "C"],
+      T: 1,
+      scenarios: { s3: true },
+    };
+    const res = {
+      schedule: {
+        A: ["Alpha"],
+        B: ["Alpha"],
+        C: ["Zebra"],
+      },
+      priv: {
+        singers_jewels: { jewel_room: "Alpha" },
+      },
+    };
+
+    expect(scoreScenario(res, cfg).breakdown.jewels).toBe(80);
   });
 
   it("should have final holder be first thief if no passes occur", () => {
@@ -1392,80 +1490,54 @@ describe("S4: Bomb Duo Scenario", () => {
         ["B", "C"],
       ],
       chars: ["X", "Y", "Z", "W"],
-      T: 5,
+      T: 2,
       mustMove: false,
       allowStay: true,
       scenarios: { s4: true },
       seed: 510,
     };
 
-    testWithThreshold(cfg, (res, cfg) => {
-      const [bomber1, bomber2] = res.priv.bomb_duo;
-
-      // Verify bombers CAN be alone (count = 1 is allowed)
-      let bomber1AloneCount = 0;
-      let bomber2AloneCount = 0;
-
-      for (let t = 0; t < cfg.T; t++) {
-        for (const room of cfg.rooms) {
-          const charsInRoom = cfg.chars.filter(
-            (c) => res.schedule[c][t] === room,
-          );
-
-          if (charsInRoom.length === 1) {
-            if (charsInRoom[0] === bomber1) bomber1AloneCount++;
-            if (charsInRoom[0] === bomber2) bomber2AloneCount++;
-          }
-        }
-      }
-
-      // At least one bomber should be alone at some point (not required, but likely)
-      // This just verifies the constraint allows it
-      expect(bomber1AloneCount + bomber2AloneCount).toBeGreaterThanOrEqual(0);
-    });
+    expectForcedVariablesToBeSatisfiable(cfg, [
+      "A1_X",
+      "A2_Y",
+      "X_X_0_A",
+      "X_Y_0_B",
+      "X_Z_0_B",
+      "X_W_0_B",
+      "X_X_1_A",
+      "X_Y_1_A",
+      "X_Z_1_B",
+      "X_W_1_C",
+    ]);
   });
 
   it("should allow bombers to be in groups of 3+", () => {
     const cfg = {
-      rooms: ["A", "B", "C", "D"],
+      rooms: ["A", "B", "C"],
       edges: [
         ["A", "B"],
         ["B", "C"],
-        ["C", "D"],
       ],
-      chars: ["P", "Q", "R", "S", "T"],
-      T: 5,
+      chars: ["X", "Y", "Z", "W"],
+      T: 2,
       mustMove: false,
       allowStay: true,
       scenarios: { s4: true },
       seed: 520,
     };
 
-    testWithThreshold(cfg, (res, cfg) => {
-      const [bomber1, bomber2] = res.priv.bomb_duo;
-
-      // Count times bombers are together in groups of 3+
-      let bombersInLargeGroup = 0;
-
-      for (let t = 0; t < cfg.T; t++) {
-        for (const room of cfg.rooms) {
-          const charsInRoom = cfg.chars.filter(
-            (c) => res.schedule[c][t] === room,
-          );
-
-          if (
-            charsInRoom.length >= 3 &&
-            charsInRoom.includes(bomber1) &&
-            charsInRoom.includes(bomber2)
-          ) {
-            bombersInLargeGroup++;
-          }
-        }
-      }
-
-      // This is allowed - just verify no constraint violation
-      expect(bombersInLargeGroup).toBeGreaterThanOrEqual(0);
-    });
+    expectForcedVariablesToBeSatisfiable(cfg, [
+      "A1_X",
+      "A2_Y",
+      "X_X_0_A",
+      "X_Y_0_A",
+      "X_Z_0_A",
+      "X_W_0_B",
+      "X_X_1_A",
+      "X_Y_1_A",
+      "X_Z_1_B",
+      "X_W_1_C",
+    ]);
   });
 
   it("should require bombers to be alone together at least once", () => {
@@ -1508,7 +1580,7 @@ describe("S4: Bomb Duo Scenario", () => {
     });
   });
 
-  it("should work with minimum configuration (3 chars, 2 rooms)", () => {
+  it("should work with a small three-character configuration", () => {
     const cfg = {
       rooms: ["A", "B"],
       edges: [["A", "B"]],
@@ -1770,7 +1842,7 @@ describe("S4: Bomb Duo Scenario", () => {
     });
   });
 
-  it("should keep byTime counts aligned with the schedule under S4", () => {
+  it("should work with the true minimum and keep byTime counts aligned", () => {
     const cfg = {
       rooms: ["Workshop"],
       edges: [],
@@ -1804,6 +1876,26 @@ describe("S4: Bomb Duo Scenario", () => {
         }
       }
     }
+  });
+
+  it("should score bomber camouflage and three-person rooms", () => {
+    const cfg = {
+      rooms: ["R1", "R2", "R3"],
+      chars: ["B1", "B2", "C", "D"],
+      T: 2,
+      scenarios: { s4: true },
+    };
+    const res = {
+      schedule: {
+        B1: ["R1", "R1"],
+        B2: ["R1", "R2"],
+        C: ["R1", "R2"],
+        D: ["R2", "R2"],
+      },
+      priv: { bomb_duo: ["B1", "B2"] },
+    };
+
+    expect(scoreScenario(res, cfg).breakdown.bomb).toBe(100);
   });
 });
 
@@ -1991,24 +2083,24 @@ describe("S5: Lovers Scenario", () => {
         ["A", "B"],
         ["B", "C"],
       ],
-      chars: ["L1", "L2", "N1"],
-      T: 4,
+      chars: ["X", "Y", "Z"],
+      T: 2,
       mustMove: false,
       allowStay: true,
       scenarios: { s5: true },
       seed: 1000,
     };
 
-    const res = solveAndDecode(cfg);
-    expect(res).not.toBeNull();
-
-    const [lover1, lover2] = res.priv.lovers;
-
-    // Lovers can be alone (in a room by themselves)
-    // Just verify they're never in the same room
-    for (let t = 0; t < cfg.T; t++) {
-      expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t]);
-    }
+    expectForcedVariablesToBeSatisfiable(cfg, [
+      "L1_X",
+      "L2_Y",
+      "X_X_0_A",
+      "X_Y_0_B",
+      "X_Z_0_B",
+      "X_X_1_A",
+      "X_Y_1_B",
+      "X_Z_1_A",
+    ]);
   });
 
   it("should work with mustMove constraint", () => {
@@ -2213,7 +2305,7 @@ describe("S5: Lovers Scenario", () => {
     });
   });
 
-  it("should work with different seeds producing different lovers", () => {
+  it("should produce valid lovers across different seeds", () => {
     const baseConfig = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -2244,6 +2336,26 @@ describe("S5: Lovers Scenario", () => {
         expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t]);
       }
     }
+  });
+
+  it("should score one- and two-meeting red herrings", () => {
+    const cfg = {
+      rooms: ["X", "Y"],
+      chars: ["L1", "L2", "A", "B"],
+      T: 4,
+      scenarios: { s5: true },
+    };
+    const res = {
+      schedule: {
+        L1: ["X", "X", "X", "X"],
+        L2: ["Y", "Y", "Y", "Y"],
+        A: ["X", "Y", "Y", "Y"],
+        B: ["Y", "X", "X", "Y"],
+      },
+      priv: { lovers: ["L1", "L2"] },
+    };
+
+    expect(scoreScenario(res, cfg).breakdown.lovers).toBe(240);
   });
 });
 
@@ -2332,6 +2444,101 @@ describe("S6: Phantom + Lovers Scenario (S2 + S5)", () => {
         expect(res.schedule[lover1][t]).not.toBe(res.schedule[lover2][t]);
       }
     });
+  });
+
+  it("should make the lovers the only non-phantom pair that never meets", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+      ],
+      chars: ["P", "L1", "L2", "N1", "N2"],
+      T: 5,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s2: true, s5: true },
+      seed: 1530,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const phantom = res.priv.phantom;
+      const loverSet = new Set(res.priv.lovers);
+
+      for (let i = 0; i < cfg.chars.length; i++) {
+        for (let j = i + 1; j < cfg.chars.length; j++) {
+          const c1 = cfg.chars[i];
+          const c2 = cfg.chars[j];
+          const met = res.schedule[c1].some(
+            (room, t) => room === res.schedule[c2][t],
+          );
+
+          if (c1 === phantom || c2 === phantom) {
+            expect(met).toBe(false);
+          } else if (loverSet.has(c1) && loverSet.has(c2)) {
+            expect(met).toBe(false);
+          } else {
+            expect(met).toBe(true);
+          }
+        }
+      }
+    });
+  });
+
+  it.each([
+    [
+      "fewer than four characters",
+      { rooms: ["A", "B", "C"], chars: ["A", "B", "C"], T: 2 },
+      "S6 requires at least 4 characters",
+    ],
+    [
+      "fewer than three rooms",
+      { rooms: ["A", "B"], chars: ["A", "B", "C", "D"], T: 2 },
+      "S6 requires at least 3 rooms",
+    ],
+    [
+      "fewer than two timesteps",
+      { rooms: ["A", "B", "C"], chars: ["A", "B", "C", "D"], T: 1 },
+      "S6 requires at least 2 timesteps",
+    ],
+  ])("should reject %s", (_, invalid, message) => {
+    const cfg = {
+      ...invalid,
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+      ],
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s2: true, s5: true },
+      seed: 1540,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(message);
+  });
+
+  it("should exclude phantom pairs from lovers difficulty scoring", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      chars: ["P", "L1", "L2", "N"],
+      T: 2,
+      scenarios: { s2: true, s5: true },
+    };
+    const res = {
+      schedule: {
+        P: ["A", "A"],
+        L1: ["B", "B"],
+        L2: ["C", "C"],
+        N: ["B", "C"],
+      },
+      priv: {
+        phantom: "P",
+        lovers: ["L1", "L2"],
+      },
+    };
+
+    expect(scoreScenario(res, cfg).breakdown.lovers).toBe(160);
   });
 });
 
@@ -2505,6 +2712,40 @@ describe("S7: Aggrosassin Scenario", () => {
     expect(res.priv.victims).toBeTruthy();
   });
 
+  it("should enforce the minimum-two kill quota when T=2", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X", "Y", "Z"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7031,
+    };
+
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    expect(res.priv.victims).toHaveLength(2);
+  });
+
+  it("should reject too few distinct victims for the kill quota", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X", "Y"],
+      T: 2,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s7: true },
+      seed: 7032,
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S7 requires at least as many potential victims as required kills",
+    );
+  });
+
   it("should track all unique victims", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
@@ -2643,7 +2884,7 @@ describe("S7: Aggrosassin Scenario", () => {
     });
   });
 
-  it("should allow aggrosassin to be any character (not just first)", () => {
+  it("should allow every character to be the aggrosassin", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -2658,19 +2899,32 @@ describe("S7: Aggrosassin Scenario", () => {
       seed: 7060,
     };
 
-    // Run multiple times with different seeds to verify aggrosassin can be different characters
-    const aggrosassins = new Set();
-    for (let seed = 7060; seed < 7070; seed++) {
-      const testCfg = { ...cfg, seed };
-      const res = solveAndDecode(testCfg);
-      if (res) {
-        aggrosassins.add(res.priv.aggrosassin);
-      }
+    for (const char of cfg.chars) {
+      expectForcedVariablesToBeSatisfiable(cfg, [`AGG_${char}`]);
     }
+  });
 
-    // Should have found at least 2 different aggrosassins across seeds
-    // (not guaranteed, but very likely with 10 different seeds)
-    expect(aggrosassins.size).toBeGreaterThan(0);
+  it("should score victims and large-group camouflage independently", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      chars: ["Agg", "V1", "V2", "Other"],
+      T: 3,
+      scenarios: { s7: true },
+    };
+    const res = {
+      schedule: {
+        Agg: ["A", "B", "A"],
+        V1: ["A", "A", "A"],
+        V2: ["B", "B", "A"],
+        Other: ["C", "C", "B"],
+      },
+      priv: {
+        aggrosassin: "Agg",
+        victims: ["V1", "V2"],
+      },
+    };
+
+    expect(scoreScenario(res, cfg).breakdown.aggrosassin).toBe(21);
   });
 });
 
@@ -2700,6 +2954,71 @@ describe("S8: Freeze Scenario", () => {
       const victims = res.priv.freeze_victims || [];
       expect(new Set(victims).size).toBe(victims.length);
     });
+  });
+
+  it("should require distinct first-time freezes at every selected timestep", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["Ari", "Bea", "Cal", "Dee", "Eli", "Flo"],
+      T: 7,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 8005,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const requiredCount = res.priv.freeze_required_kills;
+      const requiredTimes = res.priv.freeze_required_times;
+      const firstKills = res.priv.freeze_kills || [];
+      const firstKillByTime = new Map(
+        firstKills.map((kill) => [kill.time, kill]),
+      );
+
+      expect(requiredCount).toBeGreaterThanOrEqual(1);
+      expect(requiredCount).toBeLessThanOrEqual(3);
+      expect(requiredTimes).toHaveLength(requiredCount);
+      expect(new Set(requiredTimes).size).toBe(requiredCount);
+      expect(firstKills.length).toBeGreaterThanOrEqual(requiredCount);
+
+      const requiredVictims = requiredTimes.map((time) => {
+        expect(time).toBeLessThan(cfg.T);
+        expect(firstKillByTime.has(time)).toBe(true);
+        return firstKillByTime.get(time).victim;
+      });
+      expect(new Set(requiredVictims).size).toBe(requiredCount);
+    });
+  });
+
+  it("should allow additional victims beyond the one-to-three required freezes", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["Ari", "Bea", "Cal", "Dee", "Eli", "Flo"],
+      T: 7,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s8: true },
+      seed: 0,
+    };
+
+    expectForcedVariablesToBeSatisfiable(cfg, [
+      "FRZKill_Bea_Dee_0_C",
+      "FRZKill_Bea_Ari_1_B",
+      "FRZKill_Bea_Flo_3_D",
+      "FRZKill_Bea_Eli_6_A",
+    ]);
   });
 
   it("should let allowStay override mustMove", () => {
@@ -2961,6 +3280,8 @@ describe("S8: Freeze Scenario", () => {
     expect(res.priv.freeze).toBeTruthy();
     expect(res.priv.freeze_kills).toBeTruthy();
     expect(res.priv.freeze_kills.length).toBeGreaterThan(0);
+    expect(res.priv.freeze_required_kills).toBe(1);
+    expect(res.priv.freeze_required_times).toHaveLength(1);
   });
 
   it("should have at least one freeze kill", () => {
@@ -2992,43 +3313,27 @@ describe("S8: Freeze Scenario", () => {
       edges: [
         ["A", "B"],
         ["B", "C"],
+        ["C", "A"],
       ],
-      chars: ["Freeze", "Victim", "Bystander"],
+      chars: ["Other", "Freeze", "Victim", "Visitor"],
       T: 5,
       mustMove: false,
       allowStay: true,
       scenarios: { s8: true },
-      seed: 8900,
+      seed: 0,
     };
 
-    testWithThreshold(cfg, (res, cfg) => {
-      const freeze = res.priv.freeze;
-      const kills = res.priv.freeze_kills || [];
-
-      if (kills.length > 0) {
-        const kill = kills[0];
-        const victim = kill.victim;
-        const freezeRoom = kill.room;
-        const freezeTime = kill.time - 1;
-
-        // Victim is frozen in freezeRoom from freezeTime onward
-        for (let t = freezeTime; t < cfg.T; t++) {
-          expect(res.schedule[victim][t]).toBe(freezeRoom);
-        }
-
-        // Other characters can still visit that room
-        // (no constraint preventing this)
-        // Just verify the victim stays put
-        let victimMoved = false;
-        for (let t = freezeTime; t < cfg.T - 1; t++) {
-          if (res.schedule[victim][t] !== res.schedule[victim][t + 1]) {
-            victimMoved = true;
-            break;
-          }
-        }
-        expect(victimMoved).toBe(false);
-      }
-    });
+    expectForcedVariablesToBeSatisfiable(cfg, [
+      "FRZKill_Freeze_Victim_0_A",
+      "X_Freeze_0_A",
+      "X_Victim_0_A",
+      "X_Other_0_B",
+      "X_Visitor_0_C",
+      "X_Freeze_1_B",
+      "X_Victim_1_A",
+      "X_Visitor_1_A",
+      "X_Other_1_C",
+    ]);
   });
 
   it("should track kill records with correct time and room", () => {
@@ -3069,6 +3374,32 @@ describe("S8: Freeze Scenario", () => {
         expect(charsInRoom).toContain(kill.victim);
       }
     });
+  });
+
+  it("should score victims more heavily than non-Freeze red herrings", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      chars: ["Freeze", "V1", "V2", "V3"],
+      T: 2,
+      scenarios: { s8: true },
+    };
+    const res = {
+      schedule: {
+        Freeze: ["A", "A"],
+        V1: ["A", "B"],
+        V2: ["B", "B"],
+        V3: ["B", "A"],
+      },
+      priv: {
+        freeze: "Freeze",
+        freeze_kills: [
+          { victim: "V1", time: 1, room: "A" },
+          { victim: "V3", time: 2, room: "A" },
+        ],
+      },
+    };
+
+    expect(scoreScenario(res, cfg).breakdown.freeze).toBe(210);
   });
 });
 
@@ -3215,7 +3546,7 @@ describe("Edge Cases", () => {
 });
 
 describe("S9: Doctor freeze scenario", () => {
-  it("ensures frozen characters thaw mid-game", () => {
+  it("ensures every frozen character thaws and moves immediately", () => {
     const cfg = {
       rooms: ["Atrium", "Lab", "Ward"],
       edges: [
@@ -3235,28 +3566,110 @@ describe("S9: Doctor freeze scenario", () => {
       expect(res.priv.frozen).toBeTruthy();
       expect(res.priv.frozen).not.toContain(res.priv.doctor);
       expect(res.priv.heals).toBeTruthy();
-      expect(res.priv.heals.length).toBeGreaterThan(0);
+      expect(res.priv.heals).toHaveLength(res.priv.frozen.length);
 
-      const healTimes = res.priv.heals.map((h) => h.time);
-      expect(healTimes.some((t) => t > 1)).toBe(true);
-      expect(healTimes.some((t) => t < cfg.T)).toBe(true);
+      for (const character of res.priv.frozen) {
+        const characterHeals = res.priv.heals.filter(
+          (heal) => heal.character === character,
+        );
+        expect(characterHeals).toHaveLength(1);
 
-      for (const { character, time, room } of res.priv.heals) {
-        const idx = time - 1;
-        expect(res.schedule[character][idx]).toBe(room);
-        expect(res.schedule[res.priv.doctor][idx]).toBe(room);
+        const { time, room } = characterHeals[0];
+        const healIndex = time - 1;
+        const startRoom = res.schedule[character][0];
+        expect(time).toBeGreaterThan(1);
+        expect(time).toBeLessThan(cfg.T);
+        expect(res.schedule[character][healIndex]).toBe(room);
+        expect(res.schedule[res.priv.doctor][healIndex]).toBe(room);
+
+        for (let t = 0; t <= healIndex; t++) {
+          expect(res.schedule[character][t]).toBe(startRoom);
+        }
+        expect(res.schedule[character][healIndex + 1]).not.toBe(startRoom);
       }
+    });
+  });
 
-      const movedFrozen = res.priv.frozen.filter(
-        (ch) => res.schedule[ch][0] !== res.schedule[ch][cfg.T - 1],
-      );
-      expect(movedFrozen.length).toBeGreaterThan(0);
+  it("supports the three-timestep minimum with a middle heal", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
+      chars: ["Doc", "P1", "P2", "P3"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 1,
+    };
 
-      const showcase = movedFrozen[0];
-      expect(res.schedule[showcase][0]).toBe(res.schedule[showcase][1]);
-      expect(res.schedule[showcase][cfg.T - 1]).not.toBe(
-        res.schedule[showcase][0],
+    const res = solveAndDecode(cfg);
+    expect(res).not.toBeNull();
+    for (const { character, time } of res.priv.heals) {
+      expect(time).toBe(2);
+      expect(res.schedule[character][1]).toBe(res.schedule[character][0]);
+      expect(res.schedule[character][2]).not.toBe(res.schedule[character][1]);
+    }
+  });
+
+  it("rejects configurations below the documented minimums", () => {
+    const base = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["Doctor", "Patient"],
+      T: 3,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 2,
+    };
+
+    expect(() => solveAndDecode({ ...base, T: 2 })).toThrow(
+      "S9 requires at least three timesteps",
+    );
+    expect(() => solveAndDecode({ ...base, chars: ["Doctor"] })).toThrow(
+      "S9 requires at least two characters",
+    );
+    expect(() => solveAndDecode({ ...base, rooms: ["A"], edges: [] })).toThrow(
+      "S9 requires at least two rooms",
+    );
+  });
+
+  it("honors mustMove before and after frozen characters thaw", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+      ],
+      chars: ["Ari", "Bea", "Cal", "Dee", "Eli", "Flo"],
+      T: 6,
+      mustMove: true,
+      allowStay: false,
+      scenarios: { s9: true, s9FrozenRatio: 0.5 },
+      seed: 510,
+    };
+
+    testWithThreshold(cfg, (res, cfg) => {
+      const frozen = new Set(res.priv.frozen);
+      const healIndexByCharacter = new Map(
+        res.priv.heals.map((heal) => [heal.character, heal.time - 1]),
       );
+
+      for (const character of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          const stays =
+            res.schedule[character][t] === res.schedule[character][t + 1];
+          const waitingForHeal =
+            frozen.has(character) && t < healIndexByCharacter.get(character);
+          expect(stays).toBe(waitingForHeal);
+        }
+      }
     });
   });
 
@@ -3312,6 +3725,68 @@ describe("S9: Doctor freeze scenario", () => {
       expect(frozenCount).toBeGreaterThanOrEqual(minFrozen);
       expect(frozenCount).toBeLessThanOrEqual(maxFrozen);
     });
+  });
+
+  it("allows every character to be the doctor", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "A"],
+      ],
+      chars: ["Ari", "Bea", "Cal", "Dee"],
+      T: 4,
+      mustMove: false,
+      allowStay: true,
+      scenarios: { s9: true },
+      seed: 520,
+    };
+
+    for (const character of cfg.chars) {
+      expectForcedVariablesToBeSatisfiable(cfg, [`S9Doctor_${character}`]);
+    }
+  });
+
+  it("scores more frozen victims and clustered heals as harder", () => {
+    const cfg = {
+      chars: ["Doctor", "A", "B", "C"],
+      T: 5,
+      scenarios: { s9: true },
+    };
+    const oneFrozen = {
+      priv: {
+        doctor: "Doctor",
+        frozen: ["A"],
+        heals: [{ character: "A", time: 3, room: "A" }],
+      },
+    };
+    const clustered = {
+      priv: {
+        doctor: "Doctor",
+        frozen: ["A", "B"],
+        heals: [
+          { character: "A", time: 3, room: "A" },
+          { character: "B", time: 3, room: "A" },
+        ],
+      },
+    };
+    const spread = {
+      priv: {
+        doctor: "Doctor",
+        frozen: ["A", "B"],
+        heals: [
+          { character: "A", time: 2, room: "A" },
+          { character: "B", time: 4, room: "B" },
+        ],
+      },
+    };
+
+    const oneFrozenScore = scoreScenario(oneFrozen, cfg).breakdown.doctor;
+    const clusteredScore = scoreScenario(clustered, cfg).breakdown.doctor;
+    const spreadScore = scoreScenario(spread, cfg).breakdown.doctor;
+    expect(clusteredScore).toBeGreaterThan(oneFrozenScore);
+    expect(clusteredScore).toBeGreaterThan(spreadScore);
   });
 });
 
@@ -5167,7 +5642,9 @@ describe("S19: Crowded Alibi", () => {
         for (const room of cfg.rooms) counts[room] = 0;
         for (const ch of cfg.chars) counts[res.schedule[ch][t]]++;
         const maxSize = Math.max(...Object.values(counts));
-        const maxRooms = Object.keys(counts).filter((r) => counts[r] === maxSize);
+        const maxRooms = Object.keys(counts).filter(
+          (r) => counts[r] === maxSize,
+        );
         expect(maxRooms).toContain(res.schedule[celeb][t]);
       }
 

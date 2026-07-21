@@ -6,7 +6,7 @@ A deduction game where players ask questions about character movements through r
 
 ## Quick Links
 
-- **[Scenario Generator](scenario_handler_gpt.html)** - Generate mystery scenarios with configurable difficulty
+- **[Scenario Generator](scenario_generator.html)** - Generate mystery scenarios with configurable difficulty
 - **[Digital Note Sheet](digital-note-sheet.html)** - Interactive note-taking tool for tracking deductions during gameplay
 
 ## How the Game Works
@@ -50,7 +50,7 @@ Players must deduce the secret scenario by combining:
 **Mystery**: One character poisoned someone at a specific time and location.
 
 **Rules**:
-- The assassin is always the **first character** in your character list (by default "A")
+- The assassin is always the **first character** in your character list
 - Exactly one victim (not the assassin) was poisoned
 - At exactly one (time, room) pair (the "poison moment"):
   - The assassin and victim are both present
@@ -86,12 +86,15 @@ Players must deduce the secret scenario by combining:
 ---
 
 ### S3: The Singer's Jewels
-**Mystery**: A priceless necklace keeps changing hands. The first thief is the first person to reach the alphabetically first room **alone** (the “Dance Hall”), and any time the holder meets exactly one other person, the jewels pass.
+**Mystery**: A priceless necklace keeps changing hands. The first thief is the first person to reach the alphabetically first room **alone**, and any time the holder meets exactly one other person, the jewels pass.
 
 **Rules**:
-- The alphabetically earliest room is visited **alone** by some character at least once, ensuring a single, well-defined first thief
+- A hidden pickup time is chosen from the first three timesteps (or the available timesteps when the timeline is shorter)
+- No one may visit the alphabetically earliest room alone before that pickup time
+- At the pickup time, exactly one character visits that room alone and becomes the first thief
+- In a one-character game, the pickup happens at the first timestep
 - Group visits to that room (2+ people at the same timestep) are allowed but do **not** steal the jewels
-- Beyond the guaranteed solo visit, schedules remain unconstrained; the passing narrative is left for downstream clue logic
+- After pickup, the jewels pass whenever the current holder shares a room with exactly one other character
 
 **Goal**: Track who entered the key room and build the story of how the jewels moved.
 
@@ -127,14 +130,14 @@ Players must deduce the secret scenario by combining:
 - The lovers are distinct (L1 ≠ L2)
 - The lovers NEVER share a room at any timestep:
   - For ALL (time, room) pairs: L1 and L2 are never both present
-- **Every pair of non-lovers must meet at least once**:
+- **Every pair other than the lover pair must meet at least once**:
   - For any two characters who are NOT both lovers, they must share a room at some (time, room) pair
-  - This ensures all non-lovers encounter each other at least once
+  - This ensures each lover meets every non-lover, and all non-lovers meet each other
   - The lovers themselves never meet each other
 
 **Goal**: Identify the two lovers.
 
-**Difficulty Factors**: Other character pairs who rarely meet (but do meet at least once) create confusion about who the actual lovers are. Pairs that meet exactly once are strong red herrings. Difficulty scoring adds 100 points to pairs that never meet, 80 points to pairs that meet exactly once, and 40 points to pairs that meet only twice.
+**Difficulty Factors**: Other character pairs who rarely meet (but do meet at least once) create confusion about who the actual lovers are. Pairs that meet exactly once are strong red herrings. Difficulty scoring adds 80 points to pairs that meet exactly once and 40 points to pairs that meet exactly twice.
 
 ---
 
@@ -151,14 +154,15 @@ Players must deduce the secret scenario by combining:
   - The lovers NEVER share a room at any timestep
   - The lovers are distinct from the phantom
   - **Neither lover can be the phantom** (phantom is always alone, so can't have a relationship)
-- **Every pair of non-phantom, non-lovers must meet at least once**:
-  - For any two characters who are NOT lovers AND NOT the phantom, they must share a room at some point
-  - This ensures all "regular" characters encounter each other
+- **Every pair of non-phantom characters other than the lover pair must meet at least once**:
+  - Each lover must meet every regular character, and all regular characters must meet each other
   - The phantom is excluded from this requirement (they never meet anyone)
+
+**Requirements**: At least 4 characters, 3 rooms, and 2 timesteps.
 
 **Goal**: Identify the phantom and the two lovers.
 
-**Difficulty Factors**: The phantom is easy to identify (always alone). The two lovers must avoid each other while still meeting all other non-phantom characters. Other pairs who rarely meet create confusion about who the lovers are.
+**Difficulty Factors**: The phantom is easy to identify (always alone). The two lovers must avoid each other while still meeting all other non-phantom characters. Other pairs who rarely meet create confusion about who the lovers are. Lover difficulty scoring ignores all pairs containing the phantom.
 
 ---
 
@@ -191,9 +195,9 @@ Players must deduce the secret scenario by combining:
 - The aggrosassin is not marked (unlike S1 where it's always the first character), so players must deduce who it is from the pattern
 - The "half of timesteps" constraint ensures consistent killing behavior, making the pattern more detectable
 
-**Scoring**: Difficulty = (number of victims × 10) + (total 2-person meetings in entire scenario)
+**Scoring**: Difficulty = (number of victims × 10) + camouflage points
 - More victims increases difficulty significantly (heavily weighted)
-- More kill moments (each 2-person meeting) also raises the score
+- Whenever the aggrosassin appears in a group of 3+, that appearance adds one camouflage point for each person beyond a two-person group
 
 ---
 
@@ -205,20 +209,21 @@ Players must deduce the secret scenario by combining:
 - Whenever the Freeze shares a room with exactly **one** other person, that person is frozen
 - Frozen characters remain in that room for all remaining timesteps (even if `mustMove=true`)
 - **Randomized kill constraints**: The scenario randomly requires:
-  - Between 1-3 kills to occur
-  - Specific timesteps where kills must happen (excluding the final timestep)
+  - Between 1-3 distinct, first-time freezes (capped by the available victims and non-final timesteps)
+  - Specific timesteps where those first-time freezes must happen (excluding the final timestep)
+  - Additional victims may be frozen outside the required set, so the final victim count can exceed 3
   - This creates variety - some scenarios have early kills, others have kills spread throughout
 - Frozen victims can be visited later, but they never move again
 
 **Goal**: Identify Mr. Freeze and list every frozen victim (with their freeze moments).
 
 **Difficulty Factors**:
-- More frozen victims make the pattern more obvious (easier to identify)
+- More frozen victims make the Freeze easier to identify, but make reconstructing every victim and freeze moment harder
 - 1-on-1 meetings between non-Freeze characters act as red herrings and increase difficulty
 - The randomized kill timing creates unpredictable patterns across different scenarios
 
 **Scoring**: Difficulty = (number of victims × 100) + (non-Freeze 1-on-1 meetings × 5)
-- More victims significantly increase difficulty (heavily weighted)
+- Victim reconstruction is weighted more heavily than how quickly the Freeze becomes identifiable
 - Red herring 1-on-1 meetings between non-Freeze characters add moderate difficulty
 
 ---
@@ -229,10 +234,11 @@ Players must deduce the secret scenario by combining:
 **Rules**:
 - Exactly one doctor exists (randomly chosen)
 - At least one character begins frozen in place for the first timestep
-- The doctor must perform **at least one heal** that is **not** on the first or last timestep
+- Every character who begins frozen remains in their starting room until the doctor heals them
+- Every frozen character is healed exactly once, and heals never happen on the first or last timestep
 - Healing happens in-room: a frozen victim must share the room with the doctor when healed
-- Frozen characters thaw mid-game and are required to **leave their starting room** after being healed
-- Frozen characters may still move after thawing, even if `mustMove` was disabled (the scenario enforces post-heal movement)
+- A healed character must **leave their starting room on the immediately following timestep**, even if `mustMove` was disabled
+- With `mustMove=true`, unfrozen and already-thawed characters must move normally; only characters who are still frozen may stay in place
 
 **Goal**: Identify the doctor, list who started frozen, and note the heal times/rooms when they were thawed.
 
@@ -240,6 +246,8 @@ Players must deduce the secret scenario by combining:
 - More frozen victims and multiple heal moments increase the amount of timeline bookkeeping
 - Heals clustered in the middle timesteps create overlapping movements that are harder to trace
 - Forced post-heal movement generates extra paths that can mask who was frozen first
+
+**Scoring**: Difficulty = 80 + (number of frozen characters × 40) + clustering bonuses. Each additional heal on the same timestep adds 15 points.
 
 ---
 
@@ -471,7 +479,7 @@ Enable one scenario:
 - **S3 (Singer's Jewels)**: No configuration needed
 - **S4 (Bomb)**: No configuration needed (bombers automatically share a private 1-on-1 moment)
 - **S5 (Lovers)**: No configuration needed
-- **S6 (Phantom + Lovers)**: No configuration needed
+- **S6 (Phantom + Lovers)**: Requires at least 4 characters, 3 rooms, and 2 timesteps
 - **S7 (Aggrosassin)**: No configuration needed
 - **S8 (The Freeze)**: No configuration needed
 - **S9 (Doctor's Cure)**: No configuration needed
@@ -516,7 +524,7 @@ bun run dev
 ```
 
 Then open your browser to:
-- **Scenario Generator**: http://localhost:3000/scenario_handler_gpt.html
+- **Scenario Generator**: http://localhost:3000/scenario_generator.html
 - **Note Sheet**: http://localhost:3000/digital-note-sheet.html
 
 **Note**: The generator works perfectly on GitHub Pages without any build step. The dev server is only needed for local development.
@@ -576,7 +584,7 @@ The **note-sheet.html** file provides an interactive note-taking tool designed f
 
 ### Intended Workflow
 
-1. **Generate a scenario** using the main generator (scenario_handler_gpt.html)
+1. **Generate a scenario** using the main generator (scenario_generator.html)
 2. **Open note-sheet.html** in a separate tab/window
 3. **As you ask questions**, record information:
    - Shared counts go in the visit tracking table
