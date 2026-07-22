@@ -25,32 +25,46 @@ function hasConfiguredValue(value) {
   return value !== null && value !== undefined && value !== "";
 }
 
-function canVisitEveryRoomWithin(rooms, edges, timesteps) {
-  if (!rooms.length || timesteps < rooms.length) return false;
+function canVisitDistinctRoomsWithin(rooms, edges, timesteps, targetRoomCount) {
+  if (
+    !rooms.length ||
+    targetRoomCount < 1 ||
+    targetRoomCount > rooms.length ||
+    timesteps < targetRoomCount
+  ) {
+    return false;
+  }
 
   const { nbr } = neighbors(rooms, edges ?? [], false);
-  const reachable = new Set([0]);
-  const queue = [0];
-  while (queue.length) {
-    const room = queue.shift();
-    for (const next of nbr[room]) {
-      if (reachable.has(next)) continue;
-      reachable.add(next);
-      queue.push(next);
+  let largestComponent = 0;
+  const globallyVisited = new Set();
+  for (let start = 0; start < rooms.length; start++) {
+    if (globallyVisited.has(start)) continue;
+    const component = new Set([start]);
+    const queue = [start];
+    globallyVisited.add(start);
+    while (queue.length) {
+      const room = queue.shift();
+      for (const next of nbr[room]) {
+        if (component.has(next)) continue;
+        component.add(next);
+        globallyVisited.add(next);
+        queue.push(next);
+      }
     }
+    largestComponent = Math.max(largestComponent, component.size);
   }
-  if (reachable.size !== rooms.length) return false;
+  if (largestComponent < targetRoomCount) return false;
 
-  // A depth-first traversal can cover any connected map in at most 2R-1
-  // timesteps. Only shorter timelines need the exact bounded search below.
-  if (timesteps >= 2 * rooms.length - 1) return true;
+  // A depth-first traversal can cover any connected set of N rooms in at most
+  // 2N-1 timesteps. Only shorter timelines need the exact search below.
+  if (timesteps >= 2 * targetRoomCount - 1) return true;
 
-  const fullMask = (1n << BigInt(rooms.length)) - 1n;
   const memo = new Set();
 
   function search(room, stepsRemaining, visitedMask, visitedCount) {
-    if (visitedMask === fullMask) return true;
-    if (visitedCount + stepsRemaining < rooms.length) return false;
+    if (visitedCount >= targetRoomCount) return true;
+    if (visitedCount + stepsRemaining < targetRoomCount) return false;
 
     const key = `${room}|${stepsRemaining}|${visitedMask}`;
     if (memo.has(key)) return false;
@@ -83,6 +97,106 @@ function canVisitEveryRoomWithin(rooms, edges, timesteps) {
     if (search(start, timesteps - 1, 1n << BigInt(start), 1)) return true;
   }
   return false;
+}
+
+function reachableStartRooms(rooms, edges, destination, maxMoves) {
+  if (!rooms.includes(destination) || maxMoves < 1) return [];
+
+  const { idx, nbr } = neighbors(rooms, edges ?? [], false);
+  const destinationIndex = idx.get(destination);
+  const distances = Array(rooms.length).fill(Infinity);
+  distances[destinationIndex] = 0;
+  const queue = [destinationIndex];
+
+  while (queue.length) {
+    const room = queue.shift();
+    for (const next of nbr[room]) {
+      if (distances[next] !== Infinity) continue;
+      distances[next] = distances[room] + 1;
+      queue.push(next);
+    }
+  }
+
+  return rooms.filter(
+    (room, index) => room !== destination && distances[index] <= maxMoves,
+  );
+}
+
+function findHeavySofaExplanations(schedule, rooms, edges, chars) {
+  const destination = [...rooms].sort()[0];
+  const edgeKeys = new Set();
+  for (const [a, b] of edges ?? []) {
+    if (!rooms.includes(a) || !rooms.includes(b)) continue;
+    edgeKeys.add(`${a}\u0000${b}`);
+    edgeKeys.add(`${b}\u0000${a}`);
+  }
+  const timesteps = chars.length ? schedule[chars[0]].length : 0;
+  const explanations = [];
+
+  for (let first = 0; first < chars.length; first++) {
+    for (let second = first + 1; second < chars.length; second++) {
+      const carrier1 = chars[first];
+      const carrier2 = chars[second];
+
+      for (let pickup = 0; pickup < timesteps; pickup++) {
+        const startRoom = schedule[carrier1][pickup];
+        if (
+          startRoom === destination ||
+          schedule[carrier2][pickup] !== startRoom
+        ) {
+          continue;
+        }
+
+        // Pickup is the start of the carriers' uninterrupted journey together.
+        // If it is not Time 1, they must have been separated immediately before.
+        if (
+          pickup > 0 &&
+          schedule[carrier1][pickup - 1] === schedule[carrier2][pickup - 1]
+        ) {
+          continue;
+        }
+
+        const occupants = chars.filter(
+          (character) => schedule[character][pickup] === startRoom,
+        );
+        if (
+          occupants.length !== 2 ||
+          !occupants.includes(carrier1) ||
+          !occupants.includes(carrier2)
+        ) {
+          continue;
+        }
+
+        const path = [];
+        let valid = true;
+        for (let time = pickup; time < timesteps; time++) {
+          const room = schedule[carrier1][time];
+          if (schedule[carrier2][time] !== room || path.includes(room)) {
+            valid = false;
+            break;
+          }
+          if (
+            path.length > 0 &&
+            !edgeKeys.has(`${path[path.length - 1]}\u0000${room}`)
+          ) {
+            valid = false;
+            break;
+          }
+          path.push(room);
+        }
+
+        if (!valid || path[path.length - 1] !== destination) continue;
+        explanations.push({
+          carriers: [carrier1, carrier2].sort(),
+          start_room: startRoom,
+          pickup_time: pickup + 1,
+          path,
+        });
+      }
+    }
+  }
+
+  return explanations;
 }
 
 export function validateScenarioConfig(config) {
@@ -132,9 +246,93 @@ export function validateScenarioConfig(config) {
         `S15 requires at least ${roomCount} timesteps so first place can visit every room`,
       );
     }
-    if (!canVisitEveryRoomWithin(config.rooms, config.edges, config.T)) {
+    if (
+      !canVisitDistinctRoomsWithin(
+        config.rooms,
+        config.edges,
+        config.T,
+        roomCount,
+      )
+    ) {
       throw new Error(
         `S15 map must allow a route through every room within ${config.T} timesteps`,
+      );
+    }
+  }
+
+  if (scenarios.s16) {
+    const roomCount = config.rooms?.length ?? 0;
+    const characterCount = config.chars?.length ?? 0;
+
+    if (characterCount < 2) {
+      throw new Error("S16 requires at least 2 characters");
+    }
+    if (roomCount < characterCount) {
+      throw new Error("S16 requires at least as many rooms as characters");
+    }
+    if (!Number.isInteger(config.T) || config.T < characterCount) {
+      throw new Error(
+        `S16 requires at least ${characterCount} timesteps so one character can visit ${characterCount} rooms`,
+      );
+    }
+    if (
+      !canVisitDistinctRoomsWithin(
+        config.rooms,
+        config.edges,
+        config.T,
+        characterCount,
+      )
+    ) {
+      throw new Error(
+        `S16 map must allow a route through ${characterCount} distinct rooms within ${config.T} timesteps`,
+      );
+    }
+  }
+
+  if (scenarios.s17) {
+    if ((config.chars?.length ?? 0) < 4) {
+      throw new Error("S17 requires at least 4 characters");
+    }
+    if (!Number.isInteger(config.T) || config.T < 2) {
+      throw new Error(
+        "S17 requires at least 2 timesteps for a meeting and a separation",
+      );
+    }
+  }
+
+  if (scenarios.s18) {
+    const rooms = config.rooms ?? [];
+    if (rooms.length < 2) {
+      throw new Error("S18 requires at least 2 rooms");
+    }
+    if ((config.chars?.length ?? 0) < 2) {
+      throw new Error("S18 requires at least 2 characters");
+    }
+    if (!Number.isInteger(config.T) || config.T < 2) {
+      throw new Error("S18 requires at least 2 timesteps");
+    }
+
+    const destination = [...rooms].sort()[0];
+    if (
+      !reachableStartRooms(rooms, config.edges, destination, config.T - 1)
+        .length
+    ) {
+      throw new Error(
+        `S18 requires a non-destination room that can reach ${destination} within ${config.T - 1} moves`,
+      );
+    }
+  }
+
+  if (scenarios.s19) {
+    if ((config.rooms?.length ?? 0) < 3) {
+      throw new Error("S19 requires at least 3 rooms");
+    }
+    if ((config.chars?.length ?? 0) < 3) {
+      throw new Error("S19 requires at least 3 characters");
+    }
+    if (!Number.isInteger(config.T) || config.T < 2) {
+      throw new Error(
+        "S19 requires at least 2 timesteps so the reveal can be followed by another elimination opportunity",
       );
     }
   }
@@ -663,12 +861,6 @@ export function buildCNF(config) {
 
   let s16Setup = null;
   if (config.scenarios && config.scenarios.s16) {
-    if (C.length < 2) {
-      throw new Error("S16 requires at least 2 characters");
-    }
-
-    const maxDistinctVisits = Math.min(R.length, T);
-    const maxUniqueRanks = Math.min(maxDistinctVisits, C.length);
     const rng = mulberry32(resolvedSeed);
 
     const shuffled = [...C];
@@ -678,27 +870,17 @@ export function buildCNF(config) {
     }
 
     const visitCountAssignments = {};
-    const visitCountTargets = Array.from({ length: maxUniqueRanks }, (_, i) =>
-      Math.max(1, maxDistinctVisits - i),
+    const visitCountTargets = Array.from(
+      { length: C.length },
+      (_, index) => C.length - index,
     );
-    if (!visitCountTargets.includes(1)) {
-      visitCountTargets[visitCountTargets.length - 1] = 1;
-    }
-    const minReachableCount = Math.max(
-      1,
-      visitCountTargets[visitCountTargets.length - 1],
-    );
-    while (visitCountTargets.length < shuffled.length) {
-      visitCountTargets.push(minReachableCount);
-    }
 
     for (let i = 0; i < shuffled.length; i++) {
       visitCountAssignments[shuffled[i]] = visitCountTargets[i];
     }
 
-    const homebodyIndex = visitCountTargets.indexOf(minReachableCount);
-    const homebody = shuffled[Math.max(0, homebodyIndex)];
-    const minVisitCount = Math.min(...visitCountTargets);
+    const minVisitCount = 1;
+    const homebody = shuffled[visitCountTargets.indexOf(minVisitCount)];
 
     s16Setup = {
       visitCountAssignments,
@@ -931,8 +1113,6 @@ export function buildCNF(config) {
   // S17: Triple Alibi — three specific characters must meet as a trio at least once,
   // and no other trio of 3 characters may meet in the same room at the same time
   if (config.scenarios && config.scenarios.s17) {
-    if (C.length < 3) throw new Error("S17 requires at least 3 characters");
-
     const rng = mulberry32(resolvedSeed);
 
     // Randomly select 3 characters to form the alibi trio
@@ -943,10 +1123,6 @@ export function buildCNF(config) {
     }
     const trio = [shuffled[0], shuffled[1], shuffled[2]].sort();
     const trioIndices = trio.map((ch) => C.indexOf(ch));
-    const trioKey = trioIndices
-      .slice()
-      .sort((a, b) => a - b)
-      .join(",");
 
     // The special trio must meet alone at least once (no other characters present)
     // Create helper variable M_t_r = trio meets alone in room r at time t
@@ -980,6 +1156,18 @@ export function buildCNF(config) {
       }
     }
     clauses.push(allMeetings); // At least one is true
+
+    // The trio must also be visibly separated at least once; otherwise a trio
+    // that simply moves as one unit for the whole night is too trivial.
+    const apartTimes = [];
+    for (let t = 0; t < T; t++) {
+      const apart = vp.get(`S17_APART_${t}`);
+      apartTimes.push(apart);
+      for (let ri = 0; ri < R.length; ri++) {
+        clauses.push([-apart, -X(ti0, t, ri), -X(ti1, t, ri), -X(ti2, t, ri)]);
+      }
+    }
+    clauses.push(apartTimes);
 
     // Detect rooms with exactly three people: only the trio is allowed
     for (let t = 0; t < T; t++) {
@@ -2034,18 +2222,22 @@ export function buildCNF(config) {
 
   // S18: Heavy Sofa — two carriers must move sofa from start room to alphabetically first room
   if (config.scenarios && config.scenarios.s18) {
-    if (R.length < 2) throw new Error("S18 requires at least 2 rooms");
-    if (C.length < 2) throw new Error("S18 requires at least 2 characters");
-
     const rng = mulberry32(resolvedSeed);
 
     // Destination is alphabetically first room
     const destRoom = [...R].sort()[0];
     const destIdx = Ridx.get(destRoom);
 
-    // Pick a random start room (not the destination)
-    const nonDestRooms = R.filter((r) => r !== destRoom);
-    const startRoom = nonDestRooms[Math.floor(rng() * nonDestRooms.length)];
+    // Pick only from starts that can reach the destination before the timeline
+    // ends. This prevents a seeded but impossible story on disconnected maps.
+    const validStartRooms = reachableStartRooms(
+      R,
+      config.edges,
+      destRoom,
+      T - 1,
+    );
+    const startRoom =
+      validStartRooms[Math.floor(rng() * validStartRooms.length)];
     const startIdx = Ridx.get(startRoom);
 
     // Pick two random carriers
@@ -2164,17 +2356,33 @@ export function buildCNF(config) {
       }
     }
 
+    // Pickup marks the start of the carriers' uninterrupted journey together.
+    // Unless they pick up at Time 1, they must be in different rooms one turn
+    // earlier. This makes later points on the same journey ineligible as a
+    // second apparent pickup time.
+    for (let t = 1; t < T; t++) {
+      for (let ri = 0; ri < R.length; ri++) {
+        clauses.push([
+          CARRYING(t - 1),
+          -CARRYING(t),
+          -X(c1Idx, t - 1, ri),
+          -X(c2Idx, t - 1, ri),
+        ]);
+      }
+    }
+
     privKeys.S18 = { carrier1, carrier2, startRoom, destRoom };
   }
 
   // S19: Crowded Alibi — one celebrity is in a max-sized group every timestep
   if (config.scenarios && config.scenarios.s19) {
-    if (R.length < 2) throw new Error("S19 requires at least 2 rooms");
-    if (C.length < 3) throw new Error("S19 requires at least 3 characters");
-
     const rng = mulberry32(resolvedSeed);
     const celeb = C[Math.floor(rng() * C.length)];
     const celebIdx = C.indexOf(celeb);
+    // The first unique maximum cannot be the final timestep in the minimum
+    // configuration: at least one later turn is needed to eliminate whichever
+    // non-celebrity shares the reveal crowd with the celebrity.
+    const revealTime = Math.floor(rng() * (T - 1));
 
     // Build occupancy counters for each (t, room)
     const occ = Array.from({ length: T }, () => Array(R.length).fill(null));
@@ -2218,21 +2426,39 @@ export function buildCNF(config) {
       }
     }
 
-    // Require at least one timestep where the celebrity's room is the unique maximum
-    const uniqueMaxChoices = [];
-    for (let t = 0; t < T; t++) {
+    // Before the designated reveal, the celebrity's maximum-sized room must be
+    // tied with at least one other room. These helpers are implications because
+    // the containing disjunction forces one valid tied-room witness per turn.
+    for (let t = 0; t < revealTime; t++) {
+      const tieChoices = [];
       for (let ri = 0; ri < R.length; ri++) {
-        const uniq = vp.get(`S19_UNIQUE_${t}_${R[ri]}`);
-        uniqueMaxChoices.push(uniq);
-        clauses.push([-uniq, X(celebIdx, t, ri)]);
         for (let rj = 0; rj < R.length; rj++) {
-          if (rj === ri) continue;
-          const gt = roomGreaterThan(t, ri, rj);
-          clauses.push([-uniq, gt]);
+          if (ri === rj) continue;
+          const tie = vp.get(`S19_TIE_${t}_${R[ri]}_${R[rj]}`);
+          tieChoices.push(tie);
+          clauses.push([-tie, X(celebIdx, t, ri)]);
+          for (let k = 0; k < C.length; k++) {
+            clauses.push([-tie, -occ[t][ri][k], occ[t][rj][k]]);
+            clauses.push([-tie, -occ[t][rj][k], occ[t][ri][k]]);
+          }
         }
       }
+      clauses.push(tieChoices);
     }
-    if (uniqueMaxChoices.length) clauses.push(uniqueMaxChoices);
+
+    // At the chosen reveal timestep, the celebrity's room is the unique maximum.
+    const uniqueMaxChoices = [];
+    for (let ri = 0; ri < R.length; ri++) {
+      const uniq = vp.get(`S19_UNIQUE_${revealTime}_${R[ri]}`);
+      uniqueMaxChoices.push(uniq);
+      clauses.push([-uniq, X(celebIdx, revealTime, ri)]);
+      for (let rj = 0; rj < R.length; rj++) {
+        if (rj === ri) continue;
+        const gt = roomGreaterThan(revealTime, ri, rj);
+        clauses.push([-uniq, gt]);
+      }
+    }
+    clauses.push(uniqueMaxChoices);
 
     // No other character can be in a max-sized room every timestep
     for (let ci = 0; ci < C.length; ci++) {
@@ -2260,7 +2486,7 @@ export function buildCNF(config) {
       if (escapeMoments.length) clauses.push(escapeMoments);
     }
 
-    privKeys.S19 = { celebrity: celeb };
+    privKeys.S19 = { celebrity: celeb, revealTime };
   }
 
   return { vp, clauses, privKeys };
@@ -2277,7 +2503,12 @@ export function solveAndDecode(cfg) {
   const { vp, clauses, privKeys } = buildCNF(cfg);
   const numVars = vp.count();
   const solveStartTime = Date.now();
-  const sol = satSolve(clauses, numVars, seed);
+  // S19 already uses the scenario seed to choose the celebrity, reveal time,
+  // and shuffled room order. A fixed SAT branch order avoids coupling those
+  // choices to a particularly expensive symmetric search while preserving the
+  // scenario's seeded variety and determinism.
+  const solverSeed = cfg.scenarios?.s19 ? 0 : seed;
+  const sol = satSolve(clauses, numVars, solverSeed);
   const solveTime = Date.now() - solveStartTime;
   if (!sol) return null;
 
@@ -2798,19 +3029,41 @@ export function solveAndDecode(cfg) {
       }
     }
 
+    const explanations = findHeavySofaExplanations(schedule, R, cfg.edges, C);
+    const expectedCarriers = [carrier1, carrier2].sort();
+    const expectedPath = journey.map((entry) => entry.room);
+    const explanation = explanations[0];
+    const selectedStoryIsUnique =
+      explanations.length === 1 &&
+      explanation.pickup_time === pickupTime &&
+      explanation.start_room === startRoom &&
+      explanation.carriers.every(
+        (carrier, index) => carrier === expectedCarriers[index],
+      ) &&
+      explanation.path.length === expectedPath.length &&
+      explanation.path.every((room, index) => room === expectedPath[index]);
+
+    // Ambiguous schedules are unsuitable as deduction puzzles. The generator
+    // samples multiple seeded schedules, so returning null here makes it skip
+    // this candidate and retain only stories with one complete explanation.
+    if (!selectedStoryIsUnique) return null;
+
     priv.heavy_sofa = {
-      carriers: [carrier1, carrier2].sort(),
+      carriers: expectedCarriers,
       start_room: startRoom,
       destination: destRoom,
       pickup_time: pickupTime,
       journey: journey,
-      path: journey.map((j) => j.room),
+      path: expectedPath,
+      sofa_positions: sofaPositions,
+      carrying_timeline: carryingStates,
+      explanation_count: explanations.length,
     };
   }
 
   // S19: Crowded Alibi decoding
   if (privKeys.S19) {
-    const celebrity = privKeys.S19.celebrity;
+    const { celebrity, revealTime } = privKeys.S19;
 
     const maxTimeline = [];
     const missedMax = {};
@@ -2818,7 +3071,7 @@ export function solveAndDecode(cfg) {
       if (ch !== celebrity) missedMax[ch] = [];
     }
 
-    let uniqueReveal = null;
+    const uniqueReveals = [];
 
     for (let t = 0; t < T; t++) {
       const counts = {};
@@ -2838,8 +3091,8 @@ export function solveAndDecode(cfg) {
         if (!maxRooms.includes(schedule[ch][t])) missedMax[ch].push(t + 1);
       }
 
-      if (!uniqueReveal && maxRooms.length === 1 && celebRoom === maxRooms[0]) {
-        uniqueReveal = { time: t + 1, room: maxRooms[0], size: maxSize };
+      if (maxRooms.length === 1 && celebRoom === maxRooms[0]) {
+        uniqueReveals.push({ time: t + 1, room: maxRooms[0], size: maxSize });
       }
 
       maxTimeline.push({
@@ -2851,10 +3104,16 @@ export function solveAndDecode(cfg) {
       });
     }
 
+    const uniqueReveal = uniqueReveals.find(
+      (reveal) => reveal.time === revealTime + 1,
+    );
+
     priv.crowded_alibi = {
       celebrity,
       max_timeline: maxTimeline,
       unique_reveal: uniqueReveal,
+      unique_reveals: uniqueReveals,
+      designated_reveal_time: revealTime + 1,
       missed_max: missedMax,
     };
   }

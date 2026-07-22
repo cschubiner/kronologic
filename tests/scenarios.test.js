@@ -4682,17 +4682,18 @@ describe("S15: World Travelers", () => {
 });
 
 describe("S16: Homebodies", () => {
-  it("should assign tapering visit counts and repeat the minimum when needed", () => {
+  it("should assign every exact visit count from 1 through N", () => {
     const cfg = {
-      rooms: ["A", "B", "C", "D"],
+      rooms: ["A", "B", "C", "D", "E"],
       edges: [
         ["A", "B"],
         ["B", "C"],
         ["C", "D"],
-        ["D", "A"],
+        ["D", "E"],
+        ["E", "A"],
       ],
       chars: ["W", "X", "Y", "Z", "Q"],
-      T: 6,
+      T: 7,
       scenarios: { s16: true },
       seed: 1600,
     };
@@ -4700,13 +4701,7 @@ describe("S16: Homebodies", () => {
     testWithThreshold(cfg, (res, cfg) => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
-      const expectedTargets = [
-        Math.min(cfg.rooms.length, cfg.T),
-        Math.min(cfg.rooms.length, cfg.T) - 1,
-        Math.min(cfg.rooms.length, cfg.T) - 2,
-        1,
-        1,
-      ];
+      const expectedTargets = [5, 4, 3, 2, 1];
       expect(hb.visit_count_targets).toEqual(expectedTargets);
       for (const ch of cfg.chars) {
         expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
@@ -4717,10 +4712,9 @@ describe("S16: Homebodies", () => {
       const sortedTargets = Object.values(hb.visit_count_assignments).sort(
         (a, b) => a - b,
       );
-      expect(sortedActual).toEqual(sortedTargets);
-      expect(Math.min(...hb.visit_count_targets)).toBe(
-        hb.actual_visit_counts[hb.homebody],
-      );
+      expect(sortedActual).toEqual([1, 2, 3, 4, 5]);
+      expect(sortedTargets).toEqual(sortedActual);
+      expect(hb.actual_visit_counts[hb.homebody]).toBe(1);
     });
   });
 
@@ -4746,7 +4740,7 @@ describe("S16: Homebodies", () => {
     });
   });
 
-  it("should cap visit counts at min(rooms, T) rather than character count", () => {
+  it("should base the highest visit count on character count, not room count", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
       edges: [
@@ -4765,12 +4759,11 @@ describe("S16: Homebodies", () => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
       const counts = Object.values(hb.actual_visit_counts);
-      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
-      expect(counts).toContain(1);
+      expect(counts.sort((a, b) => a - b)).toEqual([1, 2, 3]);
     });
   });
 
-  it("should still solve when there are more characters than timesteps", () => {
+  it("should reject timelines too short for the 1-through-N ranking", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D", "E", "F"],
       edges: [
@@ -4787,15 +4780,9 @@ describe("S16: Homebodies", () => {
       seed: 16001,
     };
 
-    testWithThreshold(cfg, (res) => {
-      const hb = res.priv.homebodies;
-      expect(hb).toBeTruthy();
-      expect(hb.visit_count_targets).toEqual([5, 4, 3, 2, 1, 1]);
-      for (const ch of cfg.chars) {
-        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
-      }
-      expect(Object.values(hb.actual_visit_counts)).toContain(1);
-    });
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S16 requires at least 6 timesteps so one character can visit 6 rooms",
+    );
   });
 
   it("should have homebody stay in same room all timesteps", () => {
@@ -4884,7 +4871,7 @@ describe("S16: Homebodies", () => {
     });
   });
 
-  it("should allow repeated minimum counts when rooms are scarce", () => {
+  it("should reject maps with fewer rooms than characters", () => {
     const cfg = {
       rooms: ["A", "B"],
       edges: [["A", "B"]],
@@ -4894,15 +4881,9 @@ describe("S16: Homebodies", () => {
       seed: 1605,
     };
 
-    testWithThreshold(cfg, (res, cfg) => {
-      const hb = res.priv.homebodies;
-      expect(hb).toBeTruthy();
-      const targets = hb.visit_count_targets;
-      expect(targets).toEqual([2, 1, 1]);
-      for (const ch of cfg.chars) {
-        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
-      }
-    });
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S16 requires at least as many rooms as characters",
+    );
   });
 
   it("should reject configs with fewer than 2 characters", () => {
@@ -4942,8 +4923,7 @@ describe("S16: Homebodies", () => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
       const counts = Object.values(hb.actual_visit_counts);
-      expect(counts).toContain(Math.min(...hb.visit_count_targets));
-      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
+      expect(counts.sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
     });
   });
 
@@ -4970,14 +4950,14 @@ describe("S16: Homebodies", () => {
       expect(hb.ranking[0]).toBe(hb.homebody);
       // Verify ranking is sorted by visit count
       for (let i = 0; i < hb.ranking.length - 1; i++) {
-        expect(hb.actual_visit_counts[hb.ranking[i]]).toBeLessThanOrEqual(
+        expect(hb.actual_visit_counts[hb.ranking[i]]).toBeLessThan(
           hb.actual_visit_counts[hb.ranking[i + 1]],
         );
       }
     });
   });
 
-  it("should allow many rooms but limit top traveler to reachable timesteps", () => {
+  it("should not inflate the ranking when there are extra rooms", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D", "E", "F", "G", "H"],
       edges: [
@@ -5000,33 +4980,27 @@ describe("S16: Homebodies", () => {
       const hb = res.priv.homebodies;
       expect(hb).toBeTruthy();
       const counts = Object.values(hb.actual_visit_counts);
-      expect(Math.max(...counts)).toBe(Math.min(cfg.rooms.length, cfg.T));
+      expect(counts.sort((a, b) => a - b)).toEqual([1, 2, 3]);
     });
   });
 
-  it("should reuse the minimum count when timesteps limit distinct visits", () => {
+  it("should reject a map that cannot visit N distinct rooms in time", () => {
     const cfg = {
-      rooms: ["A", "B", "C", "D", "E"],
+      rooms: ["A", "B", "C", "D"],
       edges: [
         ["A", "B"],
-        ["B", "C"],
-        ["C", "D"],
-        ["D", "E"],
+        ["A", "C"],
+        ["A", "D"],
       ],
-      chars: ["O", "P", "Q"],
-      T: 2,
+      chars: ["O", "P", "Q", "R"],
+      T: 4,
       scenarios: { s16: true },
       seed: 1611,
     };
 
-    testWithThreshold(cfg, (res) => {
-      const hb = res.priv.homebodies;
-      expect(hb).toBeTruthy();
-      expect(hb.visit_count_targets).toEqual([2, 1, 1]);
-      for (const ch of cfg.chars) {
-        expect(hb.actual_visit_counts[ch]).toBe(hb.visit_count_assignments[ch]);
-      }
-    });
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S16 map must allow a route through 4 distinct rooms within 4 timesteps",
+    );
   });
 
   it("should honor visit caps when timesteps are tight but sufficient", () => {
@@ -5052,6 +5026,38 @@ describe("S16: Homebodies", () => {
       expect(counts).toContain(1);
     });
   });
+
+  it("should score visits to the homebody's room as added difficulty", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      chars: ["X", "Y", "Z"],
+      T: 3,
+      scenarios: { s16: true },
+    };
+    const withSchedule = (schedule) => ({
+      schedule,
+      priv: {
+        homebodies: {
+          homebody: "X",
+          actual_visit_counts: { X: 1, Y: 2, Z: 3 },
+        },
+      },
+    });
+    const quiet = withSchedule({
+      X: ["A", "A", "A"],
+      Y: ["B", "C", "B"],
+      Z: ["C", "B", "C"],
+    });
+    const noisy = withSchedule({
+      X: ["A", "A", "A"],
+      Y: ["B", "A", "B"],
+      Z: ["C", "A", "C"],
+    });
+
+    expect(scoreScenario(noisy, cfg).breakdown.homebodies).toBeGreaterThan(
+      scoreScenario(quiet, cfg).breakdown.homebodies,
+    );
+  });
 });
 
 describe("S17: Triple Alibi", () => {
@@ -5063,7 +5069,7 @@ describe("S17: Triple Alibi", () => {
         ["B", "C"],
         ["A", "C"],
       ],
-      chars: ["X", "Y", "Z"],
+      chars: ["W", "X", "Y", "Z"],
       T: 4,
       scenarios: { s17: true },
       seed: 1700,
@@ -5149,7 +5155,7 @@ describe("S17: Triple Alibi", () => {
     });
   });
 
-  it("should work with exactly 3 characters", () => {
+  it("should reject exactly 3 characters because there is no outsider", () => {
     const cfg = {
       rooms: ["A", "B", "C"],
       edges: [
@@ -5163,12 +5169,9 @@ describe("S17: Triple Alibi", () => {
       seed: 1702,
     };
 
-    testWithThreshold(cfg, (res, cfg) => {
-      const ta = res.priv.triple_alibi;
-      expect(ta).toBeTruthy();
-      // All 3 characters ARE the trio
-      expect(new Set(ta.trio)).toEqual(new Set(cfg.chars));
-    });
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S17 requires at least 4 characters",
+    );
   });
 
   it("should obey mandatory movement", () => {
@@ -5186,14 +5189,25 @@ describe("S17: Triple Alibi", () => {
       seed: 1703,
     };
 
-    testWithThreshold(cfg, (res) => {
+    testWithThreshold(cfg, (res, cfg) => {
       const ta = res.priv.triple_alibi;
       expect(ta).toBeTruthy();
       expect(ta.total_meetings).toBeGreaterThanOrEqual(1);
+      for (const ch of cfg.chars) {
+        for (let t = 0; t < cfg.T - 1; t++) {
+          expect(res.schedule[ch][t]).not.toBe(res.schedule[ch][t + 1]);
+        }
+      }
+
+      const trioSeparated = Array.from(
+        { length: cfg.T },
+        (_, t) => new Set(ta.trio.map((ch) => res.schedule[ch][t])),
+      ).some((rooms) => rooms.size > 1);
+      expect(trioSeparated).toBe(true);
     });
   });
 
-  it("should reject scenarios with fewer than 3 characters", () => {
+  it("should reject scenarios with fewer than 4 characters", () => {
     const cfg = {
       rooms: ["A", "B"],
       edges: [["A", "B"]],
@@ -5202,7 +5216,21 @@ describe("S17: Triple Alibi", () => {
       scenarios: { s17: true },
     };
     expect(() => solveAndDecode(cfg)).toThrow(
-      "S17 requires at least 3 characters",
+      "S17 requires at least 4 characters",
+    );
+  });
+
+  it("should require enough time for the trio to meet and separate", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["W", "X", "Y", "Z"],
+      T: 1,
+      scenarios: { s17: true },
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S17 requires at least 2 timesteps for a meeting and a separation",
     );
   });
 
@@ -5214,7 +5242,7 @@ describe("S17: Triple Alibi", () => {
         ["B", "C"],
         ["A", "C"],
       ],
-      chars: ["X", "Y", "Z"],
+      chars: ["W", "X", "Y", "Z"],
       T: 6,
       scenarios: { s17: true },
       seed: 1704,
@@ -5328,6 +5356,24 @@ describe("S17: Triple Alibi", () => {
       }
     });
   });
+
+  it("should score repeated trio meetings as easier than a single meeting", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      chars: ["W", "X", "Y", "Z"],
+      T: 6,
+      scenarios: { s17: true },
+    };
+    const resultWithMeetings = (totalMeetings) => ({
+      priv: { triple_alibi: { total_meetings: totalMeetings } },
+    });
+
+    const oneMeeting = scoreScenario(resultWithMeetings(1), cfg);
+    const threeMeetings = scoreScenario(resultWithMeetings(3), cfg);
+    expect(oneMeeting.breakdown.tripleAlibi).toBeGreaterThan(
+      threeMeetings.breakdown.tripleAlibi,
+    );
+  });
 });
 
 describe("S18: Heavy Sofa", () => {
@@ -5349,8 +5395,10 @@ describe("S18: Heavy Sofa", () => {
       const hs = res.priv.heavy_sofa;
       expect(hs).toBeTruthy();
       expect(hs.destination).toBe("Alpha");
-      // The path should end at the destination
+      expect(hs.sofa_positions).toHaveLength(cfg.T);
+      expect(hs.sofa_positions[cfg.T - 1]).toBe("Alpha");
       expect(hs.path[hs.path.length - 1]).toBe("Alpha");
+      expect(hs.explanation_count).toBe(1);
     });
   });
 
@@ -5383,6 +5431,40 @@ describe("S18: Heavy Sofa", () => {
     });
   });
 
+  it("should allow bystanders to share the carriers' room after pickup", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["P", "Q", "R", "S"],
+      T: 6,
+      scenarios: { s18: true },
+      seed: 1820,
+    };
+
+    const { successful } = testWithThreshold(cfg, () => {});
+    const hasPostPickupBystander = successful.some(({ res }) => {
+      const hs = res.priv.heavy_sofa;
+      const [carrier] = hs.carriers;
+      const others = cfg.chars.filter((ch) => !hs.carriers.includes(ch));
+      for (let t = hs.pickup_time; t < cfg.T; t++) {
+        const carrierRoom = res.schedule[carrier][t];
+        if (others.some((ch) => res.schedule[ch][t] === carrierRoom)) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    expect(hasPostPickupBystander).toBe(true);
+  });
+
   it("should allow carriers to be separate before pickup", () => {
     const cfg = {
       rooms: ["A", "B", "C", "D"],
@@ -5400,11 +5482,15 @@ describe("S18: Heavy Sofa", () => {
       seed: 1802,
     };
 
-    // This test verifies pickup can happen at various times
     testWithThreshold(cfg, (res) => {
       const hs = res.priv.heavy_sofa;
       expect(hs.pickup_time).toBeGreaterThanOrEqual(1);
       expect(hs.pickup_time).toBeLessThanOrEqual(cfg.T);
+      if (hs.pickup_time > 1) {
+        const prior = hs.pickup_time - 2;
+        const [c1, c2] = hs.carriers;
+        expect(res.schedule[c1][prior]).not.toBe(res.schedule[c2][prior]);
+      }
     });
   });
 
@@ -5424,15 +5510,9 @@ describe("S18: Heavy Sofa", () => {
 
     testWithThreshold(cfg, (res) => {
       const hs = res.priv.heavy_sofa;
-      // Before pickup, all journey entries should show same room (start room)
-      const prePickupJourney = hs.journey.filter(
-        (j) => j.time < hs.pickup_time,
-      );
-      if (prePickupJourney.length > 0) {
-        // Should all be the start room
-        prePickupJourney.forEach((j) => {
-          expect(j.room).toBe(hs.start_room);
-        });
+      for (let t = 0; t < hs.pickup_time - 1; t++) {
+        expect(hs.sofa_positions[t]).toBe(hs.start_room);
+        expect(hs.carrying_timeline[t]).toBe(false);
       }
     });
   });
@@ -5452,16 +5532,17 @@ describe("S18: Heavy Sofa", () => {
       seed: 1804,
     };
 
-    testWithThreshold(cfg, (res) => {
+    testWithThreshold(cfg, (res, cfg) => {
       const hs = res.priv.heavy_sofa;
-      // During carrying, sofa must change rooms each timestep
-      // The journey entries during transport should show a different room each time
-      const transportJourney = hs.journey.filter(
-        (j) => j.time >= hs.pickup_time,
+      const edgeKeys = new Set(
+        cfg.edges.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
       );
-      // Each entry represents a room change, so consecutive entries should differ
-      for (let i = 1; i < transportJourney.length; i++) {
-        expect(transportJourney[i].room).not.toBe(transportJourney[i - 1].room);
+      for (let t = hs.pickup_time - 1; t < cfg.T - 1; t++) {
+        const current = hs.sofa_positions[t];
+        const next = hs.sofa_positions[t + 1];
+        expect(next).not.toBe(current);
+        expect(edgeKeys.has(`${current}|${next}`)).toBe(true);
+        expect(hs.carrying_timeline[t]).toBe(true);
       }
     });
   });
@@ -5559,6 +5640,28 @@ describe("S18: Heavy Sofa", () => {
 
       // Path should match journey rooms
       expect(hs.path).toEqual(hs.journey.map((j) => j.room));
+      expect(hs.path).toEqual(
+        hs.sofa_positions.filter(
+          (room, index, positions) =>
+            index === 0 || room !== positions[index - 1],
+        ),
+      );
+    });
+  });
+
+  it("should choose only start rooms that can reach the destination in time", () => {
+    const cfg = {
+      rooms: ["Alpha", "Beta", "Gamma"],
+      edges: [["Alpha", "Beta"]],
+      chars: ["X", "Y", "Z"],
+      T: 2,
+      scenarios: { s18: true },
+      seed: 1811,
+    };
+
+    testWithThreshold(cfg, (res) => {
+      expect(res.priv.heavy_sofa.start_room).toBe("Beta");
+      expect(res.priv.heavy_sofa.explanation_count).toBe(1);
     });
   });
 
@@ -5587,6 +5690,34 @@ describe("S18: Heavy Sofa", () => {
 
     expect(() => solveAndDecode(cfg)).toThrow(
       "S18 requires at least 2 characters",
+    );
+  });
+
+  it("should reject timelines with fewer than 2 timesteps", () => {
+    const cfg = {
+      rooms: ["A", "B"],
+      edges: [["A", "B"]],
+      chars: ["X", "Y"],
+      T: 1,
+      scenarios: { s18: true },
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S18 requires at least 2 timesteps",
+    );
+  });
+
+  it("should reject maps with no reachable non-destination start", () => {
+    const cfg = {
+      rooms: ["Alpha", "Beta", "Gamma"],
+      edges: [["Beta", "Gamma"]],
+      chars: ["X", "Y"],
+      T: 4,
+      scenarios: { s18: true },
+    };
+
+    expect(() => solveAndDecode(cfg)).toThrow(
+      "S18 requires a non-destination room that can reach Alpha within 3 moves",
     );
   });
 });
@@ -5621,9 +5752,17 @@ describe("S19: Crowded Alibi", () => {
           (r) => counts[r] === maxSize,
         );
         expect(maxRooms).toContain(res.schedule[celeb][t]);
+        expect(info.max_timeline[t].size).toBe(maxSize);
+        expect(new Set(info.max_timeline[t].rooms)).toEqual(new Set(maxRooms));
       }
 
       const reveal = info.unique_reveal;
+      expect(reveal.time).toBe(info.designated_reveal_time);
+      expect(reveal.time).toBeLessThan(cfg.T);
+      expect(info.unique_reveals).toContainEqual(reveal);
+      for (let t = 0; t < reveal.time - 1; t++) {
+        expect(info.max_timeline[t].rooms.length).toBeGreaterThan(1);
+      }
       expect(info.max_timeline[reveal.time - 1].rooms.length).toBe(1);
       expect(info.max_timeline[reveal.time - 1].rooms[0]).toBe(
         res.schedule[celeb][reveal.time - 1],
@@ -5652,10 +5791,82 @@ describe("S19: Crowded Alibi", () => {
         if (ch === celeb) continue;
         expect(info.missed_max[ch]?.length || 0).toBeGreaterThan(0);
       }
+
+      const alwaysInMaximum = cfg.chars.filter((ch) =>
+        info.max_timeline.every((moment, t) =>
+          moment.rooms.includes(res.schedule[ch][t]),
+        ),
+      );
+      expect(alwaysInMaximum).toEqual([celeb]);
     });
   });
 
-  it("rejects configs with too few rooms or characters", () => {
+  it("chooses varied seeded reveal times before the final timestep", () => {
+    const cfg = {
+      rooms: ["A", "B", "C", "D"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "A"],
+        ["A", "C"],
+        ["B", "D"],
+      ],
+      chars: ["Ava", "Bea", "Cal", "Dee"],
+      T: 6,
+      scenarios: { s19: true },
+    };
+    const revealTimes = new Set();
+
+    for (let seed = 0; seed < 30; seed++) {
+      const res = solveAndDecode({ ...cfg, seed });
+      expect(res).toBeTruthy();
+      revealTimes.add(res.priv.crowded_alibi.designated_reveal_time);
+    }
+
+    expect(revealTimes.size).toBeGreaterThanOrEqual(3);
+    for (const time of revealTimes) {
+      expect(time).toBeGreaterThanOrEqual(1);
+      expect(time).toBeLessThan(cfg.T);
+    }
+  });
+
+  it("scores later reveals and later first misses as harder", () => {
+    const cfg = {
+      rooms: ["A", "B", "C"],
+      chars: ["Ava", "Bea", "Cal", "Dee"],
+      T: 6,
+      scenarios: { s19: true },
+    };
+    const result = (revealTime, missedMax) => ({
+      priv: {
+        crowded_alibi: {
+          unique_reveal: { time: revealTime, room: "A", size: 2 },
+          missed_max: missedMax,
+        },
+      },
+    });
+    const early = result(1, { Bea: [1, 4], Cal: [2], Dee: [2, 5] });
+    const lateReveal = result(4, {
+      Bea: [1, 4],
+      Cal: [2],
+      Dee: [2, 5],
+    });
+    const lateEliminations = result(1, {
+      Bea: [4, 5],
+      Cal: [5],
+      Dee: [5, 6],
+    });
+
+    expect(
+      scoreScenario(lateReveal, cfg).breakdown.crowdedAlibi,
+    ).toBeGreaterThan(scoreScenario(early, cfg).breakdown.crowdedAlibi);
+    expect(
+      scoreScenario(lateEliminations, cfg).breakdown.crowdedAlibi,
+    ).toBeGreaterThan(scoreScenario(early, cfg).breakdown.crowdedAlibi);
+  });
+
+  it("rejects configs with too few rooms, characters, or timesteps", () => {
     const tooFewRooms = {
       rooms: ["Solo"],
       edges: [],
@@ -5666,19 +5877,38 @@ describe("S19: Crowded Alibi", () => {
     };
 
     const tooFewChars = {
-      rooms: ["A", "B"],
-      edges: [["A", "B"]],
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+      ],
       chars: ["A", "B"],
       T: 3,
       scenarios: { s19: true },
       seed: 1904,
     };
 
+    const tooFewTimesteps = {
+      rooms: ["A", "B", "C"],
+      edges: [
+        ["A", "B"],
+        ["B", "C"],
+        ["A", "C"],
+      ],
+      chars: ["A", "B", "C"],
+      T: 1,
+      scenarios: { s19: true },
+      seed: 1905,
+    };
+
     expect(() => solveAndDecode(tooFewRooms)).toThrow(
-      "S19 requires at least 2 rooms",
+      "S19 requires at least 3 rooms",
     );
     expect(() => solveAndDecode(tooFewChars)).toThrow(
       "S19 requires at least 3 characters",
+    );
+    expect(() => solveAndDecode(tooFewTimesteps)).toThrow(
+      "S19 requires at least 2 timesteps",
     );
   });
 });

@@ -759,7 +759,7 @@ const SCENARIOS = [
   { id: 's14', name: 'Curse of Amarinta', desc: 'Reverse end-of-turn curse swaps to find the original carrier.' },
   { id: 's15', name: 'World Travelers', desc: 'Strictly rank the top 3 travelers by unique rooms visited.' },
   { id: 's16', name: 'Homebodies', desc: 'Each character visits a unique number of rooms.' },
-  { id: 's17', name: 'Triple Alibi', desc: 'Which three characters always meet together?' },
+  { id: 's17', name: 'Triple Alibi', desc: 'Which three characters form the only exclusive trio?' },
   { id: 's18', name: 'Heavy Sofa', desc: 'Who carried the sofa and where did it start?' },
   { id: 's19', name: 'Crowded Alibi', desc: 'Identify the celebrity who always rides the largest group.' }
 ];
@@ -1010,7 +1010,7 @@ function renderPrivateFacts(res, cfg) {
     if (info.unique_reveal) {
       facts.push({
         type: 'crowd',
-        text: `Unique max @ t=${info.unique_reveal.time} in ${info.unique_reveal.room}`
+        text: `Designated unique-max reveal @ t=${info.unique_reveal.time} in ${info.unique_reveal.room}`
       });
     }
     const missPieces = Object.entries(info.missed_max || {})

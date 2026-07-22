@@ -381,7 +381,8 @@ Players must deduce the secret scenario by combining:
 - Each character visits a **unique** number of rooms: 1, 2, 3, ... up to N (where N = number of characters)
 - The **homebody** visits exactly 1 room and stays there the entire game
 - All other characters **must move every turn** (cannot stay in the same room twice in a row)
-- Requires at least as many rooms as characters
+- Requires at least as many rooms and timesteps as characters
+- The map and timeline must allow a moving character to reach N distinct rooms; invalid configurations are rejected instead of repeating visit counts
 
 **Goal**: Determine the complete ranking of who visited how many rooms, and identify the homebody.
 
@@ -395,14 +396,15 @@ Players must deduce the secret scenario by combining:
 
 **Rules**:
 - Three specific characters (the "alibi trio") must meet as a trio **at least once with no other people present**
+- The trio must also be separated at least once; they do not travel together for the entire night
 - **No other trio** of exactly 3 characters may occupy the same room at any timestep
 - Pairs (2 people) and groups of 4+ are allowed
-- Requires at least 3 characters
+- Requires at least 4 characters and 2 timesteps, so the trio must be distinguished from at least one outsider and can both meet and separate
 
 **Goal**: Identify which three characters form the alibi trio.
 
 **Difficulty Factors**:
-- More trio meetings make the puzzle harder (more evidence to sift through)
+- A single trio meeting is hardest to spot; repeated meetings make the trio easier to identify
 - More characters = more possible trios to consider (C choose 3)
 - Movement patterns may reveal the trio based on where they converge
 
@@ -413,10 +415,12 @@ Players must deduce the secret scenario by combining:
 - Two specific characters are the designated carriers
 - The sofa starts in a non-destination room
 - **Pickup**: Both carriers must be alone together (exactly 2 people) in the sofa's room to pick it up
-- **Before pickup**: Sofa stays in place; carriers can be anywhere (separate or together)
+- **Before pickup**: Sofa stays in place; carriers can be anywhere. Unless pickup happens at Time 1, they are separate on the immediately preceding turn
 - **During transport**: Carriers must stay together, move the sofa to an adjacent room each timestep, and never revisit a room
+- Other characters may share the carriers' room after pickup; only the pickup itself must be private
 - The sofa arrives at the alphabetically first room exactly at the final timestep
-- Requires at least 2 rooms and 2 characters
+- The public schedule must have exactly one complete explanation for the carrier pair, start room, pickup time, and path; ambiguous candidates are discarded
+- Requires at least 2 rooms, 2 characters, 2 timesteps, and a non-destination start that can reach the destination in time
 
 **Goal**: Identify the two carriers, where the sofa started, and the path it took.
 
@@ -439,21 +443,25 @@ Players must deduce the secret scenario by combining:
 
 **Rules**:
 - A single **celebrity** is always in a room whose size is **at least** as large as every other room (ties allowed)
-- In **at least one timestep**, the celebrity's room is the **only** largest room (unique maximum)
+- A seeded **reveal timestep** is chosen in advance from the non-final timesteps
+- Before the reveal, the celebrity's room ties with at least one other room for largest
+- At the reveal, the celebrity's room is the **only** largest room (unique maximum)
+- Later unique maximums are allowed so every other suspect can still be eliminated
 - No other character can stay in maximum-sized rooms **every** timestep; each other character has at least one turn in a smaller group
-- Requires at least **2 rooms** and **3 characters**
+- Requires at least **3 rooms**, **3 characters**, **2 timesteps**, and a map that permits the required group changes
 
 **Goal**: Identify the celebrity who rides the biggest crowd for cover.
 
 **Private Info**:
 - Celebrity identity
 - Timeline of maximum room sizes and rooms
-- The timestep with a unique maximum group
+- The designated reveal timestep and every unique-maximum moment
 - Which characters miss the maximum-sized group and when
 
 **Difficulty Factors**:
 - More timesteps create longer maximum-size timelines to analyze
-- Unique maximum happening later makes the reveal subtler
+- A later designated reveal makes the reveal subtler
+- Suspects whose first missed maximum happens later remain plausible longer
 - Larger casts and maps make it harder to track who avoided the max groups
 
 ---
@@ -496,10 +504,10 @@ Enable one scenario:
 - **S13 (Glue Shoes)**: No configuration needed
 - **S14 (Curse of Amarinta)**: No configuration needed
 - **S15 (World Travelers)**: Requires 3+ characters, 4+ rooms, at least one timestep per room, and a map route that can visit every room (5+ rooms with non-podium characters)
-- **S16 (Homebodies)**: No configuration needed (requires rooms ≥ characters)
-- **S17 (Triple Alibi)**: No configuration needed (requires at least 3 characters)
-- **S18 (Heavy Sofa)**: No configuration needed (requires at least 2 rooms and 2 characters)
-- **S19 (Crowded Alibi)**: No configuration needed (requires at least 2 rooms and 3 characters)
+- **S16 (Homebodies)**: No configuration needed (requires rooms and timesteps ≥ characters, plus a route through that many distinct rooms)
+- **S17 (Triple Alibi)**: No configuration needed (requires at least 4 characters and 2 timesteps)
+- **S18 (Heavy Sofa)**: No configuration needed (requires at least 2 rooms, 2 characters, 2 timesteps, and a start that can reach the destination)
+- **S19 (Crowded Alibi)**: No configuration needed (requires at least 3 rooms, 3 characters, 2 timesteps, and a map that permits the required group changes)
 
 ### Difficulty Control
 

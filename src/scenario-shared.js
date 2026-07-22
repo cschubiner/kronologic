@@ -427,14 +427,20 @@ function scoreHomebodies(res, cfg) {
   // Bonus for each unique visit count that must be deduced
   score += chars.length * 10;
 
-  // Check for "close calls" - characters whose visit counts are adjacent
-  // These create interesting deduction opportunities
-  const counts = Object.values(info.actual_visit_counts).sort((a, b) => a - b);
-  for (let i = 0; i < counts.length - 1; i++) {
-    if (counts[i + 1] - counts[i] === 1) {
-      score += 5; // Adjacent counts add complexity
-    }
-  }
+  // The homebody is less obvious when several travelers pass through their
+  // room, especially when those visits create repeated shared-room clues.
+  const homebodyRoom = res.schedule[info.homebody][0];
+  const otherCharacters = chars.filter((ch) => ch !== info.homebody);
+  const otherVisitors = otherCharacters.filter((ch) =>
+    res.schedule[ch].includes(homebodyRoom),
+  );
+  const sharedMoments = otherCharacters.reduce(
+    (total, ch) =>
+      total + res.schedule[ch].filter((room) => room === homebodyRoom).length,
+    0,
+  );
+  score += otherVisitors.length * 30;
+  score += sharedMoments * 5;
 
   return score;
 }
@@ -445,8 +451,9 @@ function scoreTripleAlibi(res, cfg) {
 
   let score = 0;
 
-  // More trio meetings = harder puzzle (more evidence to analyze)
-  score += info.total_meetings * 50;
+  // One exclusive meeting is the sparsest evidence and therefore the hardest
+  // version. Repeated meetings make the trio progressively easier to spot.
+  score += Math.max(0, cfg.T - info.total_meetings + 1) * 50;
 
   // More characters = more potential trios to consider (C choose 3)
   const numChars = cfg.chars.length;
@@ -501,12 +508,14 @@ function scoreCrowdedAlibi(res, cfg) {
     score += 40; // Safety net if unique reveal decoding fails
   }
 
-  // More misses among non-celeb characters create better elimination paths
-  const missCounts = Object.values(info.missed_max || {}).reduce(
-    (sum, times) => sum + times.length,
+  // A suspect remains plausible until their first turn outside a maximum
+  // group. Later first misses are therefore harder; repeated misses after a
+  // suspect has already been eliminated do not add difficulty.
+  const firstMissDifficulty = Object.values(info.missed_max || {}).reduce(
+    (sum, times) => sum + (times[0] ?? 0),
     0,
   );
-  score += missCounts * 5;
+  score += firstMissDifficulty * 5;
 
   // Bigger casts and maps increase the search space
   score += cfg.chars.length * 8;
